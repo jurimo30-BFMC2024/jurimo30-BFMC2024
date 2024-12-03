@@ -60,6 +60,7 @@ from src.data.TrafficCommunication.processTrafficCommunication import processTra
 from src.utils.ipManager.IpReplacement import IPManager
 # ------ New component imports starts here ------#
 
+from src.simulator.SimCom.processSimCom import processSimCom
 # ------ New component imports ends here ------#
 # ======================================== SETTING UP ====================================
 allProcesses = list()
@@ -81,6 +82,7 @@ SerialHandler = False
 
 # ------ New component flags starts here ------#
  
+flagSimCom = False
 # ------ New component flags ends here ------#
 
 # ===================================== SETUP PROCESSES ==================================
@@ -122,6 +124,9 @@ if SerialHandler:
 
 # ------ New component runs starts here ------#
  
+if flagSimCom:
+    processSimCom = processSimCom(queueList, logging, debugging = False)
+    allProcesses.append(processSimCom)
 # ------ New component runs ends here ------#
 
 # ===================================== START PROCESSES ==================================
