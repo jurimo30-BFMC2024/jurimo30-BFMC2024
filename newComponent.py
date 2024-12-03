@@ -86,11 +86,11 @@ def main():
 
     import_index = flag_index = run_index = None
     for i, line in enumerate(lines):
-        if line.strip() == "# ------ New component imports ends here ------":
+        if line.strip() == "# ------ New component imports ends here ------#":
             import_index = i
-        if line.strip() == "# ------ New component flags ends here ------":
+        if line.strip() == "# ------ New component flags ends here ------#":
             flag_index = i
-        if line.strip() == "# ------ New component runs ends here ------":
+        if line.strip() == "# ------ New component runs ends here ------#":
             run_index = i
 
     # Insert in reverse order
