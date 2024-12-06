@@ -17,6 +17,7 @@ from cv_bridge import CvBridge
 import cv2
 import base64
 import numpy as np
+from queue import Queue
 
 class threadSimCom(ThreadWithStop):
     """This thread handles SimCom.
@@ -33,6 +34,8 @@ class threadSimCom(ThreadWithStop):
         self.subscribe()
         super(threadSimCom, self).__init__()
         rospy.init_node('SimCom', anonymous=False)
+        self.feedbackSpeedQueue = Queue()
+        self.feedbackSteerQueue = Queue()
 
     def run(self):
         # Start both threads
@@ -57,6 +60,7 @@ class threadSimCom(ThreadWithStop):
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
         self.commandPublisherRospy = rospy.Publisher('/automobile/command', String, queue_size=1)
+        self.feedbackSubscriberRospy = rospy.Subscriber("/automobile/feedback", String, self.feedbackCallback)
         self.steerMotorSubscriber = messageHandlerSubscriber(self.queuesList, SteerMotor, "lastOnly", True)
         self.speedMotorSubscriber = messageHandlerSubscriber(self.queuesList, SpeedMotor, "lastOnly", True)
 
@@ -66,6 +70,38 @@ class threadSimCom(ThreadWithStop):
         self.serialCameraSubscriberRospy = rospy.Subscriber("/automobile/image_raw/compressed", CompressedImage, self.compressedCameraCallback)
         self.serialCameraSender = messageHandlerSender(self.queuesList, serialCamera)
     
+    def feedbackCallback(self, data):
+        if(data.data == "@1:ack;;"):
+            self.feedbackSpeedQueue.put(True)
+        elif(data.data == "@2:ack;;"):
+            self.feedbackSteerQueue.put(True)
+        else:
+            if self.debugging:
+                self.logging.warning(f"feedback error {data.data}")
+    
+    def sendAndWaitForFeedback(self, commandData, feedbackQueue):
+        """
+        Sends the command and waits for feedback before continuing.
+        If no feedback is received within a timeout, it will resend the command.
+        
+        :param publisher: ros publisher
+        :param command_data: Data to send as a command (either speed or steer).
+        :param feedback_queue: The queue used to wait for feedback (speed or steer feedback queue).
+        """
+        for _ in range(0, 3):
+            # Publish the command
+            self.commandPublisherRospy.publish(json.dumps(commandData))
+            
+            # Wait for feedback with a short timeout
+            try:
+                feedbackQueue.get(timeout=0.1)
+                # If feedback is received, break the loop and proceed
+                return
+            except:
+                pass  # Timeout reached, resend the command if no feedback
+
+        if self.debugging:
+            self.logging.warning(f"Command not sent: {commandData}")
 
     def speedMotorThread(self):
         while self._running:
@@ -73,8 +109,9 @@ class threadSimCom(ThreadWithStop):
             if speedRecv is not None:
                 if self.debugging:
                     self.logging.info(speedRecv)
+
                 command = {"action": "1", "speed": int(speedRecv) / 10}
-                self.commandPublisherRospy.publish(json.dumps(command))
+                self.sendAndWaitForFeedback(command, self.feedbackSpeedQueue)
 
     def steerMotorThread(self):
         while self._running:
@@ -82,8 +119,10 @@ class threadSimCom(ThreadWithStop):
             if steerRecv is not None:
                 if self.debugging:
                     self.logging.info(steerRecv)
+
                 command = {"action": "2", "steerAngle": int(steerRecv)}
-                self.commandPublisherRospy.publish(json.dumps(command))
+                self.sendAndWaitForFeedback(command, self.feedbackSteerQueue)
+
 
     def mainCameraCallback(self, data):
         bridge = CvBridge()
@@ -100,7 +139,8 @@ class threadSimCom(ThreadWithStop):
 
             self.mainCameraSender.send(encodedImageData)
         except Exception as e:
-            print(f"Failed to process image: {e}")
+            if self.debugging:
+                self.logging.warning(f"Failed to process image: {e}")
 
     def compressedCameraCallback(self, data):
         try:
@@ -118,4 +158,5 @@ class threadSimCom(ThreadWithStop):
 
             self.serialCameraSender.send(encodedImageData)
         except Exception as e:
-            print(f"Failed to process image: {e}")
+            if self.debugging:
+                self.logging.warning(f"Failed to process image: {e}")
