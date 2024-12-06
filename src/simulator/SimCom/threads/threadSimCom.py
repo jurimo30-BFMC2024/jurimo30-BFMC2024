@@ -11,6 +11,7 @@ import json
 import rospy
 from sensor_msgs.msg import Image, CompressedImage
 from std_msgs.msg import String
+import threading
 
 from cv_bridge import CvBridge
 import cv2
@@ -34,31 +35,24 @@ class threadSimCom(ThreadWithStop):
         rospy.init_node('SimCom', anonymous=False)
 
     def run(self):
-        # reset position
-        command = {"action": "1", "speed": 0}
-        self.commandPublisherRospy.publish(json.dumps(command))
-        command = {"action": "steer", "steerAngle": 0}
-        self.commandPublisherRospy.publish(json.dumps(command))
+        # Start both threads
+        speed_thread = threading.Thread(target=self.speedMotorThread)
+        steer_thread = threading.Thread(target=self.steerMotorThread)
 
-        while self._running:
-            speedRecv = self.speedMotorSubscriber.receive()
-            if speedRecv is not None: 
-                if self.debugging:
-                    self.logging.info(speedRecv)
-                command = {"action": "1", "speed": int(speedRecv) / 10}
-                self.commandPublisherRospy.publish(json.dumps(command))
+        # Daemon threads will exit when the main program exits
+        speed_thread.daemon = True
+        steer_thread.daemon = True
 
-            steerRecv = self.steerMotorSubscriber.receive()
-            if steerRecv is not None:
-                if self.debugging:
-                    self.logging.info(steerRecv)
-                command = {"action": "steer", "steerAngle": int(steerRecv)}
-                self.commandPublisherRospy.publish(json.dumps(command))
+        # Start threads
+        speed_thread.start()
+        steer_thread.start()
 
-            try:
-                rospy.sleep(.1)
-            except:
-                pass
+        # Keep the main thread alive while the child threads run
+        try:
+            rospy.spin()  # Keeps the node running and listens for callbacks
+        except KeyboardInterrupt:
+            self._running = False  # Stop threads gracefully
+            rospy.loginfo("Shutting down motor control.")
 
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
@@ -71,7 +65,25 @@ class threadSimCom(ThreadWithStop):
         self.mainCameraSender = messageHandlerSender(self.queuesList, mainCamera)
         self.serialCameraSubscriberRospy = rospy.Subscriber("/automobile/image_raw/compressed", CompressedImage, self.compressedCameraCallback)
         self.serialCameraSender = messageHandlerSender(self.queuesList, serialCamera)
-        pass
+    
+
+    def speedMotorThread(self):
+        while self._running:
+            speedRecv = self.speedMotorSubscriber.receiveWithBlock()
+            if speedRecv is not None:
+                if self.debugging:
+                    self.logging.info(speedRecv)
+                command = {"action": "1", "speed": int(speedRecv) / 10}
+                self.commandPublisherRospy.publish(json.dumps(command))
+
+    def steerMotorThread(self):
+        while self._running:
+            steerRecv = self.steerMotorSubscriber.receiveWithBlock()
+            if steerRecv is not None:
+                if self.debugging:
+                    self.logging.info(steerRecv)
+                command = {"action": "2", "steerAngle": int(steerRecv)}
+                self.commandPublisherRospy.publish(json.dumps(command))
 
     def mainCameraCallback(self, data):
         bridge = CvBridge()
