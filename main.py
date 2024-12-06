@@ -125,7 +125,7 @@ if SerialHandler:
 # ------ New component runs starts here ------#
  
 if flagSimCom:
-    processSimCom = processSimCom(queueList, logging, debugging = False)
+    processSimCom = processSimCom(queueList, logging, debugging = True)
     allProcesses.append(processSimCom)
 # ------ New component runs ends here ------#
 
