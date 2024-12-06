@@ -8,7 +8,8 @@ from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 import json
 import rospy
-from sensor_msgs.msg import Image, String
+from sensor_msgs.msg import Image
+from std_msgs.msg import String
 
 class threadSimCom(ThreadWithStop):
     """This thread handles SimCom.
@@ -24,9 +25,18 @@ class threadSimCom(ThreadWithStop):
         self.debugging = debugging
         self.subscribe()
         super(threadSimCom, self).__init__()
+        rospy.init_node('SimCom', anonymous=False)
 
     def run(self):
+        speed = 0
         while self._running:
+            command = {"action": "1", "speed": int(speed)}
+            self.commandPublisherRospy.publish(json.dumps(command))
+            if speed == 0:
+                speed = 2
+            else:
+                speed = 0
+
             speedRecv = self.speedMotorSubscriber.receive()
             if speedRecv is not None: 
                 if self.debugging:
@@ -40,7 +50,13 @@ class threadSimCom(ThreadWithStop):
                     self.logging.info(steerRecv)
                 command = {"action": "steer", "steerAngle": int(steerRecv)}
                 self.commandPublisherRospy.publish(json.dumps(command))
-            rospy.sleep(0.1)  # Adjust loop frequency if needed
+            
+            try:
+                rospy.sleep(2)
+            except rospy.ROSInterruptException:
+                rospy.logwarn("ROS time was interrupted.")
+            except rospy.exceptions.ROSTimeMovedBackwardsException:
+                rospy.logwarn("ROS time moved backwards. Ignoring and continuing.")
 
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
@@ -50,7 +66,7 @@ class threadSimCom(ThreadWithStop):
 
         # steer +-20.5, speed 20
         self.cameraSubscriberRospy = rospy.Subscriber("/automobile/image_raw", Image, self.cameraCallback)
-        self.cameraSender = messageHandlerSender(self.queueList, mainCamera)
+        self.cameraSender = messageHandlerSender(self.queuesList, mainCamera)
         pass
 
     def cameraCallback(self, data):
