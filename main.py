@@ -52,14 +52,15 @@ logging.basicConfig(level=logging.INFO)
 # ===================================== PROCESS IMPORTS ==================================
 
 from src.gateway.processGateway import processGateway
-from src.dashboard.processDashboard import processDashboard
-from src.hardware.camera.processCamera import processCamera
+#from src.dashboard.processDashboard import processDashboard
+#from src.hardware.camera.processCamera import processCamera
 from src.hardware.serialhandler.processSerialHandler import processSerialHandler
 from src.data.Semaphores.Semaphores import processSemaphores
 from src.data.TrafficCommunication.processTrafficCommunication import processTrafficCommunication
 from src.utils.ipManager.IpReplacement import IPManager
 # ------ New component imports starts here ------#
 
+from src.simulator.SimCom.processSimCom import processSimCom
 # ------ New component imports ends here ------#
 # ======================================== SETTING UP ====================================
 allProcesses = list()
@@ -73,7 +74,7 @@ queueList = {
 
 logging = logging.getLogger()
 
-Dashboard = True
+Dashboard = False
 Camera = False
 Semaphores = False
 TrafficCommunication = False
@@ -81,6 +82,7 @@ SerialHandler = False
 
 # ------ New component flags starts here ------#
  
+flagSimCom = True
 # ------ New component flags ends here ------#
 
 # ===================================== SETUP PROCESSES ==================================
@@ -122,6 +124,9 @@ if SerialHandler:
 
 # ------ New component runs starts here ------#
  
+if flagSimCom:
+    processSimCom = processSimCom(queueList, logging, debugging = True)
+    allProcesses.append(processSimCom)
 # ------ New component runs ends here ------#
 
 # ===================================== START PROCESSES ==================================
