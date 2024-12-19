@@ -41,7 +41,11 @@ from src.utils.messages.allMessages import (
     ToggleBatteryLvl,
     ToggleImuData,
     ToggleInstant,
-    ToggleResourceMonitor
+    ToggleResourceMonitor,
+    CoreControl,
+    CoreBrake,
+    CoreSpeedMotor,
+    CoreSteerMotor
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -87,10 +91,10 @@ class threadWrite(ThreadWithStop):
         """Subscribe function. In this function we make all the required subscribe to process gateway"""
 
         self.klSubscriber = messageHandlerSubscriber(self.queuesList, Klem, "lastOnly", True)
-        self.controlSubscriber = messageHandlerSubscriber(self.queuesList, Control, "lastOnly", True)
-        self.steerMotorSubscriber = messageHandlerSubscriber(self.queuesList, SteerMotor, "lastOnly", True)
-        self.speedMotorSubscriber = messageHandlerSubscriber(self.queuesList, SpeedMotor, "lastOnly", True)
-        self.brakeSubscriber = messageHandlerSubscriber(self.queuesList, Brake, "lastOnly", True)
+        self.controlSubscriber = messageHandlerSubscriber(self.queuesList, CoreControl, "lastOnly", True)
+        self.steerMotorSubscriber = messageHandlerSubscriber(self.queuesList, CoreSteerMotor, "lastOnly", True)
+        self.speedMotorSubscriber = messageHandlerSubscriber(self.queuesList, CoreSpeedMotor, "lastOnly", True)
+        self.brakeSubscriber = messageHandlerSubscriber(self.queuesList, CoreBrake, "lastOnly", True)
         self.instantSubscriber = messageHandlerSubscriber(self.queuesList, ToggleInstant, "lastOnly", True)
         self.batterySubscriber = messageHandlerSubscriber(self.queuesList, ToggleBatteryLvl, "lastOnly", True)
         self.resourceMonitorSubscriber = messageHandlerSubscriber(self.queuesList, ToggleResourceMonitor, "lastOnly", True)
