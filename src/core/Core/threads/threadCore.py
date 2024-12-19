@@ -29,7 +29,7 @@ class threadCore(ThreadWithStop):
             mode = self.drivingModeSubscriber.receive()
             if mode is not None:
                 if self.debugging:
-                    self.logging.info(mode)
+                    self.logging.info(f"Control mode received: {mode}")
                     self.mode = mode
 
             if(self.mode == "stop"):
