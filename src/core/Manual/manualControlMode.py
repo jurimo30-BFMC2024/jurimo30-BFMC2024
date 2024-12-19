@@ -1,7 +1,5 @@
-from src.utils.messages.allMessages import (mainCamera)
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
-
 from src.utils.messages.allMessages import (
     Control,
     SteerMotor,
