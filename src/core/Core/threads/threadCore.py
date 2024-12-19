@@ -3,6 +3,7 @@ from src.utils.messages.allMessages import (DrivingMode)
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from Manual.manualControlMode import manualControlMode
+from Stop.stopControlMode import stopControlMode
 from core.Auto.autoFSM import autoFSM
 class threadCore(ThreadWithStop):
     """This thread handles Core.
@@ -20,6 +21,7 @@ class threadCore(ThreadWithStop):
         self.subscribe()
         super(threadCore, self).__init__()
         self.manualMode = manualControlMode(queueList, logging, debugging)
+        self.stopMode = stopControlMode(queueList, logging, debugging)
         self.autoMode = autoFSM(queueList, logging, debugging)
 
     def run(self):
@@ -31,8 +33,7 @@ class threadCore(ThreadWithStop):
                     self.mode = mode
 
             if(self.mode == "stop"):
-                """Stop all movement and turn the wheels to the neutral position"""
-                pass
+                self.stopMode.run()
             elif(self.mode == "manual"):
                 self.manualMode.run()
             elif(self.mode == "auto"):
