@@ -1,8 +1,9 @@
 from src.templates.threadwithstop import ThreadWithStop
-from src.utils.messages.allMessages import (mainCamera)
+from src.utils.messages.allMessages import (DrivingMode)
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from Manual.manualControlMode import manualControlMode
+from core.Auto.autoFSM import autoFSM
 class threadCore(ThreadWithStop):
     """This thread handles Core.
     Args:
@@ -15,14 +16,33 @@ class threadCore(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
+        self.mode = "stop"
         self.subscribe()
         super(threadCore, self).__init__()
         self.manualMode = manualControlMode(queueList, logging, debugging)
+        self.autoMode = autoFSM(queueList, logging, debugging)
 
     def run(self):
         while self._running:
-            self.manualMode.run()
+            mode = self.drivingModeSubscriber.receive()
+            if mode is not None:
+                if self.debugging:
+                    self.logging.info(mode)
+                    self.mode = mode
+
+            if(self.mode == "stop"):
+                """Stop all movement and turn the wheels to the neutral position"""
+                pass
+            elif(self.mode == "manual"):
+                self.manualMode.run()
+            elif(self.mode == "auto"):
+                self.autoMode.run()
+            elif(self.mode == "legacy"):
+                self.mode = "stop"
+                if self.debugging:
+                    self.logging.error("Unsupported driving mode")
 
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
+        self.drivingModeSubscriber = messageHandlerSubscriber(self.queuesList, DrivingMode, "LastOnly", True)
         pass
