@@ -1,0 +1,10 @@
+python3-flask
+python3-flask-socketio
+python3-flask-cors
+python3-psutil
+python3-eventlet
+python3-twisted
+python3-cryptography
+python3-opencv
+python3-serial
+xdg-utils
