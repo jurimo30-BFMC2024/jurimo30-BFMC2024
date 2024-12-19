@@ -61,6 +61,7 @@ from src.utils.ipManager.IpReplacement import IPManager
 # ------ New component imports starts here ------#
 
 from src.simulator.SimCom.processSimCom import processSimCom
+from src.core.Core.processCore import processCore
 # ------ New component imports ends here ------#
 # ======================================== SETTING UP ====================================
 allProcesses = list()
@@ -83,6 +84,7 @@ SerialHandler = False
 # ------ New component flags starts here ------#
  
 flagSimCom = True
+flagCore = False
 # ------ New component flags ends here ------#
 
 # ===================================== SETUP PROCESSES ==================================
@@ -127,6 +129,9 @@ if SerialHandler:
 if flagSimCom:
     processSimCom = processSimCom(queueList, logging, debugging = True)
     allProcesses.append(processSimCom)
+if flagCore:
+    processCore = processCore(queueList, logging, debugging = False)
+    allProcesses.append(processCore)
 # ------ New component runs ends here ------#
 
 # ===================================== START PROCESSES ==================================
