@@ -6,7 +6,11 @@ from src.utils.messages.allMessages import (
     Control,
     SteerMotor,
     SpeedMotor,
-    Brake
+    Brake,
+    CoreBrake,
+    CoreControl,
+    CoreSpeedMotor,
+    CoreSteerMotor
 )
 
 class manualControlMode():
@@ -14,6 +18,12 @@ class manualControlMode():
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
+
+        self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
+        self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
+        self.brakeMotorSender = messageHandlerSender(self.queuesList, CoreBrake)
+        self.controlMotorSender = messageHandlerSender(self.queuesList, CoreControl)
+
         self.subscribe()
 
     def subscribe(self):
@@ -25,9 +35,13 @@ class manualControlMode():
     def run(self):
         if(self.speedMotorSubscriber.isDataInPipe):
             speedRecv = self.speedMotorSubscriber.receive
+            self.speedMotorSender.send(speedRecv)
         if(self.steerMotorSubscriber.isDataInPipe):
             steerRecv = self.steerMotorSubscriber.receive
+            self.steerMotorSender.send(steerRecv)
         if(self.brakeSubscriber.isDataInPipe):
-            speedRecv = self.brakeSubscriber.receive
+            brakeRecv = self.brakeSubscriber.receive
+            self.brakeMotorSender.send(brakeRecv)
         if(self.controlSubscriber.isDataInPipe):
-            speedRecv = self.controlSubscriber.receive
+            controlRecv = self.controlSubscriber.receive
+            self.controlMotorSender.send(controlRecv)
