@@ -19,18 +19,18 @@ class LaneFollow():
         self.subscribe()
 
     def getControlData(self):
-        angle = self.laneDetectSubscriber.receiveWithBlock()
-        speed = 5
+        angle = int(self.laneDetectSubscriber.receiveWithBlock() * 20)
+        speed = 100
 
         if self.debugging:
             self.logging.info(f"Lane detect out: {angle}")
 
-        if angle > 24.0:
-            angle = 24.0
-        if angle < -24.0:
-            angle = -24.0
+        if angle > 240:
+            angle = 240
+        if angle < -240:
+            angle = -240
 
-        return int(angle), int(speed)
+        return angle, speed
 
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
