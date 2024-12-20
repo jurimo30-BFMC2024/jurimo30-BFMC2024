@@ -85,6 +85,13 @@ class LaneKeeping(Enum):
     msgID = 5
     msgType = "int"
 
+#dodata poruka za detekciju linije
+class LaneDetect(Enum):
+    Queue = "General"
+    Owner = "threadLaneDetect"
+    msgID = 6
+    msgType = "float"
+
 ################################# processCarsAndSemaphores ##################################
 class Cars(Enum):
     Queue = "General"
