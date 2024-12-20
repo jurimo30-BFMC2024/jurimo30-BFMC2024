@@ -164,7 +164,8 @@ class threadLaneDetect(ThreadWithStop):
                 #text = f"Drzis pravac"
             
             #cv2.putText(frame, text, (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (52, 85, 235), 2)
-
+        else:
+            self.logging.warning("Angle is not found")
         
         # Crtanje kontura na frejmu
         # frame_with_contours = self.draw_contours(frame, contours)
