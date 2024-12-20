@@ -23,9 +23,9 @@ class autoFSM():
         self.subscribe()
 
     def run(self):
-        if self.getTime() - self.lastTimeRun < 50:
-            return
-        self.lastTimeRun = self.getTime()
+        # if self.getTime() - self.lastTimeRun < 50:
+        #     return
+        # self.lastTimeRun = self.getTime()
 
         angle, speed = self.laneFollowData.getControlData()
 
@@ -40,6 +40,8 @@ class autoFSM():
             self.oldSpeed = speed
             if self.debugging:
                 self.logging.info(f"New speed: {speed}")
+        
+        time.sleep(0.05)
 
     def getTime(self):
         return round(time.time()*1000)
