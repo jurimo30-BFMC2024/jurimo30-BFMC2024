@@ -62,6 +62,7 @@ from src.utils.ipManager.IpReplacement import IPManager
 
 from src.simulator.SimCom.processSimCom import processSimCom
 from src.ImageProcessing.LaneDetect.processLaneDetect import processLaneDetect
+from src.core.Core.processCore import processCore
 # ------ New component imports ends here ------#
 # ======================================== SETTING UP ====================================
 allProcesses = list()
@@ -85,6 +86,7 @@ SerialHandler = False
  
 flagSimCom = True
 flagLaneDetect = True
+flagCore = False
 # ------ New component flags ends here ------#
 
 # ===================================== SETUP PROCESSES ==================================
@@ -132,6 +134,9 @@ if flagSimCom:
 if flagLaneDetect:
     processLaneDetect = processLaneDetect(queueList, logging, debugging = False)
     allProcesses.append(processLaneDetect)
+if flagCore:
+    processCore = processCore(queueList, logging, debugging = False)
+    allProcesses.append(processCore)
 # ------ New component runs ends here ------#
 
 # ===================================== START PROCESSES ==================================

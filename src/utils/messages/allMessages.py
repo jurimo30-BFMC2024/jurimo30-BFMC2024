@@ -28,6 +28,32 @@
 
 from enum import Enum
 
+####################################### fromCore ############################################
+
+class CoreSpeedMotor(Enum):
+    Queue = "General"
+    Owner = "threadCore"
+    msgID = 1
+    msgType = "str"
+
+class CoreSteerMotor(Enum):
+    Queue = "General"
+    Owner = "threadCore"
+    msgID = 2
+    msgType = "str"
+
+class CoreControl(Enum):
+    Queue = "General"
+    Owner = "threadCore"
+    msgID = 3
+    msgType = "dict"
+
+class CoreBrake(Enum):
+    Queue = "General"
+    Owner = "threadCore"
+    msgID = 4
+    msgType = "float"
+
 ####################################### processCamera #######################################
 class mainCamera(Enum):
     Queue = "General"
