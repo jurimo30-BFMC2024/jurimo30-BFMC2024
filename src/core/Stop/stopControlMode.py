@@ -12,7 +12,8 @@ class stopControlMode():
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-
+        
+        self.has_run = False
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
 
@@ -22,6 +23,11 @@ class stopControlMode():
         """Subscribes to the messages you are interested in"""
         pass
 
-    def run(self):
-        self.speedMotorSender.send("0")
-        self.steerMotorSender.send("0")
+    def reset(self):
+        self.has_run = False
+
+    def stop(self):
+        if not self.has_run:
+            self.speedMotorSender.send("0")
+            self.steerMotorSender.send("0")
+            self.has_run = True

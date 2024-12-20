@@ -26,15 +26,19 @@ class threadCore(ThreadWithStop):
 
     def run(self):
         while self._running:
-            mode = self.drivingModeSubscriber.receive()
-            if mode is not None:
+            if self.drivingModeSubscriber.isDataInPipe():
+                mode = self.drivingModeSubscriber.receive()
+                
+                if self.mode is not "stop" and mode is "stop":
+                    self.stopMode.stop()
+                elif mode is not "stop" and self.mode is "stop":
+                    self.stopMode.reset()
+                
+                self.mode = mode
                 if self.debugging:
                     self.logging.info(f"Control mode received: {mode}")
-                    self.mode = mode
 
-            if(self.mode == "stop"):
-                self.stopMode.run()
-            elif(self.mode == "manual"):
+            if(self.mode == "manual"):
                 self.manualMode.run()
             elif(self.mode == "auto"):
                 self.autoMode.run()
