@@ -37,7 +37,7 @@ def main():
     with open(autoFSM_path, 'r') as file:
         lines = file.readlines()
 
-    import_line = f"from {package_name}.{package_name} import {package_name}\n"
+    import_line = f"from src.core.Auto.{package_name}.{package_name} import {package_name}\n"
     lines.insert(0, import_line)
 
     # Write back to main.py
