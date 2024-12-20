@@ -2,9 +2,9 @@ from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.allMessages import (DrivingMode)
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
-from Manual.manualControlMode import manualControlMode
-from Stop.stopControlMode import stopControlMode
-from core.Auto.autoFSM import autoFSM
+from src.core.Manual.manualControlMode import manualControlMode
+from src.core.Stop.stopControlMode import stopControlMode
+from src.core.Auto.autoFSM import autoFSM
 class threadCore(ThreadWithStop):
     """This thread handles Core.
     Args:
@@ -29,9 +29,9 @@ class threadCore(ThreadWithStop):
             if self.drivingModeSubscriber.isDataInPipe():
                 mode = self.drivingModeSubscriber.receive()
                 
-                if self.mode is not "stop" and mode is "stop":
+                if self.mode != "stop" and mode == "stop":
                     self.stopMode.stop()
-                elif mode is not "stop" and self.mode is "stop":
+                elif mode != "stop" and self.mode == "stop":
                     self.stopMode.reset()
                 
                 self.mode = mode

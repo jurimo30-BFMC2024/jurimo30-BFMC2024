@@ -1,4 +1,4 @@
-from LaneFollow.LaneFollow import LaneFollow
+from src.core.Auto.LaneFollow.LaneFollow import LaneFollow
 from src.utils.messages.allMessages import (
     CoreSteerMotor,
     CoreSpeedMotor,
