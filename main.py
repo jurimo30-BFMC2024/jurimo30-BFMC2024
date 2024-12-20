@@ -84,7 +84,7 @@ SerialHandler = False
 # ------ New component flags starts here ------#
  
 flagSimCom = True
-flagLaneDetect = False
+flagLaneDetect = True
 # ------ New component flags ends here ------#
 
 # ===================================== SETUP PROCESSES ==================================

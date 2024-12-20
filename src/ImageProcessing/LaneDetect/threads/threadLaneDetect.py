@@ -117,7 +117,7 @@ class threadLaneDetect(ThreadWithStop):
         angle_radians = offset_pixels / pixels_per_radian
         return np.degrees(angle_radians)  # Konvertuj u stepene
         
-    def lane_info(self,frame):
+    def detect_lines(self,frame):
         height, width, _ = frame.shape
         # Definiši FOV kamere (u stepenima)
         CAMERA_FOV_DEGREES = 66  # Primer: kamera ima FOV od 66 stepeni
@@ -133,11 +133,11 @@ class threadLaneDetect(ThreadWithStop):
 
         if lane_center_x is not None:
             # Crtanje sredine puta
-            cv2.circle(frame, (lane_center_x, 130), 3, (0, 0, 255), -1)
+            # cv2.circle(frame, (lane_center_x, 130), 3, (0, 0, 255), -1)
             
             # Crtanje leve i desne linije
-            cv2.line(frame, (left_avg_x, 120), (left_avg_x, 140), (255, 0, 0), 3)
-            cv2.line(frame, (right_avg_x, 120), (right_avg_x, 140), (255, 0, 0), 3)
+            # cv2.line(frame, (left_avg_x, 120), (left_avg_x, 140), (255, 0, 0), 3)
+            # cv2.line(frame, (right_avg_x, 120), (right_avg_x, 140), (255, 0, 0), 3)
 
             # Izračunaj odstupanje i ugao
             car_center_x = width // 2
@@ -146,23 +146,27 @@ class threadLaneDetect(ThreadWithStop):
             
             distance = right_avg_x - left_avg_x
             # Prikaz odstupanja na ekranu
-            print(distance)
+            # print(distance)
             if distance < 230 and angle_degrees < 0:
-                text = f"Skreni desno za: {np.abs(angle_degrees):.2f} stepeni"
+                #text = f"Skreni desno za: {np.abs(angle_degrees):.2f} stepeni"
+                return np.abs(angle_degrees)
             elif distance < 230 and angle_degrees > 0:
-                text = f"Skreni levo za: {(-angle_degrees):.2f} stepeni"
+                #text = f"Skreni levo za: {(-angle_degrees):.2f} stepeni"
+                return -angle_degrees
             elif distance > 230 and angle_degrees < 0:
-                text = f"Skreni levo za: {angle_degrees:.2f} stepeni"
+                #text = f"Skreni levo za: {angle_degrees:.2f} stepeni"
+                return angle_degrees
             elif distance > 230 and angle_degrees > 0:
-                text = f"Skreni desno za: {angle_degrees:.2f} stepeni"
+                #text = f"Skreni desno za: {angle_degrees:.2f} stepeni"
+                return angle_degrees
             #else:
                 #text = f"Drzis pravac"
             
-            cv2.putText(frame, text, (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (52, 85, 235), 2)
+            #cv2.putText(frame, text, (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (52, 85, 235), 2)
 
         
         # Crtanje kontura na frejmu
-        frame_with_contours = self.draw_contours(frame, contours)
+        # frame_with_contours = self.draw_contours(frame, contours)
 
         # Prikaz rezultata
         #cv2.imshow("Lane Detection", frame)
