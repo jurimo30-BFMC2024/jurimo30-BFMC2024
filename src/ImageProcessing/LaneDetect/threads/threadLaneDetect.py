@@ -10,7 +10,6 @@ from src.utils.messages.allMessages import (
 )
 
 from src.templates.threadwithstop import ThreadWithStop
-from src.utils.messages.allMessages import (mainCamera)
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 class threadLaneDetect(ThreadWithStop):
@@ -28,7 +27,7 @@ class threadLaneDetect(ThreadWithStop):
         self.debugging = debugging
 
         # Sender za slanje rezultata detekcije
-        self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
+        self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect, "last only", True)
 
         self.subscribe()
         
@@ -36,16 +35,17 @@ class threadLaneDetect(ThreadWithStop):
     def run(self):
         while self._running:
             try:
-                videoData = self.videoSubscriber.receive()
-                if videoData is not None:
-                    # Dekodiraj frejm iz base64
-                    frame = self.decode_frame(videoData["data"])
+                if self.videoSubscriber.isDataInPipe():
+                    videoData = self.videoSubscriber.receive()
+                    if videoData is not None:
+                        # Dekodiraj frejm iz base64
+                        frame = self.decode_frame(videoData)
 
-                    # Detekcija linija
-                    lane_info = self.detect_lines(frame)
+                        # Detekcija linija
+                        lane_info = self.detect_lines(frame)
 
-                    # Slanje rezultate
-                    self.laneDetectionSender.send(lane_info)
+                        # Slanje rezultate
+                        self.laneDetectionSender.send(lane_info)
             except Exception as e:
                 print(e)
 
@@ -63,37 +63,38 @@ class threadLaneDetect(ThreadWithStop):
 
     # ================================ Lane detection ===============================================
 
-    def find_contours(image):
+    def find_contours(self, image):
         """Pronalaženje kontura u slici."""
         imgray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         _, thresh = cv2.threshold(imgray, 50, 255, cv2.THRESH_BINARY)    
         contours, _ = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         return contours
 
-    def draw_contours(frame, contours):
+    def draw_contours(self, frame, contours):
         """Crtanje kontura na slici."""
         return cv2.drawContours(frame, contours, -1, (0, 255, 0), cv2.FILLED)
 
     #(240, 320, 3) shape
-    def region_of_interest(image):
+    def region_of_interest(self, image):
         """Definisanje regiona od interesa."""
         
-        height = image.shape[0]
-        polygons = np.array([[(-100, height), (400, height), (270, 90), (48, 90)]])
+        height, width = image.shape[:2]
+        polygons = np.array([[(int(-100/320*width), height), (int(1.25*width), height), (int(270/320*width), int(90/240*height)), (int(48/320*width), int(90/240*height))]])
         mask = np.zeros_like(image)
         cv2.fillPoly(mask, polygons, 255)
         return cv2.bitwise_and(image, mask)
 
-    def find_lane_center(contours, width):
+    def find_lane_center(self, contours, width, height):
         """Pronalazi sredinu puta na osnovu kontura."""
         left_x = []
         right_x = []
-        center_line_y = 160  # Y-koordinata za merenje centra na slici
+        center_line_y = int(height/2)  # Y-koordinata za merenje centra na slici
+        delta = int(height/2)
 
         for contour in contours:
             for point in contour:
                 x, y = point[0]
-                if y > center_line_y - 122 and y < center_line_y + 122:  # Fokusiraj se na određeni red (y)
+                if center_line_y - delta < y < center_line_y + delta:  # Fokusiraj se na određeni red (y)
                     if x < width // 2:
                         left_x.append(x)
                     else:
@@ -108,7 +109,7 @@ class threadLaneDetect(ThreadWithStop):
 
         return None, None, None
 
-    def calculate_angle(offset_pixels, frame_width, fov_degrees):
+    def calculate_angle(self, offset_pixels, frame_width, fov_degrees):
         """Izračunava ugao na osnovu pomeraja piksela."""
         # Pretvori FOV iz stepeni u radijane
         fov_radians = np.radians(fov_degrees)
@@ -129,7 +130,7 @@ class threadLaneDetect(ThreadWithStop):
         contours = self.find_contours(roi)
 
         # Pronalazak sredine puta
-        lane_center_x, left_avg_x, right_avg_x = self.find_lane_center(contours, width)
+        lane_center_x, left_avg_x, right_avg_x = self.find_lane_center(contours, width, height)
 
         if lane_center_x is not None:
             # Crtanje sredine puta
@@ -163,7 +164,8 @@ class threadLaneDetect(ThreadWithStop):
                 #text = f"Drzis pravac"
             
             #cv2.putText(frame, text, (20, 180), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (52, 85, 235), 2)
-
+        else:
+            self.logging.warning("Angle is not found")
         
         # Crtanje kontura na frejmu
         # frame_with_contours = self.draw_contours(frame, contours)
