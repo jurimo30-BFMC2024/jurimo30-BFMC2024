@@ -140,7 +140,7 @@ class threadCamera(ThreadWithStop):
                             "output_video" + str(time.time()) + ".avi",
                             fourcc,
                             self.frame_rate,
-                            (2048, 1080),
+                            (512, 270),
                         )
 
             except Exception as e:
@@ -151,7 +151,7 @@ class threadCamera(ThreadWithStop):
                 serialRequest = self.camera.capture_array("lores")  # Will capture an array that can be used by OpenCV library
 
                 if self.recording == True:
-                    self.video_writer.write(mainRequest)
+                    self.video_writer.write(serialRequest)
 
                 serialRequest = cv2.cvtColor(serialRequest, cv2.COLOR_YUV2BGR_I420)
 
