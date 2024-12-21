@@ -71,8 +71,8 @@ class threadWrite(ThreadWithStop):
         self.logger = logger
         self.debugger = debugger
 
-        self.running = False
-        self.engineEnabled = False
+        self.running = threading.Event()
+        self.engineEnabled = threading.Event()
         self.messageConverter = MessageConverter()
         self.steerMotorSender = messageHandlerSender(self.queuesList, SteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, SpeedMotor)
@@ -80,6 +80,16 @@ class threadWrite(ThreadWithStop):
 
         self.loadConfig("init")
         self.subscribe()
+
+        threading.Thread(target=self.klemWrite, daemon=True).start()
+        threading.Thread(target=self.brakeWrite, daemon=True).start()
+        threading.Thread(target=self.speedWrite, daemon=True).start()
+        threading.Thread(target=self.steerWrite, daemon=True).start()
+        threading.Thread(target=self.controlWrite, daemon=True).start()
+        threading.Thread(target=self.instantWrite, daemon=True).start()
+        threading.Thread(target=self.batteryWrite, daemon=True).start()
+        threading.Thread(target=self.resourceMonitorWrite, daemon=True).start()
+        threading.Thread(target=self.imuWrite, daemon=True).start()
 
         if example:
             self.i = 0.0
@@ -133,99 +143,140 @@ class threadWrite(ThreadWithStop):
         else :
             return 0
         
-    # ===================================== RUN ==========================================
-    def run(self):
-        """In this function we check if we got the enable engine signal. After we got it we will start getting messages from raspberry PI. It will transform them into NUCLEO commands and send them."""
-
+    def klemWrite(self):
         while self._running:
             try:
-                klRecv = self.klSubscriber.receive()
-                if klRecv is not None:
-                    if self.debugger:
-                        self.logger.info(klRecv)
-                    if klRecv == "30":
-                        self.running = True
-                        self.engineEnabled = True
-                        command = {"action": "kl", "mode": 30}
-                        self.sendToSerial(command)
-                        self.loadConfig("sensors")
-                    elif klRecv == "15":
-                        self.running = True
-                        self.engineEnabled = False
-                        command = {"action": "kl", "mode": 15}
-                        self.sendToSerial(command)
-                        self.loadConfig("sensors")
-                    elif klRecv == "0":
-                        self.running = False
-                        self.engineEnabled = False
-                        command = {"action": "kl", "mode": 0}
-                        self.sendToSerial(command)
-
-                if self.running:
-                    if self.engineEnabled:
-                        brakeRecv = self.brakeSubscriber.receive()
-                        if brakeRecv is not None:
-                            if self.debugger:
-                                self.logger.info(brakeRecv)
-                            command = {"action": "brake", "steerAngle": int(brakeRecv)}
-                            self.sendToSerial(command)
-
-                        speedRecv = self.speedMotorSubscriber.receive()
-                        if speedRecv is not None: 
-                            if self.debugger:
-                                self.logger.info(speedRecv)
-                            command = {"action": "speed", "speed": int(speedRecv)}
-                            self.sendToSerial(command)
-
-                        steerRecv = self.steerMotorSubscriber.receive()
-                        if steerRecv is not None:
-                            if self.debugger:
-                                self.logger.info(steerRecv) 
-                            command = {"action": "steer", "steerAngle": int(steerRecv)}
-                            self.sendToSerial(command)
-
-                        controlRecv = self.controlSubscriber.receive()
-                        if controlRecv is not None:
-                            if self.debugger:
-                                self.logger.info(controlRecv) 
-                            command = {
-                                "action": "vcd",
-                                "time": int(controlRecv["Time"]),
-                                "speed": int(controlRecv["Speed"]),
-                                "steer": int(controlRecv["Steer"]),
-                            }
-                            self.sendToSerial(command)
-
-                    instantRecv = self.instantSubscriber.receive()
-                    if instantRecv is not None: 
-                        if self.debugger:
-                            self.logger.info(instantRecv) 
-                        command = {"action": "instant", "activate": int(instantRecv)}
-                        self.sendToSerial(command)
-
-                    batteryRecv = self.batterySubscriber.receive()
-                    if batteryRecv is not None: 
-                        if self.debugger:
-                            self.logger.info(batteryRecv)
-                        command = {"action": "battery", "activate": int(batteryRecv)}
-                        self.sendToSerial(command)
-
-                    resourceMonitorRecv = self.resourceMonitorSubscriber.receive()
-                    if resourceMonitorRecv is not None: 
-                        if self.debugger:
-                            self.logger.info(resourceMonitorRecv)
-                        command = {"action": "resourceMonitor", "activate": int(resourceMonitorRecv)}
-                        self.sendToSerial(command)
-
-                    imuRecv = self.imuSubscriber.receive()
-                    if imuRecv is not None: 
-                        if self.debugger:
-                            self.logger.info(imuRecv)
-                        command = {"action": "imu", "activate": int(imuRecv)}
-                        self.sendToSerial(command)
-
+                klRecv = self.klSubscriber.receiveWithBlock()
+                if self.debugger:
+                    self.logger.info(klRecv)
+                if klRecv == "30":
+                    self.running.set()
+                    self.engineEnabled.set()
+                    command = {"action": "kl", "mode": 30}
+                    self.sendToSerial(command)
+                    self.loadConfig("sensors")
+                elif klRecv == "15":
+                    self.running.set()
+                    self.engineEnabled.clear()
+                    command = {"action": "kl", "mode": 15}
+                    self.sendToSerial(command)
+                    self.loadConfig("sensors")
+                elif klRecv == "0":
+                    self.running.clear()
+                    self.engineEnabled.clear()
+                    command = {"action": "kl", "mode": 0}
+                    self.sendToSerial(command)
             except Exception as e:
-                print(e)
+                self.logger.error(e)
+    
+    def brakeWrite(self):
+        while self._running:
+            try:
+                brakeRecv = self.brakeSubscriber.receiveWithBlock()
+                if self.running.is_set():
+                    if self.engineEnabled.is_set():
+                        if self.debugger:
+                            self.logger.info(brakeRecv)
+                        command = {"action": "brake", "steerAngle": int(brakeRecv)}
+                        self.sendToSerial(command)
+            except Exception as e:
+                self.logger.error(e)
+
+    def speedWrite(self):
+        while self._running:
+            try:
+                speedRecv = self.speedMotorSubscriber.receiveWithBlock()
+                if self.running.is_set():
+                    if self.engineEnabled.is_set():
+                        if self.debugger:
+                            self.logger.info(speedRecv)
+                        command = {"action": "speed", "speed": int(speedRecv)}
+                        self.sendToSerial(command)
+            except Exception as e:
+                self.logger.error(e)
+
+    def steerWrite(self):
+        while self._running:
+            try:
+                steerRecv = self.steerMotorSubscriber.receiveWithBlock()
+                if self.running.is_set():
+                    if self.engineEnabled.is_set():
+                        if self.debugger:
+                            self.logger.info(steerRecv) 
+                        command = {"action": "steer", "steerAngle": int(steerRecv)}
+                        self.sendToSerial(command)
+            except Exception as e:
+                self.logger.error(e)
+
+    def controlWrite(self):
+        while self._running:
+            try:
+                controlRecv = self.controlSubscriber.receiveWithBlock()
+                if self.running.is_set():
+                    if self.engineEnabled.is_set():
+                        if self.debugger:
+                            self.logger.info(controlRecv) 
+                        command = {
+                            "action": "vcd",
+                            "time": int(controlRecv["Time"]),
+                            "speed": int(controlRecv["Speed"]),
+                            "steer": int(controlRecv["Steer"]),
+                        }
+                        self.sendToSerial(command)
+            except Exception as e:
+                self.logger.error(e)
+
+    def instantWrite(self):
+        while self._running:
+            try:
+                instantRecv = self.instantSubscriber.receiveWithBlock()
+                if self.running.is_set():
+                    if self.debugger:
+                        self.logger.info(instantRecv) 
+                    command = {"action": "instant", "activate": int(instantRecv)}
+                    self.sendToSerial(command)
+            except Exception as e:
+                self.logger.error(e)
+
+    def batteryWrite(self):
+        while self._running:
+            try:
+                batteryRecv = self.batterySubscriber.receiveWithBlock()
+                if self.running.is_set():
+                    if self.debugger:
+                        self.logger.info(batteryRecv)
+                    command = {"action": "battery", "activate": int(batteryRecv)}
+                    self.sendToSerial(command)
+            except Exception as e:
+                self.logger.error(e)
+    
+    def resourceMonitorWrite(self):
+        while self._running:
+            try:
+                resourceMonitorRecv = self.resourceMonitorSubscriber.receiveWithBlock()
+                if self.running.is_set():
+                    if self.debugger:
+                        self.logger.info(resourceMonitorRecv)
+                    command = {"action": "resourceMonitor", "activate": int(resourceMonitorRecv)}
+                    self.sendToSerial(command) 
+            except Exception as e:
+                self.logger.error(e)
+
+    def imuWrite(self):
+        while self._running:
+            try:
+                imuRecv = self.imuSubscriber.receiveWithBlock()
+                if self.running.is_set():
+                    if self.debugger:
+                        self.logger.info(imuRecv)
+                    command = {"action": "imu", "activate": int(imuRecv)}
+                    self.sendToSerial(command)
+            except Exception as e:
+                self.logger.error(e)
+        
+    # ===================================== RUN ==========================================
+    def run(self):
+        pass
 
     # ==================================== START =========================================
     def start(self):
