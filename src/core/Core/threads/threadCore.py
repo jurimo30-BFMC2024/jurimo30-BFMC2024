@@ -17,35 +17,32 @@ class threadCore(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.mode = "stop"
         self.subscribe()
         super(threadCore, self).__init__()
-        self.manualMode = manualControlMode(queueList, logging, debugging)
-        self.stopMode = stopControlMode(queueList, logging, debugging)
-        self.autoMode = autoFSM(queueList, logging, debugging)
+        self.modes = {
+            "stop": stopControlMode(queueList, logging, debugging),
+            "manual": manualControlMode(queueList, logging, debugging),
+            "auto": autoFSM(queueList, logging, debugging),
+        }
+        self.mode = "stop"
+        self.modes[self.mode].start()
 
     def run(self):
         while self._running:
-            if self.drivingModeSubscriber.isDataInPipe():
-                mode = self.drivingModeSubscriber.receive()
-                
-                if self.mode != "stop" and mode == "stop":
-                    self.stopMode.stop()
-                elif mode != "stop" and self.mode == "stop":
-                    self.stopMode.reset()
-                
+            mode = self.drivingModeSubscriber.receiveWithBlock()
+            if mode not in self.modes:
+                if self.debugging:
+                    self.logging.error(f"Unsupported driving mode: {mode}")
+                mode = "stop"
+
+            if mode != self.mode:
+                self.modes[self.mode].stop()
+                self.modes[mode].start()
                 self.mode = mode
                 if self.debugging:
-                    self.logging.info(f"Control mode received: {mode}")
-
-            if(self.mode == "manual"):
-                self.manualMode.run()
-            elif(self.mode == "auto"):
-                self.autoMode.run()
-            elif(self.mode == "legacy"):
-                self.mode = "stop"
-                if self.debugging:
-                    self.logging.error("Unsupported driving mode")
+                    self.logging.info(f"Selected driving mode: {mode}")
+                    
+                    
 
     def subscribe(self):
         """Subscribes to the messages you are interested in"""

@@ -1,3 +1,4 @@
+from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.utils.messages.allMessages import (
@@ -10,8 +11,9 @@ from src.utils.messages.allMessages import (
     CoreSpeedMotor,
     CoreSteerMotor
 )
+import time
 
-class manualControlMode():
+class manualControlMode(ControlModeThread):
     def __init__(self, queueList, logging, debugging=False):
         self.queuesList = queueList
         self.logging = logging
@@ -22,7 +24,11 @@ class manualControlMode():
         self.brakeMotorSender = messageHandlerSender(self.queuesList, CoreBrake)
         self.controlMotorSender = messageHandlerSender(self.queuesList, CoreControl)
 
+        self.steerRecv = 0
+        self.speedRecv = 0
+
         self.subscribe()
+        super().__init__()
 
     def subscribe(self):
         self.controlSubscriber = messageHandlerSubscriber(self.queuesList, Control, "lastOnly", True)
@@ -30,16 +36,23 @@ class manualControlMode():
         self.speedMotorSubscriber = messageHandlerSubscriber(self.queuesList, SpeedMotor, "lastOnly", True)
         self.brakeSubscriber = messageHandlerSubscriber(self.queuesList, Brake, "lastOnly", True)
 
+    def start(self):
+        self.speedMotorSender.send(self.speedRecv)
+        self.steerMotorSender.send(self.steerRecv)
+        super().start()
+
     def run(self):
-        if self.speedMotorSubscriber.isDataInPipe():
-            speedRecv = self.speedMotorSubscriber.receive()
-            self.speedMotorSender.send(speedRecv)
-        if self.steerMotorSubscriber.isDataInPipe():
-            steerRecv = self.steerMotorSubscriber.receive()
-            self.steerMotorSender.send(steerRecv)
-        if self.brakeSubscriber.isDataInPipe():
-            brakeRecv = self.brakeSubscriber.receive()
-            self.brakeMotorSender.send(brakeRecv)
-        if self.controlSubscriber.isDataInPipe():
-            controlRecv = self.controlSubscriber.receive()
-            self.controlMotorSender.send(controlRecv)
+        while self._running.is_set():
+            if self.speedMotorSubscriber.isDataInPipe():
+                self.speedRecv = self.speedMotorSubscriber.receive()
+                self.speedMotorSender.send(self.speedRecv)
+            if self.steerMotorSubscriber.isDataInPipe():
+                self.steerRecv = self.steerMotorSubscriber.receive()
+                self.steerMotorSender.send(self.steerRecv)
+            if self.brakeSubscriber.isDataInPipe():
+                brakeRecv = self.brakeSubscriber.receive()
+                self.brakeMotorSender.send(brakeRecv)
+            if self.controlSubscriber.isDataInPipe():
+                controlRecv = self.controlSubscriber.receive()
+                self.controlMotorSender.send(controlRecv)
+            time.sleep(0.05)
