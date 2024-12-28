@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 
 from src.templates.threadwithstop import ThreadWithStop
+from src.gateway.PriorityQueueHandler import PriorityQueueHandler
 
 class threadGateway(ThreadWithStop):
     """Thread which will handle processGateway functionalities.\n
@@ -43,7 +44,8 @@ class threadGateway(ThreadWithStop):
         self.logger = logger
         self.debugging = debugging
         self.sendingList = {}
-        self.queuesList = queueList
+        # self.queuesList = queueList
+        self.handler = PriorityQueueHandler(queueList)
         self.messageApproved = []
 
     # =================================== SUBSCRIBE ======================================
@@ -126,23 +128,16 @@ class threadGateway(ThreadWithStop):
         """
         
         while self._running:
-            message = None
-            # We are using "elif" because we are processing one message at a time.
-            # We work with the queues in the priority order( We start from the high priority to low priority)
-            if not self.queuesList["Critical"].empty():
-                message = self.queuesList["Critical"].get()
-            elif not self.queuesList["Warning"].empty():
-                message = self.queuesList["Warning"].get()
-            elif not self.queuesList["General"].empty():
-                message = self.queuesList["General"].get()
-            if message is not None:
-                self.send(message)
-            if not self.queuesList["Config"].empty():
-                message2 = self.queuesList["Config"].get()
-                if str.lower(message2["Subscribe/Unsubscribe"]) == "subscribe":
-                    self.subscribe(message2)
+            priority, message = self.handler.get()
+
+            if priority == "Config":
+                if str.lower(message["Subscribe/Unsubscribe"]) == "subscribe":
+                    self.subscribe(message)
                 else:
-                    self.unsubscribe(message2)
+                    self.unsubscribe(message)
+            else:
+                self.send(message)
+                
 
 
 # =====================================================================================
