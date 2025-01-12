@@ -71,6 +71,7 @@ class threadWrite(ThreadWithStop):
         self.logger = logger
         self.debugger = debugger
 
+        self.mutex = threading.Lock()
         self.running = threading.Event()
         self.engineEnabled = threading.Event()
         self.messageConverter = MessageConverter()
@@ -115,8 +116,10 @@ class threadWrite(ThreadWithStop):
     def sendToSerial(self, msg):
         command_msg = self.messageConverter.get_command(**msg)
         if command_msg != "error":
-            self.serialCom.write(command_msg.encode("ascii"))
-            self.logFile.write(command_msg)
+            with self.mutex:  # Lock the critical section
+                self.serialCom.write(command_msg.encode("ascii"))
+                self.logFile.write(command_msg)
+                time.sleep(0.05)
 
     def loadConfig(self, configType):
         with open(self.configPath, "r") as file:
@@ -148,7 +151,7 @@ class threadWrite(ThreadWithStop):
             try:
                 klRecv = self.klSubscriber.receiveWithBlock()
                 if self.debugger:
-                    self.logger.info(klRecv)
+                    self.logger.info(f"klRecv: {klRecv}")
                 if klRecv == "30":
                     self.running.set()
                     self.engineEnabled.set()
@@ -176,7 +179,7 @@ class threadWrite(ThreadWithStop):
                 if self.running.is_set():
                     if self.engineEnabled.is_set():
                         if self.debugger:
-                            self.logger.info(brakeRecv)
+                            self.logger.info(f"brakeRecv: {brakeRecv}")
                         command = {"action": "brake", "steerAngle": int(brakeRecv)}
                         self.sendToSerial(command)
             except Exception as e:
@@ -189,7 +192,7 @@ class threadWrite(ThreadWithStop):
                 if self.running.is_set():
                     if self.engineEnabled.is_set():
                         if self.debugger:
-                            self.logger.info(speedRecv)
+                            self.logger.info(f"speedRecv: {speedRecv}")
                         command = {"action": "speed", "speed": int(speedRecv)}
                         self.sendToSerial(command)
             except Exception as e:
@@ -202,7 +205,7 @@ class threadWrite(ThreadWithStop):
                 if self.running.is_set():
                     if self.engineEnabled.is_set():
                         if self.debugger:
-                            self.logger.info(steerRecv) 
+                            self.logger.info(f"steerRecv: {steerRecv}")
                         command = {"action": "steer", "steerAngle": int(steerRecv)}
                         self.sendToSerial(command)
             except Exception as e:
@@ -215,7 +218,7 @@ class threadWrite(ThreadWithStop):
                 if self.running.is_set():
                     if self.engineEnabled.is_set():
                         if self.debugger:
-                            self.logger.info(controlRecv) 
+                            self.logger.info(f"controlRecv: {controlRecv}") 
                         command = {
                             "action": "vcd",
                             "time": int(controlRecv["Time"]),
@@ -232,7 +235,7 @@ class threadWrite(ThreadWithStop):
                 instantRecv = self.instantSubscriber.receiveWithBlock()
                 if self.running.is_set():
                     if self.debugger:
-                        self.logger.info(instantRecv) 
+                        self.logger.info(f"instantRecv: {instantRecv}") 
                     command = {"action": "instant", "activate": int(instantRecv)}
                     self.sendToSerial(command)
             except Exception as e:
@@ -244,7 +247,7 @@ class threadWrite(ThreadWithStop):
                 batteryRecv = self.batterySubscriber.receiveWithBlock()
                 if self.running.is_set():
                     if self.debugger:
-                        self.logger.info(batteryRecv)
+                        self.logger.info(f"batteryRecv: {batteryRecv}")
                     command = {"action": "battery", "activate": int(batteryRecv)}
                     self.sendToSerial(command)
             except Exception as e:
@@ -256,7 +259,7 @@ class threadWrite(ThreadWithStop):
                 resourceMonitorRecv = self.resourceMonitorSubscriber.receiveWithBlock()
                 if self.running.is_set():
                     if self.debugger:
-                        self.logger.info(resourceMonitorRecv)
+                        self.logger.info(f"resourceMonitorRecv: {resourceMonitorRecv}")
                     command = {"action": "resourceMonitor", "activate": int(resourceMonitorRecv)}
                     self.sendToSerial(command) 
             except Exception as e:
@@ -268,7 +271,7 @@ class threadWrite(ThreadWithStop):
                 imuRecv = self.imuSubscriber.receiveWithBlock()
                 if self.running.is_set():
                     if self.debugger:
-                        self.logger.info(imuRecv)
+                        self.logger.info(f"imuRecv: {imuRecv}")
                     command = {"action": "imu", "activate": int(imuRecv)}
                     self.sendToSerial(command)
             except Exception as e:
