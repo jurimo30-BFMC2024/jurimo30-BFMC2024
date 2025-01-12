@@ -37,22 +37,26 @@ class manualControlMode(ControlModeThread):
         self.brakeSubscriber = messageHandlerSubscriber(self.queuesList, Brake, "lastOnly", True)
 
     def start(self):
+        print(f"stari speed: {self.speedRecv}")
+        print(f"stari steer: {self.steerRecv}")
         self.speedMotorSender.send(f"{self.speedRecv}")
         self.steerMotorSender.send(f"{self.steerRecv}")
         super().start()
 
-    def run(self):
-        while self._running.is_set():
-            if self.speedMotorSubscriber.isDataInPipe():
-                self.speedRecv = self.speedMotorSubscriber.receive()
-                self.speedMotorSender.send(f"{self.speedRecv}")
-            if self.steerMotorSubscriber.isDataInPipe():
-                self.steerRecv = self.steerMotorSubscriber.receive()
-                self.steerMotorSender.send(f"{self.steerRecv}")
-            if self.brakeSubscriber.isDataInPipe():
-                brakeRecv = self.brakeSubscriber.receive()
-                self.brakeMotorSender.send(brakeRecv)
-            if self.controlSubscriber.isDataInPipe():
-                controlRecv = self.controlSubscriber.receive()
-                self.controlMotorSender.send(controlRecv)
-            time.sleep(0.05)
+    def stop(self):
+        super().stop()
+
+    def loop(self):
+        if self.speedMotorSubscriber.isDataInPipe():
+            self.speedRecv = int(self.speedMotorSubscriber.receive())
+            self.speedMotorSender.send(f"{self.speedRecv}")
+        if self.steerMotorSubscriber.isDataInPipe():
+            self.steerRecv = int(self.steerMotorSubscriber.receive())
+            self.steerMotorSender.send(f"{self.steerRecv}")
+        if self.brakeSubscriber.isDataInPipe():
+            brakeRecv = self.brakeSubscriber.receive()
+            self.brakeMotorSender.send(brakeRecv)
+        if self.controlSubscriber.isDataInPipe():
+            controlRecv = self.controlSubscriber.receive()
+            self.controlMotorSender.send(controlRecv)
+        time.sleep(0.05)

@@ -3,7 +3,6 @@ from src.utils.messages.allMessages import (DrivingMode)
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.core.Manual.manualControlMode import manualControlMode
-from src.core.Stop.stopControlMode import stopControlMode
 from src.core.Auto.autoFSM import autoFSM
 class threadCore(ThreadWithStop):
     """This thread handles Core.
@@ -20,20 +19,21 @@ class threadCore(ThreadWithStop):
         self.subscribe()
         super(threadCore, self).__init__()
         self.modes = {
-            "stop": stopControlMode(queueList, logging, debugging),
+            # "stop": stopControlMode(queueList, logging, debugging),
             "manual": manualControlMode(queueList, logging, debugging),
             "auto": autoFSM(queueList, logging, debugging),
         }
-        self.mode = "stop"
+        self.mode = "manual"
         self.modes[self.mode].start()
 
     def run(self):
         while self._running:
             mode = self.drivingModeSubscriber.receiveWithBlock()
+            if mode == "stop": mode = "manual"
             if mode not in self.modes:
                 if self.debugging:
                     self.logging.error(f"Unsupported driving mode: {mode}")
-                mode = "stop"
+                mode = "manual"
 
             if mode != self.mode:
                 self.modes[self.mode].stop()

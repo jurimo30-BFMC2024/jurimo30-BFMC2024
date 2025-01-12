@@ -27,26 +27,28 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
         super().start()
+    
+    def stop(self):
+        super().stop()
 
-    def run(self):
-        while self._running.is_set():
-            angle, speed = self.laneFollowData.getControlData()
-            if not self._running.is_set():
-                return
+    def loop(self):
+        angle, speed = self.laneFollowData.getControlData()
+        if not self._running.is_set():
+            return
 
-            if angle != self.oldAngle:
-                self.steerMotorSender.send(f"{angle}")
-                self.oldAngle = angle
-                if self.debugging:
-                    self.logging.info(f"New steering angle: {angle}")
+        if angle != self.oldAngle:
+            self.steerMotorSender.send(f"{angle}")
+            self.oldAngle = angle
+            if self.debugging:
+                self.logging.info(f"New steering angle: {angle}")
 
-            if speed != self.oldSpeed:
-                self.speedMotorSender.send(f"{speed}")
-                self.oldSpeed = speed
-                if self.debugging:
-                    self.logging.info(f"New speed: {speed}")
-            
-            time.sleep(0.05)
+        if speed != self.oldSpeed:
+            self.speedMotorSender.send(f"{speed}")
+            self.oldSpeed = speed
+            if self.debugging:
+                self.logging.info(f"New speed: {speed}")
+        
+        time.sleep(0.05)
 
     def getTime(self):
         return round(time.time()*1000)
