@@ -37,18 +37,18 @@ class manualControlMode(ControlModeThread):
         self.brakeSubscriber = messageHandlerSubscriber(self.queuesList, Brake, "lastOnly", True)
 
     def start(self):
-        self.speedMotorSender.send(self.speedRecv)
-        self.steerMotorSender.send(self.steerRecv)
+        self.speedMotorSender.send(f"{self.speedRecv}")
+        self.steerMotorSender.send(f"{self.steerRecv}")
         super().start()
 
     def run(self):
         while self._running.is_set():
             if self.speedMotorSubscriber.isDataInPipe():
                 self.speedRecv = self.speedMotorSubscriber.receive()
-                self.speedMotorSender.send(self.speedRecv)
+                self.speedMotorSender.send(f"{self.speedRecv}")
             if self.steerMotorSubscriber.isDataInPipe():
                 self.steerRecv = self.steerMotorSubscriber.receive()
-                self.steerMotorSender.send(self.steerRecv)
+                self.steerMotorSender.send(f"{self.steerRecv}")
             if self.brakeSubscriber.isDataInPipe():
                 brakeRecv = self.brakeSubscriber.receive()
                 self.brakeMotorSender.send(brakeRecv)
