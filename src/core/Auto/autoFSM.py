@@ -1,3 +1,4 @@
+from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.core.Auto.LaneFollow.LaneFollow import LaneFollow
 from src.utils.messages.allMessages import (
     CoreSteerMotor,
@@ -7,7 +8,7 @@ from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 import time
 
-class autoFSM():
+class autoFSM(ControlModeThread):
     def __init__(self, queueList, logging, debugging=False):
         self.queuesList = queueList
         self.logging = logging
@@ -17,17 +18,23 @@ class autoFSM():
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
 
-        self.lastTimeRun = self.getTime()
+        self.subscribe()
+        super().__init__()
+
+    def start(self):
         self.oldAngle = 0
         self.oldSpeed = 0
-        self.subscribe()
+        self.steerMotorSender.send("0")
+        self.speedMotorSender.send("0")
+        super().start()
+    
+    def stop(self):
+        super().stop()
 
-    def run(self):
-        # if self.getTime() - self.lastTimeRun < 50:
-        #     return
-        # self.lastTimeRun = self.getTime()
-
+    def loop(self):
         angle, speed = self.laneFollowData.getControlData()
+        if not self._running.is_set():
+            return
 
         if angle != self.oldAngle:
             self.steerMotorSender.send(f"{angle}")

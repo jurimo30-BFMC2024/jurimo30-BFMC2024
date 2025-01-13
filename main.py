@@ -135,7 +135,7 @@ if flagLaneDetect:
     processLaneDetect = processLaneDetect(queueList, logging, debugging = False)
     allProcesses.append(processLaneDetect)
 if flagCore:
-    processCore = processCore(queueList, logging, debugging = False)
+    processCore = processCore(queueList, logging, debugging = True)
     allProcesses.append(processCore)
 # ------ New component runs ends here ------#
 
