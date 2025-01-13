@@ -43,7 +43,7 @@ class threadLaneDetect(ThreadWithStop):
                 frame = self.decode_frame(videoData)
 
                 # obradi frejm
-                angle = self.detector.process_frame(frame)
+                drawnFrame, angle = self.detector.process_frame(frame)
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
