@@ -4,17 +4,23 @@ from flask import Flask, Response
 import time
 import numpy as np
 
+class Frames:
+    width=1024
+    height=540
+    manager = Manager()
+    default_frame = None
+    shared_frames = manager.list()
+    condition = Condition()
 
 class VideoGridStreamer:
-    def __init__(self, grid_rows, grid_cols, width, height):
+    def __init__(self, grid_rows, grid_cols):
         self.grid_rows = grid_rows
         self.grid_cols = grid_cols
-        self.default_frame = self.create_blank_frame([width, height])
-        self.manager = Manager()
-        self.shared_frames = self.manager.list(
-            [self.manager.list([None for _ in range(grid_cols)]) for _ in range(grid_rows)]
-        )
-        self.condition = Condition()  # Synchronization primitive
+
+        for _ in range(grid_rows):
+            Frames.shared_frames.append(Frames.manager.list([None for _ in range(grid_cols)]))
+
+        Frames.default_frame = self.create_blank_frame([Frames.width, Frames.height])
         self.flask_process = None
 
         # Flask app setup
@@ -27,8 +33,8 @@ class VideoGridStreamer:
 
     def generate_frames(self):
         while True:
-            with self.condition:
-                self.condition.wait()  # Wait for the grid to be updated
+            with Frames.condition:
+                Frames.condition.wait()  # Wait for the grid to be updated
 
                 # Compose the grid using shared memory frames
                 grid_frame = self.compose_grid()
@@ -43,10 +49,10 @@ class VideoGridStreamer:
     def compose_grid(self):
         """Compose the entire grid from shared frames."""
         rows = []
-        for row in self.shared_frames:
+        for row in Frames.shared_frames:
             row_frames = [
-                np.frombuffer(frame, dtype=np.uint8).reshape(self.default_frame.shape)
-                if frame is not None else self.default_frame
+                np.frombuffer(frame, dtype=np.uint8).reshape(Frames.default_frame.shape)
+                if frame is not None else Frames.default_frame
                 for frame in row
             ]
             rows.append(cv2.hconcat(row_frames))
@@ -56,13 +62,16 @@ class VideoGridStreamer:
         """Video feed endpoint for Flask."""
         return Response(self.generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-    def display_frame(self, frame, row, col):
-        """Update the frame for a specific grid square."""
-        if 0 <= row < self.grid_rows and 0 <= col < self.grid_cols:
-            resized_frame = cv2.resize(frame, (self.default_frame.shape[1], self.default_frame.shape[0]))
-            with self.condition:
-                self.shared_frames[row][col] = resized_frame.tobytes()
-                self.condition.notify()  # Notify generate_frames that the grid has been updated
+    # def display_frame(self, frame, row, col):
+    #     """Update the frame for a specific grid square."""
+    #     if 0 <= row < self.grid_rows and 0 <= col < self.grid_cols:
+    #         resized_frame = cv2.resize(frame, (Frames.default_frame.shape[1], Frames.default_frame.shape[0]))
+    #         with Frames.condition:
+    #             try:
+    #                 Frames.shared_frames[row][col] = resized_frame.tobytes()
+    #                 Frames.condition.notify()  # Notify generate_frames that the grid has been updated
+    #             except IndexError as e:
+    #                 pass
 
     def start_flask_server(self, host='0.0.0.0', port=5000):
         """Start the Flask server."""
@@ -83,13 +92,24 @@ class VideoGridStreamer:
             self.flask_process.terminate()
             self.flask_process.join()
 
+class VideoStream:
+    def __init__(self, row, col):
+        self.row = row
+        self.col = col
+
+    def display(self, frame):
+        resized_frame = cv2.resize(frame, (Frames.width, Frames.height))
+        with Frames.condition:
+            try:
+                Frames.shared_frames[self.row][self.col] = resized_frame.tobytes()
+                Frames.condition.notify()
+            except IndexError as e:
+                pass
 
 # Example Usage
 if __name__ == "__main__":
-    streamer = VideoGridStreamer(grid_rows=1, grid_cols=2, width=1024, height=540)
-    streamer.start()
-
     def read_video(path, pos):
+        streamer = VideoStream(pos[0], pos[1])
         cap = cv2.VideoCapture(path)
         while cap.isOpened():
             success, frame = cap.read()
@@ -98,7 +118,10 @@ if __name__ == "__main__":
                 continue
 
             time.sleep(0.1)  # Frame rate control
-            streamer.display_frame(frame, pos[0], pos[1])
+            streamer.display(frame)
+
+    streamer = VideoGridStreamer(grid_rows=1, grid_cols=2)
+    streamer.start()
 
     from threading import Thread
 
@@ -107,6 +130,7 @@ if __name__ == "__main__":
 
     worker1.start()
     worker2.start()
+
 
     try:
         worker1.join()
