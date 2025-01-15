@@ -2,7 +2,7 @@ from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.allMessages import (serialCamera, mainCamera)
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
-from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoGridStreamer
+from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream
 from threading import Thread
 from multiprocessing import Process
 import numpy as np
@@ -18,9 +18,8 @@ class threadVideoStream(ThreadWithStop):
         debugging (bool, optional): A flag for debugging. Defaults to False.
     """
 
-    def __init__(self, queueList, streamer: VideoGridStreamer, logging, debugging=False):
+    def __init__(self, queueList, logging, debugging=False):
         self.queuesList = queueList
-        self.streamer = streamer
         self.logging = logging
         self.debugging = debugging
         self.subscribe()
@@ -47,13 +46,14 @@ class threadVideoStream(ThreadWithStop):
         return frame
     
     def displayRawCamera(self, subscriber: messageHandlerSubscriber, row: int, col: int):
+        streamer = VideoStream(row, col)
         while self._running:
             videoData = subscriber.receiveWithBlock()
 
             frame = self.decode_frame(videoData)
 
-            self.streamer.display_frame(frame, row=row, col=col)
-            # time.sleep(0.05)
+            streamer.display(frame)
+            time.sleep(0.05)
 
     def run(self):
         for th in self.displayThreads:
