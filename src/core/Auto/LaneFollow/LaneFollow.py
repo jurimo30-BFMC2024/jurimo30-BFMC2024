@@ -3,7 +3,7 @@ from src.utils.messages.allMessages import (
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
-import MovingAverage as ma
+from src.core.Auto.LaneFollow.MovingAverage import MovingAverage as ma
 
 class LaneFollow():
     """This thread handles LaneFollow.
