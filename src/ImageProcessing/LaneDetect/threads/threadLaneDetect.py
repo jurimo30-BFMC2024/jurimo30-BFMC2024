@@ -25,7 +25,7 @@ class threadLaneDetect(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.detector = LaneDetector(512, 270)
+        self.detector = LaneDetector(512, 270, logging)
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
