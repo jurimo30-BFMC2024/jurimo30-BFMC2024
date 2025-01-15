@@ -75,10 +75,10 @@ class LaneDetector:
         
         # Define a triangular region of interest (lower part of the image)
         polygon = np.array([[
-            (0, height - height*0.2),
-            (width, height - height*0.2),
-            (width- width*0.2, height // 2 - height*0.2),
-            (width*0.2, height // 2 - height*0.2)
+            (width*0.1, height - height*0.2),
+            (width*0.9, height - height*0.2),
+            (width*0.75, height // 2 - height*0.2),
+            (width*0.25, height // 2 - height*0.2)
         ]], np.int32)
         cv2.fillPoly(mask, polygon, 255)
         masked_image = cv2.bitwise_and(img, mask)
