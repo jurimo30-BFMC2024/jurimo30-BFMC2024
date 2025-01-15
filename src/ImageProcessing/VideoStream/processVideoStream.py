@@ -18,13 +18,13 @@ class processVideoStream(WorkerProcess):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.streamer = VideoGridStreamer(grid_rows=1, grid_cols=2, width=1024, height=540)
+        self.streamer = VideoGridStreamer(grid_rows=2, grid_cols=1, width=1024, height=540)
+        self.streamer.start(host='0.0.0.0', port=4201)
         super(processVideoStream, self).__init__(self.queuesList)
 
     def run(self):
         """Apply the initializing methods and start the threads."""
         super(processVideoStream, self).run()
-        self.streamer.run(host='0.0.0.0', port=5000)
 
     def _init_threads(self):
         """Create the VideoStream Publisher thread and add to the list of threads."""
