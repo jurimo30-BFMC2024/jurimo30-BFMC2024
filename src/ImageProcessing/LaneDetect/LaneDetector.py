@@ -101,7 +101,7 @@ class LaneDetector:
         roi = self.region_of_interest(edges)
         lines = self.detect_lines(roi)
 
-        angle_degrees = self.calculate_steering_angle(lines, frame.shape[1], frame.shape[0])
+        angle_degrees = float(self.calculate_steering_angle(lines, frame.shape[1], frame.shape[0]))
 
         # Draw lines on the frame
         if lines is not None:
