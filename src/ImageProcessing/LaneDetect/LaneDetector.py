@@ -19,17 +19,11 @@ class LaneDetector:
         left_intercepts = []
         right_intercepts = []
 
-        # Definišemo minimalni dozvoljeni ugao (npr. 10 stepeni)
-        min_angle_threshold = np.tan(np.radians(10))  # Tangenta od 10 stepeni
-
         for line in lines:
             for x1, y1, x2, y2 in line:
                 slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
                 intercept = y1 - slope * x1
 
-                # Filtriraj linije koje su horizontalne ili skoro horizontalne
-                if abs(slope) < min_angle_threshold:
-                    continue  # Preskoči ovu liniju
 
                 if slope < -0.5:  # Left lanes have negative slope
                     left_slopes.append(slope)
@@ -37,7 +31,7 @@ class LaneDetector:
                 elif slope > 0.5:  # Right lanes have positive slope
                     right_slopes.append(slope)
                     right_intercepts.append(intercept)
-
+        # (Ostatak funkcije ostaje isti)
         left_avg_slope = np.mean(left_slopes) if left_slopes else 0
         left_avg_intercept = np.mean(left_intercepts) if left_intercepts else 0
 
@@ -49,10 +43,24 @@ class LaneDetector:
         left_x = self.extrapolate_missing_lane(left_avg_slope, left_avg_intercept, y, img_width) if left_avg_slope != 0 else 0
         right_x = self.extrapolate_missing_lane(right_avg_slope, right_avg_intercept, y, img_width) if right_avg_slope != 0 else img_width
 
+    # 360,180), (400,220),
+
+        for line in lines:
+            for x1, y1, x2, y2 in line:
+                slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
+
+                if slope < -0.5:
+                    if self.isPointInSquare(x1, y1, 340, 180, 470, 220) or self.isPointInSquare(x1, y1, 340, 180, 470, 220):
+                        return 0
+                if slope > 0.5:
+                    if self.isPointInSquare(x1, y1, 80, 180, 190, 220) or self.isPointInSquare(x1, y1, 80, 180, 190, 220):
+                        return 0
+
+
         if left_x == 0 and right_x != img_width:
-            return -25
+            return -21
         elif right_x == img_width and left_x != 0:
-            return 25
+            return 23
         elif left_x == 0 and right_x == img_width:
             return 0
 
@@ -60,7 +68,7 @@ class LaneDetector:
         angle = np.arctan2(center_x - img_width // 2, img_width // 2)
         angle_degrees = np.degrees(angle)
         max_angle = 25
-        scaled_angle = max(-max_angle, min(max_angle, angle_degrees))
+        scaled_angle = max(-max_angle, min(max_angle, angle_degrees)) -1
 
         return scaled_angle
 
@@ -69,16 +77,24 @@ class LaneDetector:
             return width // 2
         return int((y - intercept) / slope)
 
+    def isPointInSquare(self, x, y, x1 = 360, y1 = 180, x2 = 400, y2 = 220):
+        x_min = min(x1, x2)
+        x_max = max(x1, x2)
+        y_min = min(y1, y2)
+        y_max = max(y1, y2)
+        
+        return x_min <= x <= x_max and y_min <= y <= y_max
+
     def region_of_interest(self, img):
         height, width = img.shape[:2]
         mask = np.zeros_like(img)
         
         # Define a triangular region of interest (lower part of the image)
         polygon = np.array([[
-            (width*0.1, height - height*0.2),
-            (width*0.9, height - height*0.2),
-            (width*0.75, height // 2 - height*0.2),
-            (width*0.25, height // 2 - height*0.2)
+            (width * 0.07, height - int(height * 0.2)),
+            (width * 0.9, height - int(height * 0.2)),
+            (int(width * 0.7), height // 2 - int(height * 0.2)),
+            (int(width * 0.2), height // 2 - int(height * 0.2))
         ]], np.int32)
         cv2.fillPoly(mask, polygon, 255)
         masked_image = cv2.bitwise_and(img, mask)
@@ -87,13 +103,12 @@ class LaneDetector:
     def detect_lines(self, img):
         # Use Hough transformation to detect lines
         return cv2.HoughLinesP(
-            img, rho=1, theta=np.pi / 180, threshold=50, minLineLength=50, maxLineGap=150
+            img, rho=1, theta=np.pi / 180, threshold=60, minLineLength=15, maxLineGap=120
         )
 
     def process_frame(self, frame: np.ndarray):
         """Process a single frame for lane detection."""
         angle_degrees: float = 0.0
-
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         edges = cv2.Canny(blurred, 50, 150)

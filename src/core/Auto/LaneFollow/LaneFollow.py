@@ -17,34 +17,34 @@ class LaneFollow():
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.avgSpeed = ma.MovingAverage(10)
-        self.avgAngle = ma.MovingAverage(10)
+        self.avgSpeed = ma(20)
+        self.avgAngle = ma(2)
         self.subscribe()
 
-    def map_value(value, in_min=50, in_max=180, out_min=250, out_max=80):
+    def map_value(self, value, in_min=30, in_max=170, out_min=220, out_max=80):
         value = max(min(value, in_max), in_min)
         return out_min + (out_max - out_min) * (value - in_min) / (in_max - in_min)
 
     def getControlData(self):
-        angle = int(self.laneDetectSubscriber.receiveWithBlock() * 20)
+        angle = int(self.laneDetectSubscriber.receiveWithBlock() * 10)
         
-        if abs(angle) < 50:
-            speed = 250
-        elif abs(angle) > 180:
-            speed = 80
+        if abs(angle) < 30:
+            speed = 280
+        elif abs(angle) > 170:
+            speed = 100
         else:
             speed = self.map_value(angle)
+
+        if angle > 250:
+            angle = 240
+        if angle < -250:
+            angle = -240
 
         if self.debugging:
             self.logging.info(f"Lane detect out: {angle}")
 
-        if angle > 240:
-            angle = 240
-        if angle < -240:
-            angle = -240
-
-        speed = self.avgSpeed(speed)
-        angle = self.avgAngle(angle)
+        speed = int(self.avgSpeed.filter(speed))
+        # angle = int(self.avgAngle.filter(angle))
 
         return angle, speed
 
