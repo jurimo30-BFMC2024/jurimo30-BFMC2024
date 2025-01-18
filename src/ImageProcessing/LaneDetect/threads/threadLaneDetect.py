@@ -5,6 +5,7 @@ import numpy as np
 from src.utils.messages.allMessages import (
     mainCamera,
     LaneDetect,
+    IntersectionDetect,
 )
 
 from src.templates.threadwithstop import ThreadWithStop
@@ -29,6 +30,7 @@ class threadLaneDetect(ThreadWithStop):
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
+        self.intersectionDetectionSender = messageHandlerSender(self.queuesList, IntersectionDetect)
         self.subscribe()
         
     def subscribe(self):
@@ -43,10 +45,11 @@ class threadLaneDetect(ThreadWithStop):
                 frame = self.decode_frame(videoData)
 
                 # obradi frejm
-                drawnFrame, angle = self.detector.process_frame(frame)
+                drawnFrame, angle, intersection = self.detector.process_frame(frame)
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
+                self.intersectionDetectionSender.send(intersection)
             except Exception as e:
                 print(e)
 

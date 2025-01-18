@@ -1,5 +1,6 @@
 from src.utils.messages.allMessages import (
     LaneDetect,
+    IntersectionDetect,
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -27,7 +28,11 @@ class LaneFollow():
 
     def getControlData(self):
         angle = int(self.laneDetectSubscriber.receiveWithBlock() * 10)
-        
+        intersection = self.IntersectionDetectSubscriber.receiveWithBlock()
+
+        if intersection:
+            return 0, 0
+
         if abs(angle) < 30:
             speed = 280
         elif abs(angle) > 170:
@@ -51,3 +56,4 @@ class LaneFollow():
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
         self.laneDetectSubscriber = messageHandlerSubscriber(self.queuesList, LaneDetect, "LastOnly", True)
+        self.IntersectionDetectSubscriber = messageHandlerSubscriber(self.queuesList, IntersectionDetect, "LastOnly", True)

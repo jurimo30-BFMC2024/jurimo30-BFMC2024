@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import math
 
 class LaneDetector:
     def __init__(self, width: int, height: int, logging, debugging=False, camera_fov_degrees: float = 79.3):
@@ -99,6 +100,88 @@ class LaneDetector:
         cv2.fillPoly(mask, polygon, 255)
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
+    
+    def distance(self, point1, point2):
+        """Izračunava Euklidsku udaljenost između dvije tačke."""
+        return math.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
+
+    def merge_lines(self, lines, threshold=10):
+        """
+        Spaja linije ako su krajevi dovoljno blizu (ispod praga threshold).
+        
+        lines: Lista linija, gdje je svaka linija definisana kao ((x1, y1), (x2, y2)).
+        threshold: Maksimalna dozvoljena udaljenost između krajeva linija za spajanje.
+        """
+        merged = []
+        used = [False] * len(lines)  # Prati da li je linija već spojena
+
+        for i, line1 in enumerate(lines):
+            if used[i]:
+                continue
+            (x1, y1), (x2, y2) = line1
+            for j, line2 in enumerate(lines):
+                if i == j or used[j]:
+                    continue
+                (x3, y3), (x4, y4) = line2
+
+                # Provjeri udaljenost između krajeva linija
+                if (self.distance((x1, y1), (x3, y3)) < threshold or
+                    self.distance((x1, y1), (x4, y4)) < threshold or
+                    self.distance((x2, y2), (x3, y3)) < threshold or
+                    self.distance((x2, y2), (x4, y4)) < threshold):
+                    
+                    # Ako su blizu, spajamo linije u novu
+                    new_line = ((min(x1, x2, x3, x4), min(y1, y2, y3, y4)),
+                                (max(x1, x2, x3, x4), max(y1, y2, y3, y4)))
+                    merged.append(new_line)
+                    used[j] = True
+                    break
+            else:
+                # Ako nema spajanja, dodaj trenutnu liniju
+                merged.append(line1)
+            used[i] = True
+
+        return merged
+
+
+    def detectIntersection(self, lines):
+        if lines is None:
+            return False
+        
+        lines2 = []
+        
+
+        for line in lines:
+            for x1, y1, x2, y2 in line:
+                slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
+                distance = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+
+                if slope < 0.3 and slope > -0.3:
+                    if distance > 50:
+                        lines2.append([(x1, y1), (x2, y2)])
+        
+        lines2 = self.merge_lines(lines2, 10)
+
+        if(len(lines2) == 2):
+            return True
+
+        return False
+
+
+    def region_of_interest2(self, img):
+        height, width = img.shape[:2]
+        mask = np.zeros_like(img, dtype=np.uint8)
+        
+        # Define a triangular region of interest (lower part of the image)
+        polygon = np.array([[
+            (400,110),
+            (120, 110),
+            (120, 200),
+            (400, 200)
+        ]], np.int32)
+        cv2.fillPoly(mask, polygon, (255, 255, 255))  # Mask now matches BGR format
+        masked_image = cv2.bitwise_and(img, mask)
+        return masked_image
 
     def detect_lines(self, img):
         # Use Hough transformation to detect lines
@@ -114,7 +197,12 @@ class LaneDetector:
         edges = cv2.Canny(blurred, 50, 150)
 
         roi = self.region_of_interest(edges)
+        roi2 = self.region_of_interest2(edges)
+
         lines = self.detect_lines(roi)
+        lines2 = self.detect_lines(roi2)
+
+        intersection = self.detectIntersection(lines2)
 
         angle_degrees = float(self.calculate_steering_angle(lines, frame.shape[1], frame.shape[0]))
 
@@ -124,4 +212,5 @@ class LaneDetector:
                 for x1, y1, x2, y2 in line:
                     cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
 
-        return frame, angle_degrees
+
+        return frame, angle_degrees, intersection
