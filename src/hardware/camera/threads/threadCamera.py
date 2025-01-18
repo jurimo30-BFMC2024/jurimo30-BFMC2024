@@ -149,6 +149,7 @@ class threadCamera(ThreadWithStop):
             if send:
                 mainRequest = self.camera.capture_array("main")
                 serialRequest = self.camera.capture_array("lores")  # Will capture an array that can be used by OpenCV library
+                serialRequest = cv2.cvtColor(serialRequest, cv2.COLOR_YUV2BGR_I420)
 
                 serialRequest = cv2.cvtColor(serialRequest, cv2.COLOR_YUV2BGR_I420)
                 
