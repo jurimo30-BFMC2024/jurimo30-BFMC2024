@@ -149,7 +149,7 @@ class threadCamera(ThreadWithStop):
             if send:
                 mainRequest = self.camera.capture_array("main")
                 serialRequest = self.camera.capture_array("lores")  # Will capture an array that can be used by OpenCV library
-                serialRequest = cv2.cvtColor(serialRequest, cv2.COLOR_YUV2BGR_I420)
+                #serialRequest = cv2.cvtColor(serialRequest, cv2.COLOR_YUV2BGR_I420)
                 
                 if self.recording == True:
                     self.video_writer.write(serialRequest)
@@ -178,7 +178,7 @@ class threadCamera(ThreadWithStop):
             buffer_count=1,
             queue=False,
             main={"format": "RGB888", "size": (2048, 1080)},
-            lores={"size": (512, 270)},
+            lores={"format": "RGB888", "size": (512, 270)},
             encode="lores",
         )
         self.camera.configure(config)

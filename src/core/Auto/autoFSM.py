@@ -32,7 +32,7 @@ class autoFSM(ControlModeThread):
         super().stop()
 
     def loop(self):
-        angle, speed = self.laneFollowData.getControlData()
+        angle, speed, intersection = self.laneFollowData.getControlData()
         if not self._running.is_set():
             return
 
@@ -47,6 +47,9 @@ class autoFSM(ControlModeThread):
             self.oldSpeed = speed
             if self.debugging:
                 self.logging.info(f"New speed: {speed}")
+
+        if intersection:
+            time.sleep(3)
         
         time.sleep(0.05)
 

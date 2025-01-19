@@ -95,7 +95,7 @@ class LaneDetector:
         
         # Define a triangular region of interest (lower part of the image)
         polygon = np.array([[
-            (width * 0.07, height - int(height * 0.2)),
+            (width * 0.05, height - int(height * 0.2)),
             (width * 0.9, height - int(height * 0.2)),
             (int(width * 0.7), height // 2 - int(height * 0.2)),
             (int(width * 0.2), height // 2 - int(height * 0.2))
@@ -163,13 +163,12 @@ class LaneDetector:
                     if distance > 50:
                         lines2.append([(x1, y1), (x2, y2)])
         
-        lines2 = self.merge_lines(lines2, 20)
-        print(f"Lines: {len(lines2)}")
+        #lines2 = self.merge_lines(lines2, 20)
 
         if(len(lines2) >= 2):
             return True, lines2
 
-        return False, lines2
+        return False, []
 
 
     def region_of_interest2(self, img):
@@ -178,8 +177,8 @@ class LaneDetector:
         
         # Define a triangular region of interest (lower part of the image)
         polygon = np.array([[
-            (width*0.75, height*0.4),
-            (width*0.25, height*0.4),
+            (width*0.75, height*0.55),
+            (width*0.25, height*0.55),
             (width*0.25, height*0.74),
             (width*0.75, height*0.74)
         ]], np.int32)
@@ -190,7 +189,13 @@ class LaneDetector:
     def detect_lines(self, img):
         # Use Hough transformation to detect lines
         return cv2.HoughLinesP(
-            img, rho=1, theta=np.pi / 180, threshold=75, minLineLength=15, maxLineGap=120
+            img, rho=1, theta=np.pi / 180, threshold=30, minLineLength=15, maxLineGap=60
+        )
+    
+    def detect_lines2(self, img):
+        # Use Hough transformation to detect lines
+        return cv2.HoughLinesP(
+            img, rho=1, theta=np.pi / 180, threshold=80, minLineLength=15, maxLineGap=60
         )
 
     def process_frame(self, frame: np.ndarray):
@@ -205,9 +210,9 @@ class LaneDetector:
 
 
         lines = self.detect_lines(roi)
-        lines2 = self.detect_lines(roi2)
+        lines2 = self.detect_lines2(roi2)
 
-        intersection, linesX = bool(self.detectIntersection(lines2))
+        intersection, linesX = self.detectIntersection(lines2)
 
         angle_degrees = float(self.calculate_steering_angle(lines, frame.shape[1], frame.shape[0]))
 
@@ -219,11 +224,39 @@ class LaneDetector:
                     if slope < -0.5 or slope > 0.5:
                         cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
 
-        if linesX is not None:
-            for line in lines:
+        cv2.rectangle(frame, (340,180), (470,220), (0, 150, 0), 1)
+        cv2.rectangle(frame, (80,180), (190,220), (0, 0, 150), 1)
+
+        points = np.array([
+            (int(self.width * 0.05), self.height - int(self.height * 0.2)),
+            (int(self.width * 0.9), self.height - int(self.height * 0.2)),
+            (int(self.width * 0.7), self.height // 2 - int(self.height * 0.2)),
+            (int(self.width * 0.2), self.height // 2 - int(self.height * 0.2))
+        ], dtype=np.int32)
+        points = points.reshape((-1, 1, 2))
+        cv2.polylines(frame, [points], isClosed=True, color=(0, 255, 0), thickness=3)
+
+        points = np.array([
+            (self.width*0.75, self.height*0.55),
+            (self.width*0.25, self.height*0.55),
+            (self.width*0.25, self.height*0.74),
+            (self.width*0.75, self.height*0.74)
+        ], dtype=np.int32)
+
+        # `cv2.polylines` očekuje oblik (n, 1, 2), pa preoblikujemo
+        points = points.reshape((-1, 1, 2))
+
+        # Iscrtavanje poligona na slici
+        cv2.polylines(frame, [points], isClosed=True, color=(255, 255, 0), thickness=3)
+#
+        if len(linesX) > 0:
+            for line in linesX:
                 (x1, y1), (x2, y2) = line
                 cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 5)
-
+#
         self.strm.display(frame)
+
+        if intersection:
+            print("Raskrsce")
 
         return frame, angle_degrees, intersection

@@ -31,7 +31,8 @@ class LaneFollow():
         intersection = self.intersectionDetectSubscriber.receiveWithBlock()
 
         if intersection:
-            return 0, 0
+            return 0, 0, intersection
+        
 
         if abs(angle) < 30:
             speed = 280
@@ -51,7 +52,7 @@ class LaneFollow():
         speed = int(self.avgSpeed.filter(speed))
         # angle = int(self.avgAngle.filter(angle))
 
-        return angle, speed
+        return angle, speed, intersection
 
     def subscribe(self):
         """Subscribes to the messages you are interested in"""

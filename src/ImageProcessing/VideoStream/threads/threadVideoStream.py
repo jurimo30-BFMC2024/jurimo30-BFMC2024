@@ -30,11 +30,6 @@ class threadVideoStream(ThreadWithStop):
                 "row": 0,
                 "col": 0,
             }),
-            Thread(target=self.displayRawCamera, daemon=True, kwargs={
-                "subscriber": messageHandlerSubscriber(self.queuesList, mainCamera, "lastOnly", True), 
-                "row": 1,
-                "col": 0,
-            })
         ]
 
     @staticmethod
@@ -53,7 +48,7 @@ class threadVideoStream(ThreadWithStop):
             frame = self.decode_frame(videoData)
 
             streamer.display(frame)
-            time.sleep(0.05)
+            time.sleep(0.1)
 
     def run(self):
         for th in self.displayThreads:
