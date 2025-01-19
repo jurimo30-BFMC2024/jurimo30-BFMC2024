@@ -49,7 +49,7 @@ class threadLaneDetect(ThreadWithStop):
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
-                self.intersectionDetectionSender.send(intersection)
+                self.intersectionDetectionSender.send(bool(intersection))
             except Exception as e:
                 print(e)
 

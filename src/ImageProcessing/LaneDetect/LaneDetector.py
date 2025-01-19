@@ -144,7 +144,7 @@ class LaneDetector:
         return merged
 
 
-    def detectIntersection(self, lines):
+    def detectIntersection(self, lines) -> bool:
         if lines is None:
             return False
         
@@ -160,9 +160,10 @@ class LaneDetector:
                     if distance > 50:
                         lines2.append([(x1, y1), (x2, y2)])
         
-        lines2 = self.merge_lines(lines2, 10)
+        lines2 = self.merge_lines(lines2, 20)
+        print(f"Lines: {len(lines2)}")
 
-        if(len(lines2) == 2):
+        if(len(lines2) >= 2):
             return True
 
         return False
@@ -186,7 +187,7 @@ class LaneDetector:
     def detect_lines(self, img):
         # Use Hough transformation to detect lines
         return cv2.HoughLinesP(
-            img, rho=1, theta=np.pi / 180, threshold=60, minLineLength=15, maxLineGap=120
+            img, rho=1, theta=np.pi / 180, threshold=75, minLineLength=15, maxLineGap=120
         )
 
     def process_frame(self, frame: np.ndarray):
@@ -202,7 +203,7 @@ class LaneDetector:
         lines = self.detect_lines(roi)
         lines2 = self.detect_lines(roi2)
 
-        intersection = self.detectIntersection(lines2)
+        intersection = bool(self.detectIntersection(lines2))
 
         angle_degrees = float(self.calculate_steering_angle(lines, frame.shape[1], frame.shape[0]))
 

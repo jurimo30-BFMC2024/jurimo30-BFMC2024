@@ -28,7 +28,7 @@ class LaneFollow():
 
     def getControlData(self):
         angle = int(self.laneDetectSubscriber.receiveWithBlock() * 10)
-        intersection = self.IntersectionDetectSubscriber.receiveWithBlock()
+        intersection = self.intersectionDetectSubscriber.receiveWithBlock()
 
         if intersection:
             return 0, 0
@@ -56,4 +56,4 @@ class LaneFollow():
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
         self.laneDetectSubscriber = messageHandlerSubscriber(self.queuesList, LaneDetect, "LastOnly", True)
-        self.IntersectionDetectSubscriber = messageHandlerSubscriber(self.queuesList, IntersectionDetect, "LastOnly", True)
+        self.intersectionDetectSubscriber = messageHandlerSubscriber(self.queuesList, IntersectionDetect, "LastOnly", True)
