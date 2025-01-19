@@ -61,6 +61,7 @@ from src.utils.ipManager.IpReplacement import IPManager
 # ------ New component imports starts here ------#
 
 from src.ImageProcessing.LaneDetect.processLaneDetect import processLaneDetect
+from src.ImageProcessing.ObjectDetection.processObjectDetection import processObjectDetection
 from src.core.Core.processCore import processCore
 from src.ImageProcessing.VideoStream.processVideoStream import processVideoStream
 # ------ New component imports ends here ------#
@@ -88,6 +89,7 @@ flagSimCom = False
 flagLaneDetect = True
 flagCore = True
 flagVideoStream = True
+flagObjectDetection = True
 # ------ New component flags ends here ------#
 
 # ===================================== SETUP PROCESSES ==================================
@@ -139,6 +141,9 @@ if flagLaneDetect:
 if flagCore:
     processCore = processCore(queueList, logging, debugging = True)
     allProcesses.append(processCore)
+if flagObjectDetection:
+    processObjectDetection = processObjectDetection(queueList, logging, debugging = False)
+    allProcesses.append(processObjectDetection)
 if flagVideoStream:
     processVideoStream = processVideoStream(queueList, logging, debugging = False)
     allProcesses.append(processVideoStream)
