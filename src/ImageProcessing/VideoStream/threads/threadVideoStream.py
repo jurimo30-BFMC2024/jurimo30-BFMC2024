@@ -30,6 +30,11 @@ class threadVideoStream(ThreadWithStop):
                 "row": 0,
                 "col": 0,
             }),
+            # Thread(target=self.displayRawCamera, daemon=True, kwargs={
+            #     "subscriber": messageHandlerSubscriber(self.queuesList, mainCamera, "lastOnly", True), 
+            #     "row": 1,
+            #     "col": 0,
+            # })
         ]
 
     @staticmethod
