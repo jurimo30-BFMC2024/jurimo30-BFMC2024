@@ -87,7 +87,7 @@ SerialHandler = True
 flagSimCom = False
 flagLaneDetect = True
 flagCore = True
-flagVideoStream = False
+flagVideoStream = True
 # ------ New component flags ends here ------#
 
 # ===================================== SETUP PROCESSES ==================================

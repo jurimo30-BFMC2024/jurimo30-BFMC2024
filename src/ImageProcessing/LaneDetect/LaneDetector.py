@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 import math
+from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream as vs
 
 class LaneDetector:
     def __init__(self, width: int, height: int, logging, debugging=False, camera_fov_degrees: float = 79.3):
@@ -10,6 +11,8 @@ class LaneDetector:
         self.camera_fov_degrees = camera_fov_degrees    
         self.width = width
         self.height = height
+
+        self.strm = vs(1, 0)
 
     def calculate_steering_angle(self, lines, img_width, img_height):
         if lines is None:
@@ -146,7 +149,7 @@ class LaneDetector:
 
     def detectIntersection(self, lines) -> bool:
         if lines is None:
-            return False
+            return False, []
         
         lines2 = []
         
@@ -164,9 +167,9 @@ class LaneDetector:
         print(f"Lines: {len(lines2)}")
 
         if(len(lines2) >= 2):
-            return True
+            return True, lines2
 
-        return False
+        return False, lines2
 
 
     def region_of_interest2(self, img):
@@ -175,10 +178,10 @@ class LaneDetector:
         
         # Define a triangular region of interest (lower part of the image)
         polygon = np.array([[
-            (400,110),
-            (120, 110),
-            (120, 200),
-            (400, 200)
+            (width*0.75, height*0.4),
+            (width*0.25, height*0.4),
+            (width*0.25, height*0.74),
+            (width*0.75, height*0.74)
         ]], np.int32)
         cv2.fillPoly(mask, polygon, (255, 255, 255))  # Mask now matches BGR format
         masked_image = cv2.bitwise_and(img, mask)
@@ -197,13 +200,14 @@ class LaneDetector:
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         edges = cv2.Canny(blurred, 50, 150)
 
-        roi = self.region_of_interest(edges)
         roi2 = self.region_of_interest2(edges)
+        roi = self.region_of_interest(edges)
+
 
         lines = self.detect_lines(roi)
         lines2 = self.detect_lines(roi2)
 
-        intersection = bool(self.detectIntersection(lines2))
+        intersection, linesX = bool(self.detectIntersection(lines2))
 
         angle_degrees = float(self.calculate_steering_angle(lines, frame.shape[1], frame.shape[0]))
 
@@ -211,7 +215,15 @@ class LaneDetector:
         if lines is not None:
             for line in lines:
                 for x1, y1, x2, y2 in line:
-                    cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
+                    slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
+                    if slope < -0.5 or slope > 0.5:
+                        cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
 
+        if linesX is not None:
+            for line in lines:
+                (x1, y1), (x2, y2) = line
+                cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 5)
+
+        self.strm.display(frame)
 
         return frame, angle_degrees, intersection

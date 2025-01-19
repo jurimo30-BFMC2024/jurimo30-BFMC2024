@@ -3,7 +3,7 @@ import base64
 import numpy as np
 
 from src.utils.messages.allMessages import (
-    mainCamera,
+    serialCamera,
     LaneDetect,
     IntersectionDetect,
 )
@@ -35,7 +35,7 @@ class threadLaneDetect(ThreadWithStop):
         
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
-        self.videoSubscriber = messageHandlerSubscriber(self.queuesList, mainCamera, "LastOnly", True)
+        self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
 
     def run(self):
         while self._running:
