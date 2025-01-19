@@ -1,11 +1,16 @@
 import cv2
 import base64
 import numpy as np
+import os
+
+os.environ['OMP_NUM_THREADS'] = "2"
+os.environ['MKL_NUM_THREADS'] = "2"
+
 from ultralytics import YOLO
 
 from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.allMessages import(
-    mainCamera,
+    serialCamera,
     ObjectDetection
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
@@ -24,6 +29,7 @@ class threadObjectDetection(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
+        self.model = YOLO('yolo11n.pt')
         self.streamer = VideoStream(0, 1)
         super(threadObjectDetection, self).__init__()
         
@@ -33,7 +39,7 @@ class threadObjectDetection(ThreadWithStop):
 
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
-        self.videoSubscriber = messageHandlerSubscriber(self.queuesList, mainCamera, "LastOnly", True)
+        self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
 
     def run(self):
         while self._running:
@@ -43,7 +49,7 @@ class threadObjectDetection(ThreadWithStop):
 
                 frame = self.decode_frame(videoData)
                 objects = self.main(frame)
-                self.streamer.display(objects)
+                self.streamer.display(frame)
 
             except Exception as e:
                 print(e)
@@ -67,19 +73,18 @@ class threadObjectDetection(ThreadWithStop):
             
             # Crtanje bounding box-a
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(frame, label, (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, .4, (0, 255, 0), 2)
             
         return frame
 
     def main(self, frame):
-        model = YOLO('yolo11n.pt')
-
-        results = model(frame)[0]
+        results = self.model(frame)[0]
         # Annotiraj okvire
-        frame = self.annotate_boxes(frame=frame, results=results, model=model)
+        frame = self.annotate_boxes(frame=frame, results=results, model=self.model)
         
         # Generiši labelu za detekcije (ispisuje naziv klase i poverenje)
         labels = [
-            f"{model.model.names[int(cls)]} {conf:0.2f}"
+            f"{self.model.model.names[int(cls)]} {conf:0.2f}"
             for cls, conf in zip(results.boxes.cls, results.boxes.conf)
         ]
 
