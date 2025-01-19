@@ -3,8 +3,9 @@ import base64
 import numpy as np
 
 from src.utils.messages.allMessages import (
-    mainCamera,
+    serialCamera,
     LaneDetect,
+    IntersectionDetect,
 )
 
 from src.templates.threadwithstop import ThreadWithStop
@@ -29,11 +30,12 @@ class threadLaneDetect(ThreadWithStop):
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
+        self.intersectionDetectionSender = messageHandlerSender(self.queuesList, IntersectionDetect)
         self.subscribe()
         
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
-        self.videoSubscriber = messageHandlerSubscriber(self.queuesList, mainCamera, "LastOnly", True)
+        self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
 
     def run(self):
         while self._running:
@@ -43,10 +45,11 @@ class threadLaneDetect(ThreadWithStop):
                 frame = self.decode_frame(videoData)
 
                 # obradi frejm
-                drawnFrame, angle = self.detector.process_frame(frame)
+                drawnFrame, angle, intersection = self.detector.process_frame(frame)
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
+                self.intersectionDetectionSender.send(bool(intersection))
             except Exception as e:
                 print(e)
 

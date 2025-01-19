@@ -91,12 +91,18 @@ class LaneDetect(Enum):
     Owner = "threadLaneDetect"
     msgID = 6
     msgType = "float"
+    
+class IntersectionDetect(Enum):
+    Queue = "General"
+    Owner = "threadLaneDetect"
+    msgID = 7
+    msgType = "bool"
 
 ################################# processObjectDetection ##################################
 class ObjectDetection(Enum):
     Queue = "General"
     Owner = "threadObjectDetection"
-    msgID = 7
+    msgID = 8
     msgType = "list"
 
 ################################# processCarsAndSemaphores ##################################

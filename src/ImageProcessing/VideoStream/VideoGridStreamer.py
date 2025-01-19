@@ -33,15 +33,15 @@ class VideoGridStreamer:
 
     def generate_frames(self):
         while True:
-            with Frames.condition:
-                Frames.condition.wait()  # Wait for the grid to be updated
+            #with Frames.condition:
+            #    Frames.condition.wait()  # Wait for the grid to be updated
+            time.sleep(0.1)
+            # Compose the grid using shared memory frames
+            grid_frame = self.compose_grid()
 
-                # Compose the grid using shared memory frames
-                grid_frame = self.compose_grid()
-
-                # Encode the grid frame
-                ret, buffer = cv2.imencode('.jpg', grid_frame)
-                grid_frame = buffer.tobytes()
+            # Encode the grid frame
+            ret, buffer = cv2.imencode('.jpg', grid_frame)
+            grid_frame = buffer.tobytes()
 
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + grid_frame + b'\r\n')
