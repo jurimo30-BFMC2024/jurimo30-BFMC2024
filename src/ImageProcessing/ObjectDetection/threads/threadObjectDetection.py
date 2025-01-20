@@ -15,7 +15,7 @@ from src.utils.messages.allMessages import(
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
-from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream
+from src.ImageProcessing.VideoStream.VideoStream import VideoStream
 
 class threadObjectDetection(ThreadWithStop):
     """This thread handles ObjectDetection.
@@ -30,7 +30,7 @@ class threadObjectDetection(ThreadWithStop):
         self.logging = logging
         self.debugging = debugging
         self.model = YOLO('yolo11n.pt')
-        self.streamer = VideoStream(0, 1)
+        self.streamer = VideoStream(2)
         super(threadObjectDetection, self).__init__()
         
         # Sender

@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import math
-from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream as vs
+from src.ImageProcessing.VideoStream.VideoStream import VideoStream
 
 class LaneDetector:
     def __init__(self, width: int, height: int, logging, debugging=False, camera_fov_degrees: float = 79.3):
@@ -12,7 +12,7 @@ class LaneDetector:
         self.width = width
         self.height = height
 
-        self.strm = vs(1, 0)
+        self.streamer = VideoStream(1)
 
     def calculate_steering_angle(self, lines, img_width, img_height):
         if lines is None:
@@ -254,7 +254,7 @@ class LaneDetector:
                 (x1, y1), (x2, y2) = line
                 cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 5)
 #
-        self.strm.display(frame)
+        self.streamer.display(frame)
 
         if intersection:
             print("Raskrsce")

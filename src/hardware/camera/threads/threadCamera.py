@@ -31,6 +31,7 @@ import threading
 import base64
 import picamera2
 import time
+from src.ImageProcessing.VideoStream.VideoStream import VideoStream
 
 from src.utils.messages.allMessages import (
     mainCamera,
@@ -61,6 +62,7 @@ class threadCamera(ThreadWithStop):
         self.debugger = debugger
         self.frame_rate = 5
         self.recording = False
+        self.streamer = VideoStream(0)
 
         self.video_writer = ""
 
@@ -154,6 +156,8 @@ class threadCamera(ThreadWithStop):
                 
                 if self.recording == True:
                     self.video_writer.write(serialRequest)
+
+                self.streamer.display(serialRequest)
 
                 # _, mainEncodedImg = cv2.imencode(".jpg", mainRequest)                   
                 _, serialEncodedImg = cv2.imencode(".jpg", serialRequest)
