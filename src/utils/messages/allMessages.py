@@ -28,6 +28,32 @@
 
 from enum import Enum
 
+####################################### fromCore ############################################
+
+class CoreSpeedMotor(Enum):
+    Queue = "General"
+    Owner = "threadCore"
+    msgID = 1
+    msgType = "str"
+
+class CoreSteerMotor(Enum):
+    Queue = "General"
+    Owner = "threadCore"
+    msgID = 2
+    msgType = "str"
+
+class CoreControl(Enum):
+    Queue = "General"
+    Owner = "threadCore"
+    msgID = 3
+    msgType = "dict"
+
+class CoreBrake(Enum):
+    Queue = "General"
+    Owner = "threadCore"
+    msgID = 4
+    msgType = "float"
+
 ####################################### processCamera #######################################
 class mainCamera(Enum):
     Queue = "General"
@@ -58,6 +84,26 @@ class LaneKeeping(Enum):
     Owner = "threadCamera" # here you will send an offset of the car position between the lanes of the road + - from 0 point to dashboard
     msgID = 5
     msgType = "int"
+
+#dodata poruka za detekciju linije
+class LaneDetect(Enum):
+    Queue = "General"
+    Owner = "threadLaneDetect"
+    msgID = 6
+    msgType = "float"
+    
+class IntersectionDetect(Enum):
+    Queue = "General"
+    Owner = "threadLaneDetect"
+    msgID = 7
+    msgType = "bool"
+
+################################# processObjectDetection ##################################
+class ObjectDetection(Enum):
+    Queue = "General"
+    Owner = "threadObjectDetection"
+    msgID = 8
+    msgType = "list"
 
 ################################# processCarsAndSemaphores ##################################
 class Cars(Enum):

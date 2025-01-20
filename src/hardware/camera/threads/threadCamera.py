@@ -140,31 +140,32 @@ class threadCamera(ThreadWithStop):
                             "output_video" + str(time.time()) + ".avi",
                             fourcc,
                             self.frame_rate,
-                            (2048, 1080),
+                            (512, 270),
                         )
 
             except Exception as e:
                 print(e)
 
             if send:
-                mainRequest = self.camera.capture_array("main")
+                # mainRequest = self.camera.capture_array("main")
                 serialRequest = self.camera.capture_array("lores")  # Will capture an array that can be used by OpenCV library
 
+                #serialRequest = cv2.cvtColor(serialRequest, cv2.COLOR_YUV2BGR_I420)
+                
                 if self.recording == True:
-                    self.video_writer.write(mainRequest)
+                    self.video_writer.write(serialRequest)
 
-                serialRequest = cv2.cvtColor(serialRequest, cv2.COLOR_YUV2BGR_I420)
-
-                _, mainEncodedImg = cv2.imencode(".jpg", mainRequest)                   
+                # _, mainEncodedImg = cv2.imencode(".jpg", mainRequest)                   
                 _, serialEncodedImg = cv2.imencode(".jpg", serialRequest)
 
-                mainEncodedImageData = base64.b64encode(mainEncodedImg).decode("utf-8")
+                # mainEncodedImageData = base64.b64encode(mainEncodedImg).decode("utf-8")
                 serialEncodedImageData = base64.b64encode(serialEncodedImg).decode("utf-8")
 
-                self.mainCameraSender.send(mainEncodedImageData)
+                # self.mainCameraSender.send(mainEncodedImageData)
                 self.serialCameraSender.send(serialEncodedImageData)
 
             send = not send
+            time.sleep(0.05)
 
     # =============================== START ===============================================
     def start(self):
@@ -178,8 +179,9 @@ class threadCamera(ThreadWithStop):
         config = self.camera.create_preview_configuration(
             buffer_count=1,
             queue=False,
-            main={"format": "RGB888", "size": (2048, 1080)},
-            lores={"size": (512, 270)},
+
+            # main={"format": "RGB888", "size": (2048, 1080)},
+            lores={"format": "RGB888", "size": (512, 270)},
             encode="lores",
         )
         self.camera.configure(config)

@@ -52,15 +52,18 @@ logging.basicConfig(level=logging.INFO)
 # ===================================== PROCESS IMPORTS ==================================
 
 from src.gateway.processGateway import processGateway
-#from src.dashboard.processDashboard import processDashboard
-#from src.hardware.camera.processCamera import processCamera
+from src.dashboard.processDashboard import processDashboard
+from src.hardware.camera.processCamera import processCamera
 from src.hardware.serialhandler.processSerialHandler import processSerialHandler
 from src.data.Semaphores.Semaphores import processSemaphores
 from src.data.TrafficCommunication.processTrafficCommunication import processTrafficCommunication
 from src.utils.ipManager.IpReplacement import IPManager
 # ------ New component imports starts here ------#
 
-from src.simulator.SimCom.processSimCom import processSimCom
+from src.ImageProcessing.LaneDetect.processLaneDetect import processLaneDetect
+from src.ImageProcessing.ObjectDetection.processObjectDetection import processObjectDetection
+from src.core.Core.processCore import processCore
+from src.ImageProcessing.VideoStream.processVideoStream import processVideoStream
 # ------ New component imports ends here ------#
 # ======================================== SETTING UP ====================================
 allProcesses = list()
@@ -74,15 +77,19 @@ queueList = {
 
 logging = logging.getLogger()
 
-Dashboard = False
-Camera = False
+Dashboard = True
+Camera = True
 Semaphores = False
 TrafficCommunication = False
-SerialHandler = False
+SerialHandler = True
 
 # ------ New component flags starts here ------#
  
-flagSimCom = True
+flagSimCom = False
+flagLaneDetect = True
+flagCore = True
+flagVideoStream = True
+flagObjectDetection = True
 # ------ New component flags ends here ------#
 
 # ===================================== SETUP PROCESSES ==================================
@@ -125,8 +132,21 @@ if SerialHandler:
 # ------ New component runs starts here ------#
  
 if flagSimCom:
+    from src.simulator.SimCom.processSimCom import processSimCom
     processSimCom = processSimCom(queueList, logging, debugging = True)
     allProcesses.append(processSimCom)
+if flagLaneDetect:
+    processLaneDetect = processLaneDetect(queueList, logging, debugging = False)
+    allProcesses.append(processLaneDetect)
+if flagCore:
+    processCore = processCore(queueList, logging, debugging = True)
+    allProcesses.append(processCore)
+if flagObjectDetection:
+    processObjectDetection = processObjectDetection(queueList, logging, debugging = False)
+    allProcesses.append(processObjectDetection)
+if flagVideoStream:
+    processVideoStream = processVideoStream(queueList, logging, debugging = False)
+    allProcesses.append(processVideoStream)
 # ------ New component runs ends here ------#
 
 # ===================================== START PROCESSES ==================================
