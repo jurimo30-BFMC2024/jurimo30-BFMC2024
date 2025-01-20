@@ -4,15 +4,16 @@ import math
 from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream as vs
 
 class LaneDetector:
-    def __init__(self, width: int, height: int, logging, debugging=False, camera_fov_degrees: float = 79.3):
-        self.logging = logging
+    def __init__(self, width: int, height: int,logging, debugging=False, pc = False, camera_fov_degrees: float = 79.3):
         self.debugging = debugging
-
+        self.logging = logging
         self.camera_fov_degrees = camera_fov_degrees    
         self.width = width
         self.height = height
+        self.pc = pc
+        if not pc:
+            self.strm = vs(1, 0)
 
-        self.strm = vs(1, 0)
 
     def calculate_steering_angle(self, lines, img_width, img_height):
         if lines is None:
@@ -145,7 +146,7 @@ class LaneDetector:
             used[i] = True
 
         return merged
-
+        cv2.imshow('Lane Detection', processed_frame)
 
     def detectIntersection(self, lines) -> bool:
         if lines is None:
@@ -159,7 +160,7 @@ class LaneDetector:
                 slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
                 distance = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
-                if slope < 0.3 and slope > -0.3:
+                if slope < 0.1 and slope > -0.1:
                     if distance > 50:
                         lines2.append([(x1, y1), (x2, y2)])
         
@@ -182,10 +183,25 @@ class LaneDetector:
             (width*0.25, height*0.74),
             (width*0.75, height*0.74)
         ]], np.int32)
-        cv2.fillPoly(mask, polygon, (255, 255, 255))  # Mask now matches BGR format
+        cv2.fillPoly(mask, polygon, (255, 255, 255)) # Mask now matches BGR format
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
-
+    
+    def region_of_interest3(self, img):
+        height, width = img.shape[:2]
+        mask = np.zeros_like(img, dtype=np.uint8)
+        
+        # Define a triangular region of interest (lower part of the image)
+        polygon = np.array([[
+            (width*0.75, height*0.25),
+            (width*0.25, height*0.25),
+            (width*0.25, height*0.50),
+            (width*0.75, height*0.50)
+        ]], np.int32)
+        cv2.fillPoly(mask, polygon, (255, 255, 255)) # Mask now matches BGR format
+        masked_image = cv2.bitwise_and(img, mask)
+        return masked_image
+    
     def detect_lines(self, img):
         # Use Hough transformation to detect lines
         return cv2.HoughLinesP(
@@ -199,6 +215,7 @@ class LaneDetector:
         )
 
     def process_frame(self, frame: np.ndarray):
+
         """Process a single frame for lane detection."""
         angle_degrees: float = 0.0
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -207,56 +224,75 @@ class LaneDetector:
 
         roi2 = self.region_of_interest2(edges)
         roi = self.region_of_interest(edges)
-
+        roi3 = self.region_of_interest3(edges)
 
         lines = self.detect_lines(roi)
         lines2 = self.detect_lines2(roi2)
+        lines3 = self.detect_lines2(roi3)
 
         intersection, linesX = self.detectIntersection(lines2)
+        intersectionA, linesY = self.detectIntersection(lines3)
 
         angle_degrees = float(self.calculate_steering_angle(lines, frame.shape[1], frame.shape[0]))
 
-        # Draw lines on the frame
-        if lines is not None:
-            for line in lines:
-                for x1, y1, x2, y2 in line:
-                    slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
-                    if slope < -0.5 or slope > 0.5:
-                        cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
+        if self.debugging:
+            # Draw lines on the frame
+            if lines is not None:
+                for line in lines:
+                    for x1, y1, x2, y2 in line:
+                        slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
+                        if slope < -0.5 or slope > 0.5:
+                            cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
 
-        cv2.rectangle(frame, (340,180), (470,220), (0, 150, 0), 1)
-        cv2.rectangle(frame, (80,180), (190,220), (0, 0, 150), 1)
+            cv2.rectangle(frame, (340,180), (470,220), (0, 150, 0), 1)
+            cv2.rectangle(frame, (80,180), (190,220), (0, 0, 150), 1)
 
-        points = np.array([
-            (int(self.width * 0.05), self.height - int(self.height * 0.2)),
-            (int(self.width * 0.9), self.height - int(self.height * 0.2)),
-            (int(self.width * 0.7), self.height // 2 - int(self.height * 0.2)),
-            (int(self.width * 0.2), self.height // 2 - int(self.height * 0.2))
-        ], dtype=np.int32)
-        points = points.reshape((-1, 1, 2))
-        cv2.polylines(frame, [points], isClosed=True, color=(0, 255, 0), thickness=3)
+            points = np.array([
+                (int(self.width * 0.05), self.height - int(self.height * 0.2)),
+                (int(self.width * 0.9), self.height - int(self.height * 0.2)),
+                (int(self.width * 0.7), self.height // 2 - int(self.height * 0.2)),
+                (int(self.width * 0.2), self.height // 2 - int(self.height * 0.2))
+            ], dtype=np.int32)
+            points = points.reshape((-1, 1, 2))
+            cv2.polylines(frame, [points], isClosed=True, color=(0, 255, 0), thickness=3)
 
-        points = np.array([
-            (self.width*0.75, self.height*0.55),
-            (self.width*0.25, self.height*0.55),
-            (self.width*0.25, self.height*0.74),
-            (self.width*0.75, self.height*0.74)
-        ], dtype=np.int32)
+            points = np.array([
+                (self.width*0.75, self.height*0.55),
+                (self.width*0.25, self.height*0.55),
+                (self.width*0.25, self.height*0.74),
+                (self.width*0.75, self.height*0.74)
+            ], dtype=np.int32)
 
-        # `cv2.polylines` očekuje oblik (n, 1, 2), pa preoblikujemo
-        points = points.reshape((-1, 1, 2))
+            # `cv2.polylines` očekuje oblik (n, 1, 2), pa preoblikujemo
+            points = points.reshape((-1, 1, 2))
 
-        # Iscrtavanje poligona na slici
-        cv2.polylines(frame, [points], isClosed=True, color=(255, 255, 0), thickness=3)
-#
-        if len(linesX) > 0:
-            for line in linesX:
-                (x1, y1), (x2, y2) = line
-                cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 5)
-#
-        self.strm.display(frame)
+            # Iscrtavanje poligona na slici
+            cv2.polylines(frame, [points], isClosed=True, color=(255, 255, 0), thickness=3)
 
-        if intersection:
-            print("Raskrsce")
+            points = np.array([
+                (self.width*0.75, self.height*0.25),
+                (self.width*0.25, self.height*0.25),
+                (self.width*0.25, self.height*0.50),
+                (self.width*0.75, self.height*0.50)
+            ], dtype=np.int32)
 
-        return frame, angle_degrees, intersection
+            # `cv2.polylines` očekuje oblik (n, 1, 2), pa preoblikujemo
+            points = points.reshape((-1, 1, 2))
+
+            # Iscrtavanje poligona na slici
+            cv2.polylines(frame, [points], isClosed=True, color=(150, 255, 50), thickness=3)
+
+            if len(linesX) > 0:
+                for line in linesX:
+                    (x1, y1), (x2, y2) = line
+                    cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 5)
+            
+            if len(linesY) > 0:
+                for line in linesY:
+                    (x1, y1), (x2, y2) = line
+                    cv2.line(frame, (x1, y1), (x2, y2), (200, 50, 0), 5)
+        
+        if not self.pc:
+            self.strm.display(frame)
+
+        return frame, angle_degrees, intersection, intersectionA
