@@ -6,13 +6,34 @@ from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream as vs
 class LaneDetector:
     def __init__(self, width: int, height: int,logging, debugging=False, pc = False, camera_fov_degrees: float = 79.3):
         self.debugging = debugging
-        self.logging = logging
+        self.l245ogging = logging
         self.camera_fov_degrees = camera_fov_degrees    
         self.width = width
         self.height = height
         self.pc = pc
         if not pc:
             self.strm = vs(1, 0)
+        
+        self.roadReg = np.array([[
+                (int(self.width * 0.02), self.height - int(self.height * 0.2)),
+                (int(self.width * 0.98), self.height - int(self.height * 0.2)),
+                (int(self.width * 0.8), self.height // 2 - int(self.height * 0.05)),
+                (int(self.width * 0.2), self.height // 2 - int(self.height * 0.05))
+            ]], np.int32)
+        
+        self.stopReg = np.array([[
+                (self.width*0.75, self.height*0.6),
+                (self.width*0.25, self.height*0.6),
+                (self.width*0.25, self.height*0.83),
+                (self.width*0.75, self.height*0.83)
+            ]], np.int32)
+        
+        self.interStopReg = np.array([[
+                (self.width*0.65, self.height*0.3),
+                (self.width*0.35, self.height*0.3),
+                (self.width*0.25, self.height*0.6),
+                (self.width*0.75, self.height*0.6)
+            ]], np.int32)
 
 
     def calculate_steering_angle(self, lines, img_width, img_height):
@@ -95,13 +116,7 @@ class LaneDetector:
         mask = np.zeros_like(img)
         
         # Define a triangular region of interest (lower part of the image)
-        polygon = np.array([[
-            (width * 0.05, height - int(height * 0.2)),
-            (width * 0.9, height - int(height * 0.2)),
-            (int(width * 0.7), height // 2 - int(height * 0.2)),
-            (int(width * 0.2), height // 2 - int(height * 0.2))
-        ]], np.int32)
-        cv2.fillPoly(mask, polygon, 255)
+        cv2.fillPoly(mask, self.roadReg, 255)
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
     
@@ -177,13 +192,7 @@ class LaneDetector:
         mask = np.zeros_like(img, dtype=np.uint8)
         
         # Define a triangular region of interest (lower part of the image)
-        polygon = np.array([[
-            (width*0.75, height*0.55),
-            (width*0.25, height*0.55),
-            (width*0.25, height*0.74),
-            (width*0.75, height*0.74)
-        ]], np.int32)
-        cv2.fillPoly(mask, polygon, (255, 255, 255)) # Mask now matches BGR format
+        cv2.fillPoly(mask, self.stopReg, (224555, 255, 255)) # Mask now matches BGR format
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
     
@@ -192,43 +201,34 @@ class LaneDetector:
         mask = np.zeros_like(img, dtype=np.uint8)
         
         # Define a triangular region of interest (lower part of the image)
-        polygon = np.array([[
-            (width*0.75, height*0.25),
-            (width*0.25, height*0.25),
-            (width*0.25, height*0.50),
-            (width*0.75, height*0.50)
-        ]], np.int32)
-        cv2.fillPoly(mask, polygon, (255, 255, 255)) # Mask now matches BGR format
+
+        cv2.fillPoly(mask, self.interStopReg, (255, 255, 255)) # Mask now matches BGR format
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
     
-    def detect_lines(self, img):
+    def detect_lines(self, img, tres = 30):
         # Use Hough transformation to detect lines
         return cv2.HoughLinesP(
-            img, rho=1, theta=np.pi / 180, threshold=30, minLineLength=15, maxLineGap=60
+            img, rho=1, theta=np.pi / 180, threshold=tres, minLineLength=15, maxLineGap=60
         )
     
-    def detect_lines2(self, img):
-        # Use Hough transformation to detect lines
-        return cv2.HoughLinesP(
-            img, rho=1, theta=np.pi / 180, threshold=80, minLineLength=15, maxLineGap=60
-        )
 
     def process_frame(self, frame: np.ndarray):
 
         """Process a single frame for lane detection."""
         angle_degrees: float = 0.0
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        edges = cv2.Canny(blurred, 50, 150)
+        blurred = cv2.GaussianBlur(gray, (7, 7), 0)
+        _ , blurred = cv2.threshold(blurred, 245, 255, cv2.THRESH_BINARY)
+        edges = cv2.Canny(blurred, 50, 200)
 
         roi2 = self.region_of_interest2(edges)
         roi = self.region_of_interest(edges)
         roi3 = self.region_of_interest3(edges)
 
-        lines = self.detect_lines(roi)
-        lines2 = self.detect_lines2(roi2)
-        lines3 = self.detect_lines2(roi3)
+        lines = self.detect_lines(roi, 25)
+        lines2 = self.detect_lines(roi2, 45)
+        lines3 = self.detect_lines(roi3, 80)
 
         intersection, linesX = self.detectIntersection(lines2)
         intersectionA, linesY = self.detectIntersection(lines3)
@@ -242,55 +242,37 @@ class LaneDetector:
                     for x1, y1, x2, y2 in line:
                         slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
                         if slope < -0.5 or slope > 0.5:
-                            cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 5)
+                            cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 3)
 
             cv2.rectangle(frame, (340,180), (470,220), (0, 150, 0), 1)
             cv2.rectangle(frame, (80,180), (190,220), (0, 0, 150), 1)
 
-            points = np.array([
-                (int(self.width * 0.05), self.height - int(self.height * 0.2)),
-                (int(self.width * 0.9), self.height - int(self.height * 0.2)),
-                (int(self.width * 0.7), self.height // 2 - int(self.height * 0.2)),
-                (int(self.width * 0.2), self.height // 2 - int(self.height * 0.2))
-            ], dtype=np.int32)
-            points = points.reshape((-1, 1, 2))
-            cv2.polylines(frame, [points], isClosed=True, color=(0, 255, 0), thickness=3)
+            points = self.roadReg.reshape((-1, 1, 2))
+            cv2.polylines(frame, [points], isClosed=True, color=(0, 255, 0), thickness=2)
 
-            points = np.array([
-                (self.width*0.75, self.height*0.55),
-                (self.width*0.25, self.height*0.55),
-                (self.width*0.25, self.height*0.74),
-                (self.width*0.75, self.height*0.74)
-            ], dtype=np.int32)
 
             # `cv2.polylines` očekuje oblik (n, 1, 2), pa preoblikujemo
-            points = points.reshape((-1, 1, 2))
+            points = self.stopReg.reshape((-1, 1, 2))
 
             # Iscrtavanje poligona na slici
-            cv2.polylines(frame, [points], isClosed=True, color=(255, 255, 0), thickness=3)
+            cv2.polylines(frame, [points], isClosed=True, color=(255, 255, 0), thickness=2)
 
-            points = np.array([
-                (self.width*0.75, self.height*0.25),
-                (self.width*0.25, self.height*0.25),
-                (self.width*0.25, self.height*0.50),
-                (self.width*0.75, self.height*0.50)
-            ], dtype=np.int32)
 
             # `cv2.polylines` očekuje oblik (n, 1, 2), pa preoblikujemo
-            points = points.reshape((-1, 1, 2))
+            points = self.interStopReg.reshape((-1, 1, 2))
 
             # Iscrtavanje poligona na slici
-            cv2.polylines(frame, [points], isClosed=True, color=(150, 255, 50), thickness=3)
+            cv2.polylines(frame, [points], isClosed=True, color=(150, 255, 50), thickness=2)
 
             if len(linesX) > 0:
                 for line in linesX:
                     (x1, y1), (x2, y2) = line
-                    cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 5)
+                    cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 3)
             
             if len(linesY) > 0:
                 for line in linesY:
                     (x1, y1), (x2, y2) = line
-                    cv2.line(frame, (x1, y1), (x2, y2), (200, 50, 0), 5)
+                    cv2.line(frame, (x1, y1), (x2, y2), (200, 50, 0), 3)
         
         if not self.pc:
             self.strm.display(frame)
