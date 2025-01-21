@@ -180,7 +180,7 @@ class threadCamera(ThreadWithStop):
             buffer_count=1,
             queue=False,
 
-            # main={"format": "RGB888", "size": (2048, 1080)},
+            main={"format": "RGB888", "size": (512, 270)},
             lores={"format": "RGB888", "size": (512, 270)},
             encode="lores",
         )
