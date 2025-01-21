@@ -101,7 +101,7 @@ class IntersectionDetect(Enum):
 class IntersectionDetect2(Enum):
     Queue = "General"
     Owner = "threadLaneDetect"
-    msgID = 7
+    msgID = 8
     msgType = "bool"
 
 ################################# processObjectDetection ##################################

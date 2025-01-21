@@ -155,7 +155,7 @@ class threadCamera(ThreadWithStop):
                 if self.recording == True:
                     self.video_writer.write(serialRequest)
 
-                # _, mainEncodedImg = cv2.imencode(".jpg", mainRequest)                   
+                #_, mainEncodedImg = cv2.imencode(".jpg", mainRequest)                   
                 _, serialEncodedImg = cv2.imencode(".jpg", serialRequest)
 
                 # mainEncodedImageData = base64.b64encode(mainEncodedImg).decode("utf-8")
@@ -179,8 +179,7 @@ class threadCamera(ThreadWithStop):
         config = self.camera.create_preview_configuration(
             buffer_count=1,
             queue=False,
-
-            main={"format": "RGB888", "size": (512, 270)},
+            main={"format": "RGB888", "size": (2048, 1080)},
             lores={"format": "RGB888", "size": (512, 270)},
             encode="lores",
         )
