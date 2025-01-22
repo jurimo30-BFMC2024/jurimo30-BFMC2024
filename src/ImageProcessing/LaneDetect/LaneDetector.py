@@ -22,17 +22,17 @@ class LaneDetector:
             ]], np.int32)
         
         self.stopReg = np.array([[
-                (self.width*0.75, self.height*0.6),
-                (self.width*0.25, self.height*0.6),
+                (self.width*0.75, self.height*0.68),
+                (self.width*0.25, self.height*0.68),
                 (self.width*0.25, self.height*0.83),
                 (self.width*0.75, self.height*0.83)
             ]], np.int32)
         
         self.interStopReg = np.array([[
-                (self.width*0.65, self.height*0.3),
-                (self.width*0.35, self.height*0.3),
-                (self.width*0.25, self.height*0.6),
-                (self.width*0.75, self.height*0.6)
+                (self.width*0.65, self.height*0.35),
+                (self.width*0.35, self.height*0.35),
+                (self.width*0.25, self.height*0.68),
+                (self.width*0.75, self.height*0.68)
             ]], np.int32)
 
 
@@ -51,10 +51,10 @@ class LaneDetector:
                 intercept = y1 - slope * x1
 
 
-                if slope < -0.5:  # Left lanes have negative slope
+                if slope < -0.4:  # Left lanes have negative slope
                     left_slopes.append(slope)
                     left_intercepts.append(intercept)
-                elif slope > 0.5:  # Right lanes have positive slope
+                elif slope > 0.4:  # Right lanes have positive slope
                     right_slopes.append(slope)
                     right_intercepts.append(intercept)
         # (Ostatak funkcije ostaje isti)
@@ -75,10 +75,10 @@ class LaneDetector:
             for x1, y1, x2, y2 in line:
                 slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
 
-                if slope < -0.5:
+                if slope < -0.4:
                     if self.isPointInSquare(x1, y1, 340, 180, 470, 220) or self.isPointInSquare(x1, y1, 340, 180, 470, 220):
                         return 0
-                if slope > 0.5:
+                if slope > 0.4:
                     if self.isPointInSquare(x1, y1, 80, 180, 190, 220) or self.isPointInSquare(x1, y1, 80, 180, 190, 220):
                         return 0
 
@@ -124,45 +124,6 @@ class LaneDetector:
         """Izračunava Euklidsku udaljenost između dvije tačke."""
         return math.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
 
-    def merge_lines(self, lines, threshold=10):
-        """
-        Spaja linije ako su krajevi dovoljno blizu (ispod praga threshold).
-        
-        lines: Lista linija, gdje je svaka linija definisana kao ((x1, y1), (x2, y2)).
-        threshold: Maksimalna dozvoljena udaljenost između krajeva linija za spajanje.
-        """
-        merged = []
-        used = [False] * len(lines)  # Prati da li je linija već spojena
-
-        for i, line1 in enumerate(lines):
-            if used[i]:
-                continue
-            (x1, y1), (x2, y2) = line1
-            for j, line2 in enumerate(lines):
-                if i == j or used[j]:
-                    continue
-                (x3, y3), (x4, y4) = line2
-
-                # Provjeri udaljenost između krajeva linija
-                if (self.distance((x1, y1), (x3, y3)) < threshold or
-                    self.distance((x1, y1), (x4, y4)) < threshold or
-                    self.distance((x2, y2), (x3, y3)) < threshold or
-                    self.distance((x2, y2), (x4, y4)) < threshold):
-                    
-                    # Ako su blizu, spajamo linije u novu
-                    new_line = ((min(x1, x2, x3, x4), min(y1, y2, y3, y4)),
-                                (max(x1, x2, x3, x4), max(y1, y2, y3, y4)))
-                    merged.append(new_line)
-                    used[j] = True
-                    break
-            else:
-                # Ako nema spajanja, dodaj trenutnu liniju
-                merged.append(line1)
-            used[i] = True
-
-        return merged
-        cv2.imshow('Lane Detection', processed_frame)
-
     def detectIntersection(self, lines) -> bool:
         if lines is None:
             return False, []
@@ -175,7 +136,7 @@ class LaneDetector:
                 slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
                 distance = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
-                if slope < 0.1 and slope > -0.1:
+                if slope < 0.2 and slope > -0.2:
                     if distance > 50:
                         lines2.append([(x1, y1), (x2, y2)])
         
@@ -209,7 +170,7 @@ class LaneDetector:
     def detect_lines(self, img, tres = 30):
         # Use Hough transformation to detect lines
         return cv2.HoughLinesP(
-            img, rho=1, theta=np.pi / 180, threshold=tres, minLineLength=10, maxLineGap=60
+            img, rho=1, theta=np.pi / 180, threshold=tres, minLineLength=20, maxLineGap=80
         )
     
 
@@ -218,17 +179,17 @@ class LaneDetector:
         """Process a single frame for lane detection."""
         angle_degrees: float = 0.0
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        _ , blurred = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY)
-        blurred = cv2.GaussianBlur(blurred, (5, 5), 0)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        _ , blurred = cv2.threshold(blurred, 220, 255, cv2.THRESH_BINARY)
         edges = cv2.Canny(blurred, 50, 200)
 
         roi2 = self.region_of_interest2(edges)
         roi = self.region_of_interest(edges)
         roi3 = self.region_of_interest3(edges)
 
-        lines = self.detect_lines(roi, 45)
-        lines2 = self.detect_lines(roi2, 40)
-        lines3 = self.detect_lines(roi3, 70)
+        lines = self.detect_lines(roi, 30)
+        lines2 = self.detect_lines(roi2, 30)
+        lines3 = self.detect_lines(roi3, 40)
 
         intersection, linesX = self.detectIntersection(lines2)
         intersectionA, linesY = self.detectIntersection(lines3)
@@ -241,7 +202,7 @@ class LaneDetector:
                 for line in lines:
                     for x1, y1, x2, y2 in line:
                         slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
-                        if slope < -0.5 or slope > 0.5:
+                        if slope < -0.4 or slope > 0.4:
                             cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 3)
 
             cv2.rectangle(frame, (340,180), (470,220), (0, 150, 0), 1)
@@ -276,5 +237,8 @@ class LaneDetector:
         
         if not self.pc:
             self.strm.display(frame)
+
+        if intersectionA:
+            intersection = False
 
         return frame, angle_degrees, intersection, intersectionA
