@@ -5,17 +5,17 @@ import time
 import numpy as np
 
 class Frames:
-    width=1024
-    height=540
+    width=768
+    height=405
     manager = Manager()
     default_frame = None
     shared_frames = manager.list()
-    condition = Condition()
 
 class VideoGridStreamer:
-    def __init__(self, grid_rows, grid_cols):
+    def __init__(self, grid_rows, grid_cols, fps: int = 20):
         self.grid_rows = grid_rows
         self.grid_cols = grid_cols
+        self.fps = fps
 
         for _ in range(grid_rows):
             Frames.shared_frames.append(Frames.manager.list([None for _ in range(grid_cols)]))
@@ -27,24 +27,31 @@ class VideoGridStreamer:
         self.app = Flask(__name__)
         self.app.add_url_rule('/', 'video_feed', self.video_feed)
 
+    def __del__(self):
+        """Stop the Flask server."""
+        if self.flask_process and self.flask_process.is_alive():
+            self.flask_process.terminate()
+            self.flask_process.join()
+
     def create_blank_frame(self, size):
         """Create a blank frame of given size (black image)."""
         return np.zeros((size[1], size[0], 3), dtype=np.uint8)  # (height, width, channels)
 
     def generate_frames(self):
+        t_per_frame = 1 / self.fps
         while True:
-            #with Frames.condition:
-            #    Frames.condition.wait()  # Wait for the grid to be updated
-            time.sleep(0.1)
+            exec_time = time.time()
             # Compose the grid using shared memory frames
             grid_frame = self.compose_grid()
 
             # Encode the grid frame
-            ret, buffer = cv2.imencode('.jpg', grid_frame)
+            ret, buffer = cv2.imencode('.jpg', grid_frame, [cv2.IMWRITE_JPEG_QUALITY, 40])
             grid_frame = buffer.tobytes()
 
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + grid_frame + b'\r\n')
+            
+            time.sleep(max(0, t_per_frame - (time.time() - exec_time)))
 
     def compose_grid(self):
         """Compose the entire grid from shared frames."""
@@ -62,17 +69,6 @@ class VideoGridStreamer:
         """Video feed endpoint for Flask."""
         return Response(self.generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-    # def display_frame(self, frame, row, col):
-    #     """Update the frame for a specific grid square."""
-    #     if 0 <= row < self.grid_rows and 0 <= col < self.grid_cols:
-    #         resized_frame = cv2.resize(frame, (Frames.default_frame.shape[1], Frames.default_frame.shape[0]))
-    #         with Frames.condition:
-    #             try:
-    #                 Frames.shared_frames[row][col] = resized_frame.tobytes()
-    #                 Frames.condition.notify()  # Notify generate_frames that the grid has been updated
-    #             except IndexError as e:
-    #                 pass
-
     def start_flask_server(self, host='0.0.0.0', port=5000):
         """Start the Flask server."""
         self.app.run(host=host, port=port, debug=False)
@@ -86,12 +82,6 @@ class VideoGridStreamer:
         )
         self.flask_process.start()
 
-    def stop(self):
-        """Stop the Flask server."""
-        if self.flask_process and self.flask_process.is_alive():
-            self.flask_process.terminate()
-            self.flask_process.join()
-
 class VideoStream:
     def __init__(self, row, col):
         self.row = row
@@ -99,12 +89,10 @@ class VideoStream:
 
     def display(self, frame):
         resized_frame = cv2.resize(frame, (Frames.width, Frames.height))
-        with Frames.condition:
-            try:
-                Frames.shared_frames[self.row][self.col] = resized_frame.tobytes()
-                Frames.condition.notify()
-            except IndexError as e:
-                pass
+        try:
+            Frames.shared_frames[self.row][self.col] = resized_frame.tobytes()
+        except IndexError as e:
+            pass
 
 # Example Usage
 if __name__ == "__main__":
