@@ -209,7 +209,7 @@ class LaneDetector:
     def detect_lines(self, img, tres = 30):
         # Use Hough transformation to detect lines
         return cv2.HoughLinesP(
-            img, rho=1, theta=np.pi / 180, threshold=tres, minLineLength=15, maxLineGap=60
+            img, rho=1, theta=np.pi / 180, threshold=tres, minLineLength=10, maxLineGap=60
         )
     
 
@@ -218,17 +218,17 @@ class LaneDetector:
         """Process a single frame for lane detection."""
         angle_degrees: float = 0.0
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (7, 7), 0)
-        _ , blurred = cv2.threshold(blurred, 245, 255, cv2.THRESH_BINARY)
+        _ , blurred = cv2.threshold(gray, 240, 255, cv2.THRESH_BINARY)
+        blurred = cv2.GaussianBlur(blurred, (5, 5), 0)
         edges = cv2.Canny(blurred, 50, 200)
 
         roi2 = self.region_of_interest2(edges)
         roi = self.region_of_interest(edges)
         roi3 = self.region_of_interest3(edges)
 
-        lines = self.detect_lines(roi, 25)
-        lines2 = self.detect_lines(roi2, 45)
-        lines3 = self.detect_lines(roi3, 80)
+        lines = self.detect_lines(roi, 45)
+        lines2 = self.detect_lines(roi2, 40)
+        lines3 = self.detect_lines(roi3, 70)
 
         intersection, linesX = self.detectIntersection(lines2)
         intersectionA, linesY = self.detectIntersection(lines3)
