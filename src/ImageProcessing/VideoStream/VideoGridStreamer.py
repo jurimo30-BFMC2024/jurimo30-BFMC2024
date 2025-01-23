@@ -12,7 +12,7 @@ class Frames:
     shared_frames = manager.list()
 
 class VideoGridStreamer:
-    def __init__(self, grid_rows, grid_cols, fps: int = 20):
+    def __init__(self, grid_rows, grid_cols, fps: int = 10):
         self.grid_rows = grid_rows
         self.grid_cols = grid_cols
         self.fps = fps
@@ -50,8 +50,8 @@ class VideoGridStreamer:
 
             yield (b'--frame\r\n'
                    b'Content-Type: image/jpeg\r\n\r\n' + grid_frame + b'\r\n')
-            
-            time.sleep(max(0, t_per_frame - (time.time() - exec_time)))
+            time_to_sleep = t_per_frame - (time.time() - exec_time)
+            time.sleep(max(0, time_to_sleep))
 
     def compose_grid(self):
         """Compose the entire grid from shared frames."""
