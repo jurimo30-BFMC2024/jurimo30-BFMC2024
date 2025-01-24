@@ -9,7 +9,7 @@ os.environ['MKL_NUM_THREADS'] = "2"
 from ultralytics import YOLO
 
 from src.templates.threadwithstop import ThreadWithStop
-from src.utils.messages.allMessages import(
+from src.utils.messages.allMessages import (
     serialCamera,
     ObjectDetection
 )
@@ -45,11 +45,17 @@ class threadObjectDetection(ThreadWithStop):
         while self._running:
             try:
                 videoData = self.videoSubscriber.receiveWithBlock()
-                # Dekodiraj frejm iz base64
-
+                # Decode frame from base64
                 frame = self.decode_frame(videoData)
-                objects = self.main(frame)
-                self.streamer.display(frame)
+
+                # Crop frame to top-right quadrant
+                frame_cropped = self.crop_top_right(frame)
+
+                # Process cropped frame with YOLO
+                objects = self.main(frame_cropped)
+
+                # Display the original frame with annotations
+                self.streamer.display(objects)
 
             except Exception as e:
                 print(e)
@@ -61,17 +67,23 @@ class threadObjectDetection(ThreadWithStop):
         np_array = np.frombuffer(frame_data, np.uint8)
         frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
         return frame
-    
+
+    @staticmethod
+    def crop_top_right(frame):
+        """Crop the top-right quadrant of the frame."""
+        height, width, _ = frame.shape
+        return frame[:height // 2, width // 2:]
+
     def annotate_boxes(self, frame, results, model):
         for box in results.boxes:
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
             cls = int(box.cls[0])
             conf = box.conf[0].item()
 
-            # Koristi model.model.names za naziv klase
+            # Use model.model.names for class name
             label = f"{model.model.names[cls]}: {conf:.2f}"
             
-            # Crtanje bounding box-a
+            # Draw bounding box
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(frame, label, (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, .4, (0, 255, 0), 2)
             
@@ -79,16 +91,17 @@ class threadObjectDetection(ThreadWithStop):
 
     def main(self, frame):
         results = self.model(frame)[0]
-        # Annotiraj okvire
+        
+        # Annotate boxes on the frame
         frame = self.annotate_boxes(frame=frame, results=results, model=self.model)
         
-        # Generiši labelu za detekcije (ispisuje naziv klase i poverenje)
+        # Generate labels for detections (display class name and confidence)
         labels = [
             f"{self.model.model.names[int(cls)]} {conf:0.2f}"
             for cls, conf in zip(results.boxes.cls, results.boxes.conf)
         ]
 
-        # Ispisivanje naziva klasa i poverenja na ekranu
+        # Print class names and confidence to console
         for label in labels:
             print(label)
 
