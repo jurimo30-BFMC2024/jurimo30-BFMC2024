@@ -6,6 +6,7 @@ from src.utils.messages.allMessages import (
     serialCamera,
     LaneDetect,
     IntersectionDetect,
+    IntersectionDetect2,
 )
 
 from src.templates.threadwithstop import ThreadWithStop
@@ -26,11 +27,12 @@ class threadLaneDetect(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.detector = LaneDetector(512, 270, logging)
+        self.detector = LaneDetector(512, 270, logging, True, False)
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
         self.intersectionDetectionSender = messageHandlerSender(self.queuesList, IntersectionDetect)
+        self.intersectionDetectionSender2 = messageHandlerSender(self.queuesList, IntersectionDetect2)
         self.subscribe()
         
     def subscribe(self):
@@ -45,11 +47,12 @@ class threadLaneDetect(ThreadWithStop):
                 frame = self.decode_frame(videoData)
 
                 # obradi frejm
-                drawnFrame, angle, intersection = self.detector.process_frame(frame)
+                drawnFrame, angle, intersection, intersectionA = self.detector.process_frame(frame)
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
                 self.intersectionDetectionSender.send(bool(intersection))
+                self.intersectionDetectionSender2.send(bool(intersectionA))
             except Exception as e:
                 print(e)
 
