@@ -8,11 +8,12 @@ from src.utils.messages.allMessages import (
     IntersectionDetect,
     IntersectionDetect2,
 )
-
 from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.ImageProcessing.LaneDetect.LaneDetector import LaneDetector
+from src.ImageProcessing.LaneDetect.imagePreProcessing import ImagePreProcessing as ImgProcessor
+from src.ImageProcessing.LaneDetect.StopLineDetector import StopLineDetector as StopDetect
 
 class threadLaneDetect(ThreadWithStop):
     """This thread handles LaneDetect.
@@ -27,7 +28,9 @@ class threadLaneDetect(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.detector = LaneDetector(512, 270, logging, True, False)
+        self.laneDetector = LaneDetector(512, 270, logging, debugging, False)
+        self.imgProcessor = ImgProcessor(512, 270, logging, debugging, False)
+        self.stopLineDetector = StopDetect(512, 270, logging, debugging, False)
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
@@ -45,9 +48,14 @@ class threadLaneDetect(ThreadWithStop):
                 videoData = self.videoSubscriber.receiveWithBlock()
                 # Dekodiraj frejm iz base64
                 frame = self.decode_frame(videoData)
+                edges = self.imgProcessor.process_frame(frame)
+
+                # !!!!!!!!!!!!! edges ne treba mjenjati koristi se za dalju obradu nad njim
+                # !!!!!!!!!!! sva crtanja za debagovanje raditi nad frejmom on se salje na server
 
                 # obradi frejm
-                drawnFrame, angle, intersection, intersectionA = self.detector.process_frame(frame)
+                frame, intersection, intersectionA = self.stopLineDetector.process_frame(frame, edges)
+                frame, angle = self.laneDetector.process_frame(frame, edges)
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
