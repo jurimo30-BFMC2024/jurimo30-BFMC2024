@@ -14,6 +14,7 @@ from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.ImageProcessing.LaneDetect.LaneDetector import LaneDetector
 from src.ImageProcessing.LaneDetect.imagePreProcessing import ImagePreProcessing as ImgProcessor
 from src.ImageProcessing.LaneDetect.StopLineDetector import StopLineDetector as StopDetect
+from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream as vs
 
 class threadLaneDetect(ThreadWithStop):
     """This thread handles LaneDetect.
@@ -31,6 +32,7 @@ class threadLaneDetect(ThreadWithStop):
         self.laneDetector = LaneDetector(512, 270, logging, debugging, False)
         self.imgProcessor = ImgProcessor(512, 270, logging, debugging, False)
         self.stopLineDetector = StopDetect(512, 270, logging, debugging, False)
+        self.strm = vs(1, 0)
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
@@ -61,6 +63,7 @@ class threadLaneDetect(ThreadWithStop):
                 self.laneDetectionSender.send(angle)
                 self.intersectionDetectionSender.send(bool(intersection))
                 self.intersectionDetectionSender2.send(bool(intersectionA))
+                self.strm.display(frame)
             except Exception as e:
                 print(e)
 
