@@ -78,7 +78,7 @@ class threadObjectDetection(ThreadWithStop):
         return frame
 
     def main(self, frame):
-        results = self.model(frame)[0]
+        results = self.model(frame, verbose=False)[0]
         # Annotiraj okvire
         frame = self.annotate_boxes(frame=frame, results=results, model=self.model)
         
@@ -89,7 +89,7 @@ class threadObjectDetection(ThreadWithStop):
         ]
 
         # Ispisivanje naziva klasa i poverenja na ekranu
-        for label in labels:
-            print(label)
+        #for label in labels:
+        #    print(label)
 
         return frame

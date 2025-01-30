@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import math
 from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream as vs
+from src.core.Auto.PID import PIDController as pid
 
 class LaneDetector:
     def __init__(self, width: int, height: int,logging, debugging=False, pc = False, camera_fov_degrees: float = 79.3):
@@ -11,6 +12,7 @@ class LaneDetector:
         self.width = width
         self.height = height
         self.pc = pc
+        self.currentAngle = 0
         if not pc:
             self.strm = vs(1, 0)
         
@@ -29,22 +31,22 @@ class LaneDetector:
             ]], np.int32)
         
         self.interStopReg = np.array([[
-                (self.width*0.65, self.height*0.35),
-                (self.width*0.35, self.height*0.35),
+                (self.width*0.68, self.height*0.40),
+                (self.width*0.32, self.height*0.40),
                 (self.width*0.25, self.height*0.68),
                 (self.width*0.75, self.height*0.68)
             ]], np.int32)
-
+        
+        self.squareLeft = (100, 180, 190, 220)
+        self.squareRight = (320, 180, 410, 220)
 
     def calculate_steering_angle(self, lines, img_width, img_height):
         if lines is None:
             return 0  # No lines detected, keep going straight
-
         left_slopes = []
         right_slopes = []
         left_intercepts = []
         right_intercepts = []
-
         for line in lines:
             for x1, y1, x2, y2 in line:
                 slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
@@ -76,10 +78,10 @@ class LaneDetector:
                 slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
 
                 if slope < -0.4:
-                    if self.isPointInSquare(x1, y1, 340, 180, 470, 220) or self.isPointInSquare(x1, y1, 340, 180, 470, 220):
+                    if self.isPointInSquare(x1, y1, self.squareRight) or self.isPointInSquare(x2, y2, self.squareRight):
                         return 0
                 if slope > 0.4:
-                    if self.isPointInSquare(x1, y1, 80, 180, 190, 220) or self.isPointInSquare(x1, y1, 80, 180, 190, 220):
+                    if self.isPointInSquare(x1, y1, self.squareLeft) or self.isPointInSquare(x2, y2, self.squareLeft):
                         return 0
 
 
@@ -95,7 +97,6 @@ class LaneDetector:
         angle_degrees = np.degrees(angle)
         max_angle = 25
         scaled_angle = max(-max_angle, min(max_angle, angle_degrees)) -1
-
         return scaled_angle
 
     def extrapolate_missing_lane(self, slope, intercept, y, width):
@@ -103,7 +104,8 @@ class LaneDetector:
             return width // 2
         return int((y - intercept) / slope)
 
-    def isPointInSquare(self, x, y, x1 = 360, y1 = 180, x2 = 400, y2 = 220):
+    def isPointInSquare(self, x, y, square):
+        x1, y1, x2, y2 = square
         x_min = min(x1, x2)
         x_max = max(x1, x2)
         y_min = min(y1, y2)
@@ -112,16 +114,12 @@ class LaneDetector:
         return x_min <= x <= x_max and y_min <= y <= y_max
 
     def region_of_interest(self, img):
-        height, width = img.shape[:2]
         mask = np.zeros_like(img)
-        
-        # Define a triangular region of interest (lower part of the image)
         cv2.fillPoly(mask, self.roadReg, 255)
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
     
     def distance(self, point1, point2):
-        """Izračunava Euklidsku udaljenost između dvije tačke."""
         return math.sqrt((point1[0] - point2[0])**2 + (point1[1] - point2[1])**2)
 
     def detectIntersection(self, lines) -> bool:
@@ -129,8 +127,6 @@ class LaneDetector:
             return False, []
         
         lines2 = []
-        
-
         for line in lines:
             for x1, y1, x2, y2 in line:
                 slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
@@ -139,57 +135,51 @@ class LaneDetector:
                 if slope < 0.2 and slope > -0.2:
                     if distance > 50:
                         lines2.append([(x1, y1), (x2, y2)])
-        
-        #lines2 = self.merge_lines(lines2, 20)
 
         if(len(lines2) >= 2):
             return True, lines2
 
         return False, []
-
+    def gamma_correction(self, image: np.ndarray, gamma: float) -> np.ndarray:
+        image_normalized = image  / 255.0
+        corrected = np.power(image_normalized, gamma)
+        corrected = np.uint8(corrected * 255)
+        return corrected
 
     def region_of_interest2(self, img):
-        height, width = img.shape[:2]
         mask = np.zeros_like(img, dtype=np.uint8)
-        
-        # Define a triangular region of interest (lower part of the image)
-        cv2.fillPoly(mask, self.stopReg, (224555, 255, 255)) # Mask now matches BGR format
+        cv2.fillPoly(mask, self.stopReg, (555, 255, 255)) # Mask now matches BGR format
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
     
     def region_of_interest3(self, img):
-        height, width = img.shape[:2]
         mask = np.zeros_like(img, dtype=np.uint8)
-        
-        # Define a triangular region of interest (lower part of the image)
-
         cv2.fillPoly(mask, self.interStopReg, (255, 255, 255)) # Mask now matches BGR format
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
     
-    def detect_lines(self, img, tres = 30):
-        # Use Hough transformation to detect lines
-        return cv2.HoughLinesP(
-            img, rho=1, theta=np.pi / 180, threshold=tres, minLineLength=20, maxLineGap=80
-        )
+    def drawRectangle(self, frame, square):
+        x1, y1, x2, y2 = square
+        cv2.rectangle(frame, (x1,y1), (x2,y2), (25, 200, 50), 2)
     
-
+    def detect_lines(self, img, tres = 30):
+        return cv2.HoughLinesP(img, rho=1, theta=np.pi / 180, threshold=tres, minLineLength=15, maxLineGap=5)
+    
     def process_frame(self, frame: np.ndarray):
-
-        """Process a single frame for lane detection."""
         angle_degrees: float = 0.0
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
-        _ , blurred = cv2.threshold(blurred, 220, 255, cv2.THRESH_BINARY)
-        edges = cv2.Canny(blurred, 50, 200)
+
+        gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        gama = self.gamma_correction(gray, 12)
+        blurred = cv2.GaussianBlur(gama, [5, 5], 0)
+        edges = cv2.Canny(blurred, 50, 150)
 
         roi2 = self.region_of_interest2(edges)
         roi = self.region_of_interest(edges)
         roi3 = self.region_of_interest3(edges)
 
-        lines = self.detect_lines(roi, 30)
-        lines2 = self.detect_lines(roi2, 30)
-        lines3 = self.detect_lines(roi3, 40)
+        lines = self.detect_lines(roi, 25)
+        lines2 = self.detect_lines(roi2, 10)
+        lines3 = self.detect_lines(roi3, 15)
 
         intersection, linesX = self.detectIntersection(lines2)
         intersectionA, linesY = self.detectIntersection(lines3)
@@ -204,25 +194,16 @@ class LaneDetector:
                         slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
                         if slope < -0.4 or slope > 0.4:
                             cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 3)
+            
 
-            cv2.rectangle(frame, (340,180), (470,220), (0, 150, 0), 1)
-            cv2.rectangle(frame, (80,180), (190,220), (0, 0, 150), 1)
+            self.drawRectangle(frame, self.squareLeft)
+            self.drawRectangle(frame, self.squareRight)
 
             points = self.roadReg.reshape((-1, 1, 2))
             cv2.polylines(frame, [points], isClosed=True, color=(0, 255, 0), thickness=2)
-
-
-            # `cv2.polylines` očekuje oblik (n, 1, 2), pa preoblikujemo
             points = self.stopReg.reshape((-1, 1, 2))
-
-            # Iscrtavanje poligona na slici
             cv2.polylines(frame, [points], isClosed=True, color=(255, 255, 0), thickness=2)
-
-
-            # `cv2.polylines` očekuje oblik (n, 1, 2), pa preoblikujemo
             points = self.interStopReg.reshape((-1, 1, 2))
-
-            # Iscrtavanje poligona na slici
             cv2.polylines(frame, [points], isClosed=True, color=(150, 255, 50), thickness=2)
 
             if len(linesX) > 0:
