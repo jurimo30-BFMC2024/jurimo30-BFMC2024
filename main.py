@@ -64,6 +64,7 @@ from src.ImageProcessing.LaneDetect.processLaneDetect import processLaneDetect
 from src.ImageProcessing.ObjectDetection.processObjectDetection import processObjectDetection
 from src.core.Core.processCore import processCore
 from src.ImageProcessing.VideoStream.processVideoStream import processVideoStream
+from src.hardware.Sensors.processSensors import processSensors
 # ------ New component imports ends here ------#
 # ======================================== SETTING UP ====================================
 allProcesses = list()
@@ -90,6 +91,7 @@ flagLaneDetect = True
 flagCore = True
 flagVideoStream = True
 flagObjectDetection = True
+flagSensors = True
 # ------ New component flags ends here ------#
 
 # ===================================== SETUP PROCESSES ==================================
@@ -147,6 +149,9 @@ if flagObjectDetection:
 if flagVideoStream:
     processVideoStream = processVideoStream(queueList, logging, debugging = False)
     allProcesses.append(processVideoStream)
+if flagSensors:
+    processSensors = processSensors(queueList, logging, debugging = False)
+    allProcesses.append(processSensors)
 # ------ New component runs ends here ------#
 
 # ===================================== START PROCESSES ==================================

@@ -124,6 +124,19 @@ class Semaphores(Enum):
     msgID = 2
     msgType = "dict"
 
+################################# From ESP32 ##################################
+class FrontSensors(Enum):
+    Queue = "General"
+    Owner = "threadSensors"
+    msgID = 1
+    msgType = "dict"
+
+class SideSensors(Enum):
+    Queue = "General"
+    Owner = "threadSensors"
+    msgID = 2
+    msgType = "dict"
+
 ################################# From Dashboard ##################################
 class SpeedMotor(Enum):
     Queue = "General"
