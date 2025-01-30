@@ -88,10 +88,31 @@ class VideoStream:
         self.col = col
 
     def display(self, frame):
+        # Convert frame to 3-channel BGR format if necessary
+        if len(frame.shape) == 2:
+            # Handle grayscale (2D array)
+            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+        else:
+            channels = frame.shape[2]
+            if channels == 1:
+                # Handle single-channel 3D array
+                frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
+            elif channels == 4:
+                # Remove alpha channel
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2BGR)
+            elif channels == 2:
+                # Convert 2-channel to 3-channel by adding a zero channel
+                zeros = np.zeros(frame.shape[:2], dtype=frame.dtype)
+                frame = cv2.merge([frame[:, :, 0], frame[:, :, 1], zeros])
+            elif channels > 3:
+                # Keep only first 3 channels for multi-channel formats
+                frame = frame[:, :, :3]
+
+        # Resize and store the frame
         resized_frame = cv2.resize(frame, (Frames.width, Frames.height))
         try:
             Frames.shared_frames[self.row][self.col] = resized_frame.tobytes()
-        except IndexError as e:
+        except IndexError:
             pass
 
 # Example Usage
