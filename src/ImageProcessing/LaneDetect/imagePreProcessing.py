@@ -9,8 +9,6 @@ class ImagePreProcessing:
         self.width = width
         self.height = height
         self.pc = pc
-        if not pc:
-            self.strm = vs(1, 0)
     
     def gamma_correction(self, image: np.ndarray, gamma: float) -> np.ndarray:
         image_normalized = image  / 255.0
@@ -24,9 +22,4 @@ class ImagePreProcessing:
         gama = self.gamma_correction(gray, 12)
         blurred = cv2.GaussianBlur(gama, [5, 5], 0)
         edges = cv2.Canny(blurred, 50, 150)
-
-        if self.debugging:
-            if not self.pc:
-                self.strm.display(edges)
-
         return frame
