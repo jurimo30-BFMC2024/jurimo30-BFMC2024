@@ -138,7 +138,7 @@ if flagSimCom:
     processSimCom = processSimCom(queueList, logging, debugging = True)
     allProcesses.append(processSimCom)
 if flagLaneDetect:
-    processLaneDetect = processLaneDetect(queueList, logging, debugging = False)
+    processLaneDetect = processLaneDetect(queueList, logging, debugging = True)
     allProcesses.append(processLaneDetect)
 if flagCore:
     processCore = processCore(queueList, logging, debugging = True)

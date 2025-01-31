@@ -23,12 +23,12 @@ class SpeedControl():
         if stopLine:
             return 0
 
-        if abs(self.finalAngle) < 30:
+        if abs(angle) < 30:
             speed = 350
-        elif abs(self.finalAngle) > 170:
+        elif abs(angle) > 170:
             speed = 120
         else:
-            speed = self.map_value(self.finalAngle)
+            speed = self.map_value(angle)
 
 
         if lowDistance:
