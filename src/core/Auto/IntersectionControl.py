@@ -13,25 +13,35 @@ class IntersectionControl():
         self.status = 0 # 0-nije startovano, 1 - startovano ide napred, 2 - startovano mota
         self.lastPoint = 0
 
-    def getControlData(self):
-        angle = 0
-        speed = 0
+    def getControlData(self, smer):
         self.lastStatus = self.status
         intersection = True
+
+        if(smer == "Right"):
+            angle = 230
+            time1 = 1.2
+            time2 = 5.3
+        else:
+            angle = -230
+            time1 = 2.2
+            time2 = 6
 
         if self.status == 0:
             self.lastPoint = time.time()
             self.status = 1
             angle = 0
-            speed = 10
+            speed = 100
+            print("Raskrsnica krenula")
         elif self.status == 1:
-            if (time.time() - self.lastPoint) >= 1.5:
+            if (time.time() - self.lastPoint) >= time1:
+                print("Krecem da motam")
                 self.status = 2
                 self.lastPoint = time.time()
-                angle = -23
-                speed = 10
+                angle = angle
+                speed = 100
         elif self.status == 2:
-            if (time.time() - self.lastPoint) > 5:
+            if (time.time() - self.lastPoint) > time2:
+                print("Zavrsena raskrsnica")
                 self.status = 0
                 intersection = False
                 angle = 0
@@ -39,4 +49,3 @@ class IntersectionControl():
                 self.lastPoint = 0
         
         return angle, speed, intersection
-

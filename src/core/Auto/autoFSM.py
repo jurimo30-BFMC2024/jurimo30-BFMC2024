@@ -17,12 +17,14 @@ class autoFSM(ControlModeThread):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.laneFollowData = LaneFollow(self.queuesList, self.logging, self.debugging)
+        self.laneFollowData = LaneFollow(self.queuesList, self.logging, False)
         self.speedControler = SpeedControl(self.logging, self.debugging)
         self.interCont = InterCont(queueList, logging, debugging)
         
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
+
+        self.intersection = False
 
         self.subscribe()
         super().__init__()
@@ -47,8 +49,8 @@ class autoFSM(ControlModeThread):
         #ulaz obrade sa ESP
         obstacle = False
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
-        if not intersection:
-            intersection = (stopLine and (stopSign or traficLight))
+        if not self.intersection:
+            self.intersection = (stopLine and (stopSign or traficLight))
         parking = False
         pedestrian = False
         highway = False
@@ -63,8 +65,8 @@ class autoFSM(ControlModeThread):
         #################         FSM            ############
         if parking:
             pass
-        elif intersection:
-            angle, speed, intersection = self.interCont.getControlData()
+        elif self.intersection:
+            angle, speed, self.intersection = self.interCont.getControlData("Right")
             pass
         else:
             speed = self.speedControler.getControlData(angle, stopLine, lowDistance, highway, False)
