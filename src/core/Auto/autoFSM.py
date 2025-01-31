@@ -1,6 +1,7 @@
 from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.core.Auto.LaneFollow.LaneFollow import LaneFollow
 from src.core.Auto.SpeedControl import SpeedControl
+from src.core.Auto.IntersectionControl import IntersectionControl as InterCont
 from src.utils.messages.allMessages import (
     CoreSteerMotor,
     CoreSpeedMotor,
@@ -18,6 +19,7 @@ class autoFSM(ControlModeThread):
         self.debugging = debugging
         self.laneFollowData = LaneFollow(self.queuesList, self.logging, self.debugging)
         self.speedControler = SpeedControl(self.logging, self.debugging)
+        self.interCont = InterCont(queueList, logging, debugging)
         
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
@@ -40,15 +42,19 @@ class autoFSM(ControlModeThread):
         stopLine = self.intersectionDetectSubscriber.receiveWithBlock()
         lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
         #ulaz detekcije objekata znakova
-        stopSign = False
+        stopSign = True
         traficLight = False
         #ulaz obrade sa ESP
         obstacle = False
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
-        intersection = (stopLine and (stopSign or traficLight))
+        if not intersection:
+            intersection = (stopLine and (stopSign or traficLight))
         parking = False
         pedestrian = False
         highway = False
+        navigateCommand = []
+
+
     
         if not self._running.is_set():
             return
@@ -58,6 +64,7 @@ class autoFSM(ControlModeThread):
         if parking:
             pass
         elif intersection:
+            angle, speed, intersection = self.interCont.getControlData()
             pass
         else:
             speed = self.speedControler.getControlData(angle, stopLine, lowDistance, highway, False)
