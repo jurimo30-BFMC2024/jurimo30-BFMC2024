@@ -22,4 +22,4 @@ class ImagePreProcessing:
         gama = self.gamma_correction(gray, 12)
         blurred = cv2.GaussianBlur(gama, [5, 5], 0)
         edges = cv2.Canny(blurred, 50, 150)
-        return frame
+        return edges
