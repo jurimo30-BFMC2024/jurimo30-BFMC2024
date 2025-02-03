@@ -70,6 +70,7 @@ class autoFSM(ControlModeThread):
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
         if not self.intersection:
             self.intersection = (stopLine and (self.traffic_signs["stop sign"] or False))
+            self.traffic_signs["stop sign"] = False
         if not self.highway and self.traffic_signs["highway entrance sign"]:
             self.highway = True
             self.traffic_signs["highway entrance sign"] = False
@@ -87,7 +88,7 @@ class autoFSM(ControlModeThread):
         if self.parking:
             pass
         elif self.intersection:
-            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand)
+            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs)
             pass
         else:
             speed = self.speedControler.getControlData(angle, stopLine, lowDistance, self.highway, False)

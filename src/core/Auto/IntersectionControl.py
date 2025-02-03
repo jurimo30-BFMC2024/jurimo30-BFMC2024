@@ -14,7 +14,7 @@ class IntersectionControl():
         self.navPint = 0
         self.smer = "None"
 
-    def getControlData(self, navigate):
+    def getControlData(self, navigate, signs):
         self.lastStatus = self.status
         intersection = True
         self.speed = 100
@@ -59,5 +59,6 @@ class IntersectionControl():
                 intersection = False
                 self.angle = 0
                 self.lastPoint = 0
+                signs[""]
         
         return self.angle, self.speed, intersection
