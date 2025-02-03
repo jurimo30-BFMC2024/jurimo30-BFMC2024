@@ -90,19 +90,10 @@ class threadObjectDetection(ThreadWithStop):
         return frame
 
     def main(self, frame):
-        results = self.model(frame)[0]
+        results = self.model(frame, verbose = True)[0]
         
         # Annotate boxes on the frame
         frame = self.annotate_boxes(frame=frame, results=results, model=self.model)
-        
-        # Generate labels for detections (display class name and confidence)
-        labels = [
-            f"{self.model.model.names[int(cls)]} {conf:0.2f}"
-            for cls, conf in zip(results.boxes.cls, results.boxes.conf)
-        ]
-
-        # Print class names and confidence to console
-        for label in labels:
-            print(label)
+    
 
         return frame
