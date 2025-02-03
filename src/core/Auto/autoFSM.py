@@ -34,6 +34,7 @@ class autoFSM(ControlModeThread):
         self.oldSpeed = 0
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
+        self.navigateCommand = ["Right", "Right", "Straight", "Straight", "Right", "Left"]
         super().start()
     
     def stop(self):
@@ -54,7 +55,9 @@ class autoFSM(ControlModeThread):
         parking = False
         pedestrian = False
         highway = False
-        navigateCommand = []
+
+        # path plan
+
 
 
     
@@ -66,7 +69,7 @@ class autoFSM(ControlModeThread):
         if parking:
             pass
         elif self.intersection:
-            angle, speed, self.intersection = self.interCont.getControlData("Right")
+            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand)
             pass
         else:
             speed = self.speedControler.getControlData(angle, stopLine, lowDistance, highway, False)
