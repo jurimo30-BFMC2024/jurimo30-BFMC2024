@@ -30,6 +30,10 @@ class threadObjectDetection(ThreadWithStop):
         self.logging = logging
         self.debugging = debugging
         self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/runs /content/runs/detect/train/weights/best.pt')
+        self.detecting = True # Moze se detektovati novi znak
+        self.lost_sign_count = 0 # Koliko puta znak moze nestati pre nego sto trazimo novi
+        self.lost_sign_threshold = 17 # Koliko puta znak mora nestati pre nego sto trazimo novi
+        self.last_detected_sign = None # Poslednji detektovani znak
         self.streamer = VideoStream(0, 1)
         super(threadObjectDetection, self).__init__()
         
@@ -90,10 +94,35 @@ class threadObjectDetection(ThreadWithStop):
         return frame
 
     def main(self, frame):
-        results = self.model(frame, verbose = True)[0]
+        results = self.model(frame, verbose = False)[0]
         
-        # Annotate boxes on the frame
+        detected_sign = None  # Trenutno detektovani znak (ako postoji)
+
+        for box in results.boxes.data:
+            x1, y1, x2, y2, conf, cls = box.tolist()
+            cls = int(cls)
+
+            if self.model.model.names[cls] and conf > 0.75:
+                detected_sign = self.model.model.names[cls]
+        
+        if self.detecting and detected_sign:
+            if detected_sign != self.last_detected_sign:
+                print("Detektovan znak:", detected_sign)
+                self.last_detected_sign = detected_sign  # Ažuriramo poslednji znak
+                self.detecting = False  # Blokiramo dalju detekciju
+                self.lost_sign_count = 0  # Resetujemo brojač
+            else:
+                # Ako je isti znak kao prethodno detektovan, ignorišemo ga
+                print(f"Isti znak ({detected_sign}) ponovo detektovan, ignorišemo...")
+
+        elif not detected_sign:
+            self.lost_sign_count += 1
+            if self.lost_sign_count >= self.lost_sign_threshold:
+                print("Znak nestao, sada čekamo novi znak...")
+                self.detecting = True  # Dozvoljavamo novu detekciju
+                self.last_detected_sign = None  # Resetujemo poslednji znak
+
+        # Prikaz slike sa anotacijama
         frame = self.annotate_boxes(frame=frame, results=results, model=self.model)
-    
 
         return frame
