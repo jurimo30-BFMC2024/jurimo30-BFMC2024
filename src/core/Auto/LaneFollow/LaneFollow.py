@@ -1,7 +1,5 @@
 from src.utils.messages.allMessages import (
     LaneDetect,
-    IntersectionDetect,
-    IntersectionDetect2,
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -20,7 +18,6 @@ class LaneFollow():
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.avgSpeed = ma(20)
         self.avgAngle = ma(5)
         self.subscribe()
         self.pid = pid(0.5, 0.3, 0)
@@ -37,26 +34,8 @@ class LaneFollow():
 
     def getControlData(self):
         angle = int(self.laneDetectSubscriber.receiveWithBlock() * 10)
-        intersection = self.intersectionDetectSubscriber.receiveWithBlock()
-        intersectionA = self.intersectionDetectSubscriber2.receiveWithBlock()
-        if intersection:
-            return 0, 0, intersection
 
         self.finalAngle = angle
-
-        if abs(self.finalAngle) < 30:
-            speed = 350
-        elif abs(self.finalAngle) > 170:
-            speed = 120
-        else:
-            speed = self.map_value(self.finalAngle)
-
-
-        if intersectionA:
-            n = 0
-            speed = 50
-            while n < 3 and self.avgSpeed.get_average() > 120:
-                self.avgSpeed.add(80)
 
         if self.finalAngle > 250:
             self.finalAngle = 240
@@ -64,15 +43,12 @@ class LaneFollow():
             self.finalAngle = -240
 
         if self.debugging:
-            self.logging.info(f"Lane detect out: {angle}")
+            self.logging.info(f"Lane detect out: {self.finalAngle}")
 
-        speed = int(self.avgSpeed.filter(speed))
-        self.finalAngle = int(self.avgAngle.filter(self.finalAngle))
+        #self.finalAngle = int(self.avgAngle.filter(self.finalAngle))
 
-        return self.finalAngle, speed, intersection
+        return self.finalAngle
 
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
         self.laneDetectSubscriber = messageHandlerSubscriber(self.queuesList, LaneDetect, "LastOnly", True)
-        self.intersectionDetectSubscriber = messageHandlerSubscriber(self.queuesList, IntersectionDetect, "LastOnly", True)
-        self.intersectionDetectSubscriber2 = messageHandlerSubscriber(self.queuesList, IntersectionDetect2, "LastOnly", True)
