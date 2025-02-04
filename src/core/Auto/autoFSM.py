@@ -78,9 +78,12 @@ class autoFSM(ControlModeThread):
         if not self.highway and self.traffic_signs["highway entrance sign"]:
             self.highway = True
             self.traffic_signs["highway entrance sign"] = False
-        if self.highway and self.traffic_signs["highway exit sign"]:
+            print("Ulazak na autoput")
+        if self.highway and (self.traffic_signs["highway exit sign"]):
             self.highway = False
             self.traffic_signs["highway entrance sign"] = False
+            self.traffic_signs["highway exit sign"] = False
+            print("Izlazak sa auto puta")
 
 
     
