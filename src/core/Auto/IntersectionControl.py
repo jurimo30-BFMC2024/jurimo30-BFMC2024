@@ -37,15 +37,16 @@ class IntersectionControl():
             time2 = 100
 
         if self.status == -1:
+            print("Pokmrenut manevar raskrsnice")
             self.status = 0
             self.lastPoint = time.time()
             self.angle = 0
             self.speed = 0
             if sign == "stop sign":
                 time0 = 3
+                print("Cekanje za znak stop")
             else:
                 time0 = 0
-
         if self.status == 0:
             if (time.time() - self.lastPoint) >= time0:
                 print("Krecem sa algoritmom")

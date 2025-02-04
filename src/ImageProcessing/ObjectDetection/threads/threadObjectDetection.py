@@ -63,6 +63,7 @@ class threadObjectDetection(ThreadWithStop):
 
                 if sign is not None:
                     self.objectDetectionSender.send(sign)
+                    
 
             except Exception as e:
                 print(e)
