@@ -43,7 +43,6 @@ def udp_listener():
         if node_id in graph.nodes:
             node_index = list(graph.nodes).index(node_id)  # Find index for color list
             node_colors[node_index] = 'red'
-            print(f"Node {node_id} updated to red.")
 
             # Redraw the graph
             plt.clf()  # Clear the figure
@@ -55,6 +54,7 @@ def udp_listener():
 
             plt.draw()
             plt.pause(0.1)
+            node_colors[node_index] = 'lightblue'
         else:
             print(f"Node {node_id} not found in the graph.")
 
