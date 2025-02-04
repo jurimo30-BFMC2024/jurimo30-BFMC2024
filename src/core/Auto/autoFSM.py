@@ -1,3 +1,4 @@
+from src.core.Auto.Parking.Parking import Parking
 from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.core.Auto.LaneFollow.LaneFollow import LaneFollow
 from src.core.Auto.SpeedControl import SpeedControl
@@ -8,6 +9,9 @@ from src.utils.messages.allMessages import (
     IntersectionDetect,
     IntersectionDetect2,
     ObjectDetection,
+    SideSensors,
+    FrontSensors,
+    ParkingSpotDetect
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -65,8 +69,15 @@ class autoFSM(ControlModeThread):
             sign = self.signDetectionSubscriber.receive()
             self.traffic_signs[sign] = True
 
+        parkingSpotDetected = None
+        if self.parkingSpotDetectionSubscriber.isDataInPipe():
+            parkingSpotDetected = self.parkingSpotDetectionSubscriber.receive()
+
         #ulaz obrade sa ESP
+        frontSensors = self.frontSensorSubscriber.receiveWithBlock()
+        sideSensors = self.sideSensorSubscriber.receiveWithBlock()
         obstacle = False
+        
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
         if not self.intersection:
             if self.traffic_signs["stop sign"]:
@@ -81,12 +92,9 @@ class autoFSM(ControlModeThread):
             self.highway = False
             self.traffic_signs["highway entrance sign"] = False
 
-
-    
         if not self._running.is_set():
             return
         
-
         #################         FSM            ############
         if self.parking:
             pass
@@ -120,4 +128,7 @@ class autoFSM(ControlModeThread):
         self.intersectionDetectSubscriber = messageHandlerSubscriber(self.queuesList, IntersectionDetect, "LastOnly", True)
         self.intersectionDetectSubscriber2 = messageHandlerSubscriber(self.queuesList, IntersectionDetect2, "LastOnly", True)
         self.signDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ObjectDetection, "FIFO", True)
-        pass
+        self.sideSensorSubscriber = messageHandlerSubscriber(self.queuesList, SideSensors, "LastOnly", True)
+        self.frontSensorSubscriber = messageHandlerSubscriber(self.queuesList, FrontSensors, "LastOnly", True)
+        self.parkingSpotDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ParkingSpotDetect, "LastOnly", True)
+        
