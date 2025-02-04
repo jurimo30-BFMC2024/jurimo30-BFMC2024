@@ -34,7 +34,7 @@ class autoFSM(ControlModeThread):
         self.oldSpeed = 0
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
-        self.navigateCommand = ["Right", "Right", "Straight", "Straight", "Right", "Left"]
+        self.navigateCommand = ["Right", "Right", "Straight", "Right", "Left"]
         self.traffic_signs = {
             "stop sign": False,
             "crosswalk sign": False,
@@ -69,9 +69,11 @@ class autoFSM(ControlModeThread):
         obstacle = False
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
         if not self.intersection:
-            self.intersection = (stopLine and (self.traffic_signs["stop sign"] or False))
-            self.traffic_signs["stop sign"] = False
-            self.intersectionSign = "stop sign"
+            if self.traffic_signs["stop sign"]:
+                if stopLine:
+                    self.intersection = stopLine and self.traffic_signs["stop sign"]
+                    self.traffic_signs["stop sign"] = False
+                    self.intersectionSign = "stop sign"
         if not self.highway and self.traffic_signs["highway entrance sign"]:
             self.highway = True
             self.traffic_signs["highway entrance sign"] = False
