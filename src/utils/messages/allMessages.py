@@ -109,7 +109,7 @@ class ObjectDetection(Enum):
     Queue = "General"
     Owner = "threadObjectDetection"
     msgID = 8
-    msgType = "list"
+    msgType = "str"
 
 ################################# processCarsAndSemaphores ##################################
 class Cars(Enum):

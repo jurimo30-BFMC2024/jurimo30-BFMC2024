@@ -9,7 +9,7 @@ os.environ['MKL_NUM_THREADS'] = "2"
 from ultralytics import YOLO
 
 from src.templates.threadwithstop import ThreadWithStop
-from src.utils.messages.allMessages import(
+from src.utils.messages.allMessages import (
     serialCamera,
     ObjectDetection
 )
@@ -29,7 +29,11 @@ class threadObjectDetection(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.model = YOLO('yolo11n.pt')
+        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/runs /content/runs/detect/train/weights/best.pt')
+        self.detecting = True # Moze se detektovati novi znak
+        self.lost_sign_count = 0 # Koliko puta znak moze nestati pre nego sto trazimo novi
+        self.lost_sign_threshold = 17 # Koliko puta znak mora nestati pre nego sto trazimo novi
+        self.last_detected_sign = None # Poslednji detektovani znak
         self.streamer = VideoStream(0, 1)
         super(threadObjectDetection, self).__init__()
         
@@ -45,11 +49,20 @@ class threadObjectDetection(ThreadWithStop):
         while self._running:
             try:
                 videoData = self.videoSubscriber.receiveWithBlock()
-                # Dekodiraj frejm iz base64
-
+                # Decode frame from base64
                 frame = self.decode_frame(videoData)
-                objects = self.main(frame)
-                self.streamer.display(frame)
+
+                # Crop frame to top-right quadrant
+                frame_cropped = self.crop_top_right(frame)
+
+                # Process cropped frame with YOLO
+                objects, sign = self.main(frame_cropped)
+
+                # Display the original frame with annotations
+                self.streamer.display(objects)
+
+                if sign is not None:
+                    self.objectDetectionSender.send(sign)
 
             except Exception as e:
                 print(e)
@@ -61,35 +74,64 @@ class threadObjectDetection(ThreadWithStop):
         np_array = np.frombuffer(frame_data, np.uint8)
         frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
         return frame
-    
+
+    @staticmethod
+    def crop_top_right(frame):
+        """Crop the top-right quadrant of the frame."""
+        height, width, _ = frame.shape
+        return frame[:height // 2, width // 2:]
+
     def annotate_boxes(self, frame, results, model):
         for box in results.boxes:
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
             cls = int(box.cls[0])
             conf = box.conf[0].item()
 
-            # Koristi model.model.names za naziv klase
+            # Use model.model.names for class name
             label = f"{model.model.names[cls]}: {conf:.2f}"
             
-            # Crtanje bounding box-a
+            # Draw bounding box
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
             cv2.putText(frame, label, (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, .4, (0, 255, 0), 2)
             
         return frame
 
     def main(self, frame):
-        results = self.model(frame, verbose=False)[0]
-        # Annotiraj okvire
-        frame = self.annotate_boxes(frame=frame, results=results, model=self.model)
+        if self.debugging:
+            results = self.model(frame, verbose = True)[0]
+        else:
+            results = self.model(frame, verbose = False)[0]
+            
+        detected_sign = None  # Trenutno detektovani znak (ako postoji)
+
+        for box in results.boxes.data:
+            x1, y1, x2, y2, conf, cls = box.tolist()
+            cls = int(cls)
+
+            if self.model.model.names[cls] and conf > 0.75:
+                detected_sign = self.model.model.names[cls]
         
-        # Generiši labelu za detekcije (ispisuje naziv klase i poverenje)
-        labels = [
-            f"{self.model.model.names[int(cls)]} {conf:0.2f}"
-            for cls, conf in zip(results.boxes.cls, results.boxes.conf)
-        ]
+        if self.detecting and detected_sign:
+            if detected_sign != self.last_detected_sign:
+                if self.debugging:
+                    print("Detektovan znak:", detected_sign)
+                self.last_detected_sign = detected_sign  # Ažuriramo poslednji znak
+                self.detecting = False  # Blokiramo dalju detekciju
+                self.lost_sign_count = 0  # Resetujemo brojač
+            else:
+                # Ako je isti znak kao prethodno detektovan, ignorišemo ga
+                if self.debugging:
+                    print(f"Isti znak ({detected_sign}) ponovo detektovan, ignorišemo...")
 
-        # Ispisivanje naziva klasa i poverenja na ekranu
-        #for label in labels:
-        #    print(label)
+        elif not detected_sign:
+            self.lost_sign_count += 1
+            if self.lost_sign_count >= self.lost_sign_threshold:
+                if self.debugging:
+                    print("Znak nestao, sada čekamo novi znak...")
+                self.detecting = True  # Dozvoljavamo novu detekciju
+                self.last_detected_sign = None  # Resetujemo poslednji znak
 
-        return frame
+        # Prikaz slike sa anotacijama
+        frame = self.annotate_boxes(frame=frame, results=results, model=self.model)
+
+        return frame, detected_sign
