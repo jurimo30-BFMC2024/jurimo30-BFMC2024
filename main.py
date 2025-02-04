@@ -141,7 +141,7 @@ if flagLaneDetect:
     processLaneDetect = processLaneDetect(queueList, logging, debugging = True)
     allProcesses.append(processLaneDetect)
 if flagCore:
-    processCore = processCore(queueList, logging, debugging = True)
+    processCore = processCore(queueList, logging, debugging = False)
     allProcesses.append(processCore)
 if flagObjectDetection:
     processObjectDetection = processObjectDetection(queueList, logging, debugging = False)

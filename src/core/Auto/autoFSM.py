@@ -74,7 +74,6 @@ class autoFSM(ControlModeThread):
                 if stopLine:
                     print("Krecemo sa raskrsnicom")
                     self.intersection = True
-                    self.traffic_signs["stop sign"] = False
                     self.intersectionSign = "stop sign"
         if not self.highway and self.traffic_signs["highway entrance sign"]:
             self.highway = True

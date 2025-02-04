@@ -43,12 +43,14 @@ class IntersectionControl():
             self.angle = 0
             self.speed = 0
             if sign == "stop sign":
-                time0 = 3
+                self.time0 = 3
                 print("Cekanje za znak stop")
             else:
-                time0 = 0
+                self.time0 = 0
+
+
         if self.status == 0:
-            if (time.time() - self.lastPoint) >= time0:
+            if (time.time() - self.lastPoint) >= self.time0:
                 print("Krecem sa algoritmom")
                 self.smer = navigate[self.navPint]
                 print(f"Smer je {self.smer}")
@@ -72,5 +74,6 @@ class IntersectionControl():
                 self.angle = 0
                 self.lastPoint = 0
                 self.speed = 100
+                signs[sign] = False
         
         return self.angle, self.speed, intersection

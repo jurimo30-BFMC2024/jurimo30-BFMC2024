@@ -104,6 +104,7 @@ class threadObjectDetection(ThreadWithStop):
             results = self.model(frame, verbose = False)[0]
             
         detected_sign = None  # Trenutno detektovani znak (ako postoji)
+        returnSign = None
 
         for box in results.boxes.data:
             x1, y1, x2, y2, conf, cls = box.tolist()
@@ -111,28 +112,17 @@ class threadObjectDetection(ThreadWithStop):
 
             if self.model.model.names[cls] and conf > 0.75:
                 detected_sign = self.model.model.names[cls]
-        
-        if self.detecting and detected_sign:
-            if detected_sign != self.last_detected_sign:
-                if self.debugging:
-                    print("Detektovan znak:", detected_sign)
-                self.last_detected_sign = detected_sign  # Ažuriramo poslednji znak
-                self.detecting = False  # Blokiramo dalju detekciju
-                self.lost_sign_count = 0  # Resetujemo brojač
-            else:
-                # Ako je isti znak kao prethodno detektovan, ignorišemo ga
-                if self.debugging:
-                    print(f"Isti znak ({detected_sign}) ponovo detektovan, ignorišemo...")
 
-        elif not detected_sign:
-            self.lost_sign_count += 1
-            if self.lost_sign_count >= self.lost_sign_threshold:
-                if self.debugging:
-                    print("Znak nestao, sada čekamo novi znak...")
-                self.detecting = True  # Dozvoljavamo novu detekciju
-                self.last_detected_sign = None  # Resetujemo poslednji znak
+            if (detected_sign != self.last_detected_sign):
+                if detected_sign is not None:
+                    returnSign = detected_sign
+                else:
+                    pass
+        
+            
 
         # Prikaz slike sa anotacijama
+        self.last_detected_sign = detected_sign
         frame = self.annotate_boxes(frame=frame, results=results, model=self.model)
 
-        return frame, detected_sign
+        return frame, returnSign
