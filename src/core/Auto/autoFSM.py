@@ -71,6 +71,7 @@ class autoFSM(ControlModeThread):
         if not self.intersection:
             self.intersection = (stopLine and (self.traffic_signs["stop sign"] or False))
             self.traffic_signs["stop sign"] = False
+            self.intersectionSign = "stop sign"
         if not self.highway and self.traffic_signs["highway entrance sign"]:
             self.highway = True
             self.traffic_signs["highway entrance sign"] = False
@@ -88,7 +89,7 @@ class autoFSM(ControlModeThread):
         if self.parking:
             pass
         elif self.intersection:
-            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs)
+            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign)
             pass
         else:
             speed = self.speedControler.getControlData(angle, stopLine, lowDistance, self.highway, False)

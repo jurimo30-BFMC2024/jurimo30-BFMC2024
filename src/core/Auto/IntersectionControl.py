@@ -9,15 +9,14 @@ class IntersectionControl():
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.status = 0 # 0-nije startovano, 1 - startovano ide napred, 2 - startovano mota
+        self.status = -1 # 0-nije startovano, 1 - startovano ide napred, 2 - startovano mota
         self.lastPoint = 0
         self.navPint = 0
         self.smer = "None"
 
-    def getControlData(self, navigate, signs):
+    def getControlData(self, navigate, signs, sign):
         self.lastStatus = self.status
         intersection = True
-        self.speed = 100
 
         if(self.smer == "Right"):
             tangle = 230
@@ -37,28 +36,40 @@ class IntersectionControl():
             time1 = 100
             time2 = 100
 
+        if self.status == -1:
+            self.status = 0
+            self.lastPoint = time.time()
+            self.angle = 0
+            self.speed = 0
+            if sign == "stop sign":
+                time0 = 3
+            else:
+                time0 = 0
 
         if self.status == 0:
-            print("Krecem sa algoritmom")
-            self.smer = navigate[self.navPint]
-            print(f"Smer je {self.smer}")
-            self.navPint += 1
-            self.lastPoint = time.time()
-            self.status = 1
-            self.angle = 0
+            if (time.time() - self.lastPoint) >= time0:
+                print("Krecem sa algoritmom")
+                self.smer = navigate[self.navPint]
+                print(f"Smer je {self.smer}")
+                self.navPint += 1
+                self.lastPoint = time.time()
+                self.status = 1
+                self.angle = 0
+                self.speed = 100
         elif self.status == 1:
             if (time.time() - self.lastPoint) >= time1:
                 print("Krecem da motam")
                 self.status = 2
                 self.lastPoint = time.time()
                 self.angle = tangle
+                self.speed = 100
         elif self.status == 2:
             if (time.time() - self.lastPoint) >= time2:
                 print("kraj")
-                self.status = 0
+                self.status = -1
                 intersection = False
                 self.angle = 0
                 self.lastPoint = 0
-                signs[""]
+                self.speed = 100
         
         return self.angle, self.speed, intersection
