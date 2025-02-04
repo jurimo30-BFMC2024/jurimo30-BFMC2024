@@ -7,10 +7,12 @@ from src.utils.messages.allMessages import (
     CoreSpeedMotor,
     IntersectionDetect,
     IntersectionDetect2,
+    ObjectDetection,
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 import time
+import enum
 
 class autoFSM(ControlModeThread):
     def __init__(self, queueList, logging, debugging=False):
@@ -24,8 +26,6 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
 
-        self.intersection = False
-
         self.subscribe()
         super().__init__()
 
@@ -34,6 +34,24 @@ class autoFSM(ControlModeThread):
         self.oldSpeed = 0
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
+        self.navigateCommand = ["Right", "Right", "Straight", "Right", "Left"]
+        self.traffic_signs = {
+            "stop sign": False,
+            "crosswalk sign": False,
+            "highway entrance sign": False,
+            "highway exit sign": False,
+            "one way road sign": False,
+            "no-entry road sign": False,
+            "parking sign": False,
+            "priority sign": False,
+            "round-about sign": False
+        }
+
+        self.intersection = False
+        self.crosswalk = False
+        self.highway = False
+        self.parking = False
+
         super().start()
     
     def stop(self):
@@ -43,18 +61,25 @@ class autoFSM(ControlModeThread):
         angle = self.laneFollowData.getControlData()
         stopLine = self.intersectionDetectSubscriber.receiveWithBlock()
         lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
-        #ulaz detekcije objekata znakova
-        stopSign = True
-        traficLight = False
+        if self.signDetectionSubscriber.isDataInPipe():
+            sign = self.signDetectionSubscriber.receive()
+            self.traffic_signs[sign] = True
+
         #ulaz obrade sa ESP
         obstacle = False
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
         if not self.intersection:
-            self.intersection = (stopLine and (stopSign or traficLight))
-        parking = False
-        pedestrian = False
-        highway = False
-        navigateCommand = []
+            if self.traffic_signs["stop sign"]:
+                if stopLine:
+                    self.intersection = stopLine and self.traffic_signs["stop sign"]
+                    self.traffic_signs["stop sign"] = False
+                    self.intersectionSign = "stop sign"
+        if not self.highway and self.traffic_signs["highway entrance sign"]:
+            self.highway = True
+            self.traffic_signs["highway entrance sign"] = False
+        if self.highway and self.traffic_signs["highway exit sign"]:
+            self.highway = False
+            self.traffic_signs["highway entrance sign"] = False
 
 
     
@@ -63,13 +88,13 @@ class autoFSM(ControlModeThread):
         
 
         #################         FSM            ############
-        if parking:
+        if self.parking:
             pass
         elif self.intersection:
-            angle, speed, self.intersection = self.interCont.getControlData("Right")
+            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign)
             pass
         else:
-            speed = self.speedControler.getControlData(angle, stopLine, lowDistance, highway, False)
+            speed = self.speedControler.getControlData(angle, stopLine, lowDistance, self.highway, False)
 
         ############ Sending data ##############################
 
@@ -94,4 +119,5 @@ class autoFSM(ControlModeThread):
         """Subscribes to the messages you are interested in"""
         self.intersectionDetectSubscriber = messageHandlerSubscriber(self.queuesList, IntersectionDetect, "LastOnly", True)
         self.intersectionDetectSubscriber2 = messageHandlerSubscriber(self.queuesList, IntersectionDetect2, "LastOnly", True)
+        self.signDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ObjectDetection, "FIFO", True)
         pass

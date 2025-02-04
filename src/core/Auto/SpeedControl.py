@@ -23,12 +23,20 @@ class SpeedControl():
         if stopLine:
             return 0
 
-        if abs(angle) < 30:
-            speed = 350
-        elif abs(angle) > 170:
-            speed = 120
+        if not highway:
+            if abs(angle) < 30:
+                speed = 250
+            elif abs(angle) > 170:
+                speed = 100
+            else:
+                speed = self.map_value(angle, 30, 170, 100, 250)
         else:
-            speed = self.map_value(angle)
+            if abs(angle) < 70:
+                speed = 350
+            elif abs(angle) > 170:
+                speed = 200
+            else:
+                speed = self.map_value(angle, 70, 170, 200, 350)
 
 
         if lowDistance:

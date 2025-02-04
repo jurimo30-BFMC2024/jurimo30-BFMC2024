@@ -1,4 +1,3 @@
-
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.core.Auto.LaneFollow.MovingAverage import MovingAverage as ma
@@ -10,42 +9,67 @@ class IntersectionControl():
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.status = 0 # 0-nije startovano, 1 - startovano ide napred, 2 - startovano mota
+        self.status = -1 # 0-nije startovano, 1 - startovano ide napred, 2 - startovano mota
         self.lastPoint = 0
+        self.navPint = 0
+        self.smer = "None"
 
-    def getControlData(self, smer):
+    def getControlData(self, navigate, signs, sign):
         self.lastStatus = self.status
         intersection = True
 
-        if(smer == "Right"):
-            angle = 230
+        if(self.smer == "Right"):
+            tangle = 230
             time1 = 1.2
             time2 = 5.3
-        else:
-            angle = -230
+        elif(self.smer == "Left"):
+            tangle = -230
             time1 = 2.2
             time2 = 6
+        elif(self.smer == "Straight"):
+            tangle = 0
+            time1 = 1
+            time2 = 1.5
+            self.speed = 200
+        else:
+            tangle = 0
+            time1 = 100
+            time2 = 100
+
+        if self.status == -1:
+            self.status = 0
+            self.lastPoint = time.time()
+            self.angle = 0
+            self.speed = 0
+            if sign == "stop sign":
+                time0 = 3
+            else:
+                time0 = 0
 
         if self.status == 0:
-            self.lastPoint = time.time()
-            self.status = 1
-            angle = 0
-            speed = 100
-            print("Raskrsnica krenula")
+            if (time.time() - self.lastPoint) >= time0:
+                print("Krecem sa algoritmom")
+                self.smer = navigate[self.navPint]
+                print(f"Smer je {self.smer}")
+                self.navPint += 1
+                self.lastPoint = time.time()
+                self.status = 1
+                self.angle = 0
+                self.speed = 100
         elif self.status == 1:
             if (time.time() - self.lastPoint) >= time1:
                 print("Krecem da motam")
                 self.status = 2
                 self.lastPoint = time.time()
-                angle = angle
-                speed = 100
+                self.angle = tangle
+                self.speed = 100
         elif self.status == 2:
-            if (time.time() - self.lastPoint) > time2:
-                print("Zavrsena raskrsnica")
-                self.status = 0
+            if (time.time() - self.lastPoint) >= time2:
+                print("kraj")
+                self.status = -1
                 intersection = False
-                angle = 0
-                speed = 0
+                self.angle = 0
                 self.lastPoint = 0
+                self.speed = 100
         
-        return angle, speed, intersection
+        return self.angle, self.speed, intersection
