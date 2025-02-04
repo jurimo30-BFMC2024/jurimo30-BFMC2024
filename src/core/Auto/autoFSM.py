@@ -70,11 +70,15 @@ class autoFSM(ControlModeThread):
         obstacle = False
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
         if not self.intersection:
-            if self.traffic_signs["stop sign"]:
+            if self.traffic_signs["stop sign"] or self.traffic_signs["priority sign"]:
                 if stopLine:
                     print("Krecemo sa raskrsnicom")
                     self.intersection = True
-                    self.intersectionSign = "stop sign"
+                    if self.traffic_signs["stop sign"]:
+                        self.intersectionSign = "stop sign"
+                    if self.traffic_signs["priority sign"]:
+                        self.intersectionSign = "priority sign"
+
         if not self.highway and self.traffic_signs["highway entrance sign"]:
             self.highway = True
             self.traffic_signs["highway entrance sign"] = False

@@ -45,6 +45,8 @@ class IntersectionControl():
             if sign == "stop sign":
                 self.time0 = 3
                 print("Cekanje za znak stop")
+            elif sign == "priority sign":
+                self.time0 = 0
             else:
                 self.time0 = 0
 
