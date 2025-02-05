@@ -87,7 +87,7 @@ class PriorityQueueHandler:
 
             if self.debugging:
                 process_time = (time.time() - rcv_t) * 1000
-                self.process_times.append(process_time)
+                self.process_times.append((process_time, message))
 
                 # Update message frequency
                 message_key = (message["Owner"], message["msgID"])
@@ -98,15 +98,11 @@ class PriorityQueueHandler:
                     self.max_processing_time = process_time
                     self.most_processing_time_message = message
 
-                # Track messages around the local max processing time
-                if len(self.process_times) >= 3:
-                    local_max_index = self.process_times.index(max(self.process_times))
-                    if local_max_index > 0 and local_max_index < len(self.process_times) - 1:
-                        self.messages_around_max_time = [
-                            self.process_times[local_max_index - 1],
-                            self.process_times[local_max_index],
-                            self.process_times[local_max_index + 1]
-                        ]
+                    # Get the message before the max processing time message
+                    if len(self.process_times) > 1:
+                        self.message_before_max_time = self.process_times[-2][1]
+                    else:
+                        self.message_before_max_time = None
 
                 if time.time() - self.last_print_time > 1:
                     print(f"[{time.time()}] {self.get_debugging_statistics()}")
@@ -123,15 +119,15 @@ class PriorityQueueHandler:
         Returns:
             dict: A dictionary containing debugging statistics.
         """
-        most_sent_message = max(self.message_counts, key=self.message_counts.get)
+        # most_sent_message = max(self.message_counts, key=self.message_counts.get)
         return {
-            "most_sent_message": {
-                "message": most_sent_message,
-                "count": self.message_counts[most_sent_message]
-            },
+            # "most_sent_message": {
+            #     "message": most_sent_message,
+            #     "count": self.message_counts[most_sent_message]
+            # },
             "most_processing_time_message": {
                 "message": self.most_processing_time_message,
                 "processing_time": self.max_processing_time
             },
-            "messages_around_max_time": self.messages_around_max_time
+            "message_before_max_time": self.message_before_max_time
         }
