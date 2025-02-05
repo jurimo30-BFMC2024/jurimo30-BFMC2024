@@ -34,7 +34,7 @@ class autoFSM(ControlModeThread):
         self.oldSpeed = 0
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
-        self.navigateCommand = ["Right", "Right", "Straight", "Right", "Left"]
+        self.navigateCommand = ["Straight", "Right", "Left", "Left", "Right"]
         self.traffic_signs = {
             "stop sign": False,
             "crosswalk sign": False,
