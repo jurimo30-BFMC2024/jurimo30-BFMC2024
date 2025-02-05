@@ -26,7 +26,8 @@ class autoFSM(ControlModeThread):
         self.laneFollowData = LaneFollow(self.queuesList, self.logging, False)
         self.speedControler = SpeedControl(self.logging, self.debugging)
         self.interCont = InterCont(queueList, logging, debugging)
-        
+        self.parkingController = Parking(queueList, logging, debugging)
+
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
 
@@ -70,9 +71,7 @@ class autoFSM(ControlModeThread):
             self.traffic_signs[sign] = True
             print(f"Preuzet je znak {sign}")
 
-        parkingSpotDetected = None
-        if self.parkingSpotDetectionSubscriber.isDataInPipe():
-            parkingSpotDetected = self.parkingSpotDetectionSubscriber.receive()
+        parkingSpotDetected = self.parkingSpotDetectionSubscriber.receive()
 
         #ulaz obrade sa ESP
         frontSensors = self.frontSensorSubscriber.receiveWithBlock()
@@ -101,7 +100,9 @@ class autoFSM(ControlModeThread):
         
         #################         FSM            ############
         if self.parking:
-            pass
+            park_angle, speed, self.parking = self.parkingController.run(parkingSpotDetected, sideSensors)
+            if park_angle is not None:
+                angle = park_angle
         elif self.intersection:
             angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign)
             pass
