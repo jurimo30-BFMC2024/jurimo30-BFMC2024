@@ -84,36 +84,37 @@ class PriorityQueueHandler:
             tuple: (priority_name, message) where priority_name is the string name of the priority level.
         """
         self.message_semaphore.acquire()  # Block until a message is available
-        try:
-            _, _, priority, message, rcv_t = self.priority_queue.get()
+        while True:
+            try:
+                _, _, priority, message, rcv_t = self.priority_queue.get(True, 0.5)
 
-            if self.debugging:
-                process_time = (time.time() - rcv_t) * 1000  # in milliseconds
-                self.process_times.append((process_time, (message["Owner"], message["msgID"])))
+                if self.debugging:
+                    process_time = (time.time() - rcv_t) * 1000  # in milliseconds
+                    self.process_times.append((process_time, (message["Owner"], message["msgID"])))
 
-                # Update message frequency
-                message_key = (message["Owner"], message["msgID"])
-                self.message_counts[message_key] += 1
+                    # Update message frequency
+                    message_key = (message["Owner"], message["msgID"])
+                    self.message_counts[message_key] += 1
 
-                # Update message with the most processing time
-                if process_time > self.max_processing_time:
-                    self.max_processing_time = process_time
-                    self.most_processing_time_message = (message["Owner"], message["msgID"])
+                    # Update message with the most processing time
+                    if process_time > self.max_processing_time:
+                        self.max_processing_time = process_time
+                        self.most_processing_time_message = (message["Owner"], message["msgID"])
 
-                    # Get the message immediately before the max processing time message,
-                    # storing both its processing_time and its (Owner, msgID)
-                    if len(self.process_times) > 1:
-                        self.message_before_max_time = self.process_times[-2]
-                    else:
-                        self.message_before_max_time = None
+                        # Get the message immediately before the max processing time message,
+                        # storing both its processing_time and its (Owner, msgID)
+                        if len(self.process_times) > 1:
+                            self.message_before_max_time = self.process_times[-2]
+                        else:
+                            self.message_before_max_time = None
 
-                if time.time() - self.last_print_time > 2:
-                    self._write_debug_statistics()
-                    self.last_print_time = time.time()
+                    if time.time() - self.last_print_time > 2:
+                        self._write_debug_statistics()
+                        self.last_print_time = time.time()
 
-            return priority, message
-        except Exception as e:
-            self.logger.error(f"Exception[PQH_get]: {e}")
+                return priority, message
+            except Exception as e:
+                self.logger.error(f"Exception[PQH_get]: {e}")
 
     def get_debugging_statistics(self):
         """
