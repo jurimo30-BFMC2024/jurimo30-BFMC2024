@@ -14,7 +14,7 @@ class IntersectionControl():
         self.navPint = 0
         self.smer = "None"
 
-    def getControlData(self, navigate, signs, sign):
+    def getControlData(self, navigate, signs, sign, oldAngle):
         self.lastStatus = self.status
         intersection = True
 
@@ -39,7 +39,7 @@ class IntersectionControl():
             print("Pokmrenut manevar raskrsnice")
             self.status = 0
             self.lastPoint = time.time()
-            self.angle = 0
+            self.angle = oldAngle
             self.speed = 0
             if sign == "stop sign":
                 self.time0 = 3
@@ -58,7 +58,7 @@ class IntersectionControl():
                 self.navPint += 1
                 self.lastPoint = time.time()
                 self.status = 1
-                self.angle = 0
+                self.angle = oldAngle
                 self.speed = 100
         elif self.status == 1:
             if (time.time() - self.lastPoint) >= time1:
