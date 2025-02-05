@@ -1,57 +1,25 @@
-"""
-PriorityQueueHandler Module
-
-This module implements a priority-based message queue handler using Python's `threading` 
-and `multiprocessing` libraries. The `PriorityQueueHandler` class manages multiple 
-queues assigned to different priorities (e.g., "Critical", "Warning", "General", "Config") 
-and processes messages from these queues in priority order.
-
-Features:
-- Separate worker threads for each priority queue.
-- Internal priority-based message queueing for thread-safe access.
-- Blocking `get` method to fetch messages based on their priority.
-
-Usage:
-- Initialize the `PriorityQueueHandler` with a dictionary of `Queue` objects for each priority.
-- Add messages to the respective priority queues.
-- Retrieve messages using the `get` method in priority order.
-
-Example:
-    queue_list = {
-        "Critical": Queue(),
-        "Warning": Queue(),
-        "General": Queue(),
-        "Config": Queue(),
-    }
-    handler = PriorityQueueHandler(queue_list)
-
-    # Add messages to queues
-    queue_list["Critical"].put("Critical Message 1")
-
-    # Get and process messages
-    priority, message = handler.get()
-    print(f"Priority: {priority}, Message: {message}")
-"""
-
-from threading import Semaphore, Thread
-from multiprocessing import Queue
+from threading import Semaphore, Thread, Lock
 import queue
 import time
-from collections import deque
+from collections import deque, defaultdict
 
 class PriorityQueueHandler:
     """
     A priority-based message queue handler that processes messages from multiple queues in priority order.
     """
 
-    def __init__(self, queue_list):
+    def __init__(self, queue_list, logger, debugging):
         """
         Initialize the PriorityQueueHandler with the given queues and start worker threads.
 
         Args:
             queue_list (dict): Dictionary of multiprocessing.Queue instances for each priority.
+            logger: Logger instance for logging errors and debug information.
+            debugging (bool): Whether to enable debugging statistics.
         """
         self.queue_list = queue_list
+        self.logger = logger
+        self.debugging = debugging
         self.message_semaphore = Semaphore(0)
         self.priority_queue = queue.PriorityQueue()
         
@@ -66,10 +34,20 @@ class PriorityQueueHandler:
         # Counter to ensure unique tuples for the priority queue
         self.counter = 0
 
-        # Statistika vremena obrade
-        self.process_times = deque(maxlen=1000)
-        self.max_process_time = 0
-        self.total_process_time = 0
+        if self.debugging:
+            self.debug_lock = Lock()
+            # Statistics for processing times
+            self.process_times = deque(maxlen=1000)
+            self.total_process_time = 0
+
+            # Debugging statistics
+            self.message_counts = defaultdict(int)  # Track frequency of each message
+            self.most_processing_time_message = None  # Track message with the highest processing time
+            self.max_processing_time = 0  # Track the highest processing time
+            self.messages_around_max_time = []  # Track messages around the local max processing time
+
+            self.stats_thread = Thread(target=self._write_statistics_to_file, daemon=True)
+            self.stats_thread.start()
 
         self.threads = []
         for priority in self.queue_list:
@@ -91,9 +69,9 @@ class PriorityQueueHandler:
                 self.counter += 1  
                 try:
                     self.priority_queue.put((level, self.counter, priority, message, time.time()), False)
+                    self.message_semaphore.release()
                 except Exception as e:
-                    print(f"Exception in _queue_worker: {e}")
-                self.message_semaphore.release()
+                    self.logger.error(f"Exception in _queue_worker: {e}")
         except:
             pass
 
@@ -107,22 +85,68 @@ class PriorityQueueHandler:
             tuple: (priority_name, message) where priority_name is the string name of the priority level.
         """
         self.message_semaphore.acquire()  # Block until a message is available
-        while True:
-            try:
-                _, _, priority, message, rcv_t = self.priority_queue.get(True, 0.5)
-                process_time = (time.time() - rcv_t) * 1000
-                self.process_times.append(process_time)
+        try:
+            _, _, priority, message, rcv_t = self.priority_queue.get()
 
-                # Ažuriranje statistike
-                self.max_process_time = max(self.max_process_time, process_time)
+            if self.debugging:
+                with self.debug_lock:
+                    process_time = (time.time() - rcv_t) * 1000
+                    self.process_times.append(process_time)
 
-                # Lokalni prosjek samo zadnjih 1000 vrijednosti
-                local_avg = sum(self.process_times) / len(self.process_times)
-                local_min = min(self.process_times)
-                local_max = max(self.process_times)
-                
-                # print(f"Process time: {process_time:.2f}ms | Max: {self.max_process_time:.2f}ms | Local Avg: {local_avg:.2f}ms | Local Min: {local_min:.2f}ms | Local Max: {local_max:.2f}ms")
+                    # Update message frequency
+                    message_key = (message["Owner"], message["msgID"])
+                    self.message_counts[message_key] += 1
 
-                return priority, message
-            except Exception as e:
-                print(f"Exception[PQH_get]: {e}")
+                    # Update message with the most processing time
+                    if process_time > self.max_processing_time:
+                        self.max_processing_time = process_time
+                        self.most_processing_time_message = message
+
+                    # Track messages around the local max processing time
+                    if len(self.process_times) >= 3:
+                        local_max_index = self.process_times.index(max(self.process_times))
+                        if local_max_index > 0 and local_max_index < len(self.process_times) - 1:
+                            self.messages_around_max_time = [
+                                self.process_times[local_max_index - 1],
+                                self.process_times[local_max_index],
+                                self.process_times[local_max_index + 1]
+                            ]
+
+            return priority, message
+        except Exception as e:
+            self.logger.error(f"Exception[PQH_get]: {e}")
+
+    def get_debugging_statistics(self):
+        """
+        Retrieve debugging statistics.
+
+        Returns:
+            dict: A dictionary containing debugging statistics.
+        """
+        with self.debug_lock:
+            most_sent_message = max(self.message_counts, key=self.message_counts.get)
+            return {
+                "most_sent_message": {
+                    "message": most_sent_message,
+                    "count": self.message_counts[most_sent_message]
+                },
+                "most_processing_time_message": {
+                    "message": self.most_processing_time_message,
+                    "processing_time": self.max_processing_time
+                },
+                "messages_around_max_time": self.messages_around_max_time
+            }
+        
+    def _write_statistics_to_file(self):
+        """Periodically writes debugging statistics to a file every 0.3s."""
+        while self.debugging:
+            with self.debug_lock:
+                try:
+                    stats = self.get_debugging_statistics()
+                    if stats:
+                        with open("debug_stats.txt", "a") as f:
+                            f.write(f"{time.time()}: {stats}\n")
+                except Exception as e:
+                    self.logger.error(f"Exception in _write_statistics_to_file: {e}")
+                    
+            time.sleep(0.5)
