@@ -35,7 +35,6 @@ class PriorityQueueHandler:
         self.counter = 0
 
         if self.debugging:
-            self.debug_lock = Lock()
             # Statistics for processing times
             self.process_times = deque(maxlen=1000)
             self.total_process_time = 0
@@ -45,9 +44,7 @@ class PriorityQueueHandler:
             self.most_processing_time_message = None  # Track message with the highest processing time
             self.max_processing_time = 0  # Track the highest processing time
             self.messages_around_max_time = []  # Track messages around the local max processing time
-
-            self.stats_thread = Thread(target=self._write_statistics_to_file, daemon=True)
-            self.stats_thread.start()
+            self.last_print_time = 0
 
         self.threads = []
         for priority in self.queue_list:
@@ -89,28 +86,31 @@ class PriorityQueueHandler:
             _, _, priority, message, rcv_t = self.priority_queue.get()
 
             if self.debugging:
-                with self.debug_lock:
-                    process_time = (time.time() - rcv_t) * 1000
-                    self.process_times.append(process_time)
+                process_time = (time.time() - rcv_t) * 1000
+                self.process_times.append(process_time)
 
-                    # Update message frequency
-                    message_key = (message["Owner"], message["msgID"])
-                    self.message_counts[message_key] += 1
+                # Update message frequency
+                message_key = (message["Owner"], message["msgID"])
+                self.message_counts[message_key] += 1
 
-                    # Update message with the most processing time
-                    if process_time > self.max_processing_time:
-                        self.max_processing_time = process_time
-                        self.most_processing_time_message = message
+                # Update message with the most processing time
+                if process_time > self.max_processing_time:
+                    self.max_processing_time = process_time
+                    self.most_processing_time_message = message
 
-                    # Track messages around the local max processing time
-                    if len(self.process_times) >= 3:
-                        local_max_index = self.process_times.index(max(self.process_times))
-                        if local_max_index > 0 and local_max_index < len(self.process_times) - 1:
-                            self.messages_around_max_time = [
-                                self.process_times[local_max_index - 1],
-                                self.process_times[local_max_index],
-                                self.process_times[local_max_index + 1]
-                            ]
+                # Track messages around the local max processing time
+                if len(self.process_times) >= 3:
+                    local_max_index = self.process_times.index(max(self.process_times))
+                    if local_max_index > 0 and local_max_index < len(self.process_times) - 1:
+                        self.messages_around_max_time = [
+                            self.process_times[local_max_index - 1],
+                            self.process_times[local_max_index],
+                            self.process_times[local_max_index + 1]
+                        ]
+
+                if time.time() - self.last_print_time > 1:
+                    print(self.get_debugging_statistics())
+                    self.last_print_time = time.time()
 
             return priority, message
         except Exception as e:
@@ -123,30 +123,15 @@ class PriorityQueueHandler:
         Returns:
             dict: A dictionary containing debugging statistics.
         """
-        with self.debug_lock:
-            most_sent_message = max(self.message_counts, key=self.message_counts.get)
-            return {
-                "most_sent_message": {
-                    "message": most_sent_message,
-                    "count": self.message_counts[most_sent_message]
-                },
-                "most_processing_time_message": {
-                    "message": self.most_processing_time_message,
-                    "processing_time": self.max_processing_time
-                },
-                "messages_around_max_time": self.messages_around_max_time
-            }
-        
-    def _write_statistics_to_file(self):
-        """Periodically writes debugging statistics to a file every 0.3s."""
-        while self.debugging:
-            with self.debug_lock:
-                try:
-                    stats = self.get_debugging_statistics()
-                    if stats:
-                        with open("debug_stats.txt", "a") as f:
-                            f.write(f"{time.time()}: {stats}\n")
-                except Exception as e:
-                    self.logger.error(f"Exception in _write_statistics_to_file: {e}")
-                    
-            time.sleep(0.5)
+        most_sent_message = max(self.message_counts, key=self.message_counts.get)
+        return {
+            "most_sent_message": {
+                "message": most_sent_message,
+                "count": self.message_counts[most_sent_message]
+            },
+            "most_processing_time_message": {
+                "message": self.most_processing_time_message,
+                "processing_time": self.max_processing_time
+            },
+            "messages_around_max_time": self.messages_around_max_time
+        }
