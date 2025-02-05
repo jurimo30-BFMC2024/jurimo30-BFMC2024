@@ -96,7 +96,7 @@ class PriorityQueueHandler:
                 # Update message with the most processing time
                 if process_time > self.max_processing_time:
                     self.max_processing_time = process_time
-                    self.most_processing_time_message = message
+                    self.most_processing_time_message = (message["Owner"], message["msgID"])
 
                     # Get the message before the max processing time message
                     if len(self.process_times) > 1:
@@ -104,8 +104,8 @@ class PriorityQueueHandler:
                     else:
                         self.message_before_max_time = None
 
-                if time.time() - self.last_print_time > 1:
-                    print(f"[{time.time()}] {self.get_debugging_statistics()}")
+                if time.time() - self.last_print_time > 2:
+                    self._write_debug_statistics()
                     self.last_print_time = time.time()
 
             return priority, message
@@ -131,3 +131,12 @@ class PriorityQueueHandler:
             },
             "message_before_max_time": self.message_before_max_time
         }
+    
+    def _write_debug_statistics(self):
+        """
+        Periodically writes debugging statistics to a file every 0.3s.
+        Runs in a separate daemon thread.
+        """
+        if self.debugging:
+            with open("debug_stats.log", "a") as f:
+                f.write(f"{time.time()} {self.get_debugging_statistics()}\n")
