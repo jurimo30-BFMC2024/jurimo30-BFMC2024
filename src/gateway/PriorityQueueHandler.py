@@ -109,7 +109,7 @@ class PriorityQueueHandler:
                         ]
 
                 if time.time() - self.last_print_time > 1:
-                    print(self.get_debugging_statistics())
+                    print(f"[{time.time()}] {self.get_debugging_statistics()}")
                     self.last_print_time = time.time()
 
             return priority, message
