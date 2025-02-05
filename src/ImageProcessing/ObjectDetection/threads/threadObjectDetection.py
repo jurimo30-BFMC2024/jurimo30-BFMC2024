@@ -96,7 +96,7 @@ class threadObjectDetection(ThreadWithStop):
             else:
                 self.lost_sign_count += 1
                 if self.lost_sign_count >= self.lost_sign_threshold:
-                    self.objectDetectionSender.send(None)  # Sign lost
+                    #self.objectDetectionSender.send(None)  # Sign lost
                     self.current_sign = None
                     self.lost_sign_count = 0
         else:
