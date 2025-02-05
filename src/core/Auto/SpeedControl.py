@@ -18,7 +18,7 @@ class SpeedControl():
         value = max(min(value, in_max), in_min)
         return out_min + (out_max - out_min) * (value - in_min) / (in_max - in_min)
 
-    def getControlData(self, angle, stopLine, lowDistance, highway, lowSpeed):
+    def getControlData(self, angle, stopLine, lowDistance, highway, frontDistance):
 
         if stopLine:
             return 65
@@ -27,6 +27,7 @@ class SpeedControl():
             if abs(angle) < 30:
                 speed = 250
             elif abs(angle) > 170:
+                print(f"angle: {angle} speed: 100")
                 speed = 100
             else:
                 speed = self.map_value(angle, 30, 170, 100, 250)
@@ -45,6 +46,10 @@ class SpeedControl():
             while n < 3 and self.avgSpeed.get_average() > 120:
                 self.avgSpeed.add(70)
                 n += 1
+
+        if frontDistance < 30:
+            self.avgSpeed.add(0)
+            return 0
 
         speed = int(self.avgSpeed.filter(speed))
 

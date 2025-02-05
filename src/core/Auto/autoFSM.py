@@ -8,6 +8,7 @@ from src.utils.messages.allMessages import (
     IntersectionDetect,
     IntersectionDetect2,
     ObjectDetection,
+    FrontSensors
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -67,7 +68,9 @@ class autoFSM(ControlModeThread):
             print(f"Preuzet je znak {sign}")
 
         #ulaz obrade sa ESP
-        obstacle = False
+        
+        frontDistance = self.frontDetector.receiveWithBlock()
+
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
         if not self.intersection:
             if self.traffic_signs["stop sign"] or self.traffic_signs["priority sign"]:
@@ -128,4 +131,5 @@ class autoFSM(ControlModeThread):
         self.intersectionDetectSubscriber = messageHandlerSubscriber(self.queuesList, IntersectionDetect, "LastOnly", True)
         self.intersectionDetectSubscriber2 = messageHandlerSubscriber(self.queuesList, IntersectionDetect2, "LastOnly", True)
         self.signDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ObjectDetection, "FIFO", True)
+        self.frontDetector = messageHandlerSubscriber(self.queuesList, FrontSensors, "LastOnly", True)
         pass
