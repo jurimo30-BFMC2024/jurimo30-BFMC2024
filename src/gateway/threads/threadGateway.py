@@ -40,7 +40,7 @@ class threadGateway(ThreadWithStop):
         self.logger = logger
         self.debugging = debugging
         self.sendingList = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
-        self.handler = PriorityQueueHandler(queueList)
+        self.handler = PriorityQueueHandler(queueList, logger, debugging)
         self.messageApproved = set()  # Use a set for O(1) lookups
         self.executor = ThreadPoolExecutor(max_workers=4)  # Reusable thread pool
         self.pipe_locks = defaultdict(Lock)  # Locks for each pipe
