@@ -21,7 +21,7 @@ class SpeedControl():
     def getControlData(self, angle, stopLine, lowDistance, highway, lowSpeed):
 
         if stopLine:
-            return 0
+            return 65
 
         if not highway:
             if abs(angle) < 30:
