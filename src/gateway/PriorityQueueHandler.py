@@ -37,6 +37,7 @@ from threading import Semaphore, Thread
 from multiprocessing import Queue
 import queue
 import time
+from collections import deque
 
 class PriorityQueueHandler:
     """
@@ -65,7 +66,11 @@ class PriorityQueueHandler:
         # Counter to ensure unique tuples for the priority queue
         self.counter = 0
 
-        # Start worker threads for each priority queue
+        # Statistika vremena obrade
+        self.process_times = deque(maxlen=1000)
+        self.max_process_time = 0
+        self.total_process_time = 0
+
         self.threads = []
         for priority in self.queue_list:
             thread = Thread(target=self._queue_worker, args=(priority,), daemon=True)
@@ -81,17 +86,15 @@ class PriorityQueueHandler:
         """
         try:
             while True:
-                # Block until a message is available in the external queue
                 message = self.queue_list[priority].get()
-                # Calculate the priority level and enqueue the message
                 level = self.priority_order[priority]
-                self.counter += 1  # Increment counter for unique tuples
+                self.counter += 1  
                 try:
-                    self.priority_queue.put((level, self.counter, priority, message), False)
+                    self.priority_queue.put((level, self.counter, priority, message, time.time()), False)
                 except Exception as e:
                     print(f"Exception in _queue_worker: {e}")
-                self.message_semaphore.release()  # Signal new message
-        except :
+                self.message_semaphore.release()
+        except:
             pass
 
     def get(self):
@@ -106,8 +109,20 @@ class PriorityQueueHandler:
         self.message_semaphore.acquire()  # Block until a message is available
         while True:
             try:
-                _, _, priority, message = self.priority_queue.get(True, 0.5)
+                _, _, priority, message, rcv_t = self.priority_queue.get(True, 0.5)
+                process_time = (time.time() - rcv_t) * 1000
+                self.process_times.append(process_time)
+
+                # Ažuriranje statistike
+                self.max_process_time = max(self.max_process_time, process_time)
+
+                # Lokalni prosjek samo zadnjih 1000 vrijednosti
+                local_avg = sum(self.process_times) / len(self.process_times)
+                local_min = min(self.process_times)
+                local_max = max(self.process_times)
+                
+                # print(f"Process time: {process_time:.2f}ms | Max: {self.max_process_time:.2f}ms | Local Avg: {local_avg:.2f}ms | Local Min: {local_min:.2f}ms | Local Max: {local_max:.2f}ms")
+
                 return priority, message
             except Exception as e:
                 print(f"Exception[PQH_get]: {e}")
-                # pass
