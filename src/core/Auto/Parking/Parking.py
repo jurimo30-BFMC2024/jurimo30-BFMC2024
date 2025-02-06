@@ -124,8 +124,8 @@ class Parking():
 
     def evaluate_side_sensors(self, side_sensors):
         # Implement logic to evaluate side sensors
-        left_spot = side_sensors["left"] != 0
-        right_spot = side_sensors["right"] != 0
+        left_spot = side_sensors["left"] < 40.0
+        right_spot = side_sensors["right"] < 40.0
 
         self.left_spot_taken = self.left_spot_taken or left_spot
         self.right_spot_taken = self.right_spot_taken or right_spot
@@ -146,12 +146,12 @@ if __name__ == "__main__":
     
     # Mock sensor data
     test_cases = [
-        (None, {"left": 0, "right": 0}),  # Searching for a parking spot
-        (True, {"left": 0, "right": 0}),  # Parking spot detected
-        (None, {"left": 1, "right": 0}),  # Left side detected
-        (True, {"left": 0, "right": 0}),  # Both sides detected
-        (None, {"left": 1, "right": 1}),  # Both sides detected
-        (None, {"left": 1, "right": 1}),  # Both sides detected
+        (None, {"left": float('inf'), "right": float('inf')}),  # Searching for a parking spot
+        (True, {"left": float('inf'), "right": float('inf')}),  # Parking spot detected
+        (None, {"left": 10.0, "right": float('inf')}),  # Left side detected
+        (True, {"left": float('inf'), "right": float('inf')}),  # Both sides detected
+        (None, {"left": 10.0, "right": 10.0}),  # Both sides detected
+        (None, {"left": 10.0, "right": 10.0}),  # Both sides detected
     ]
     
     running = True
