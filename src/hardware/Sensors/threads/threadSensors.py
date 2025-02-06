@@ -42,13 +42,13 @@ class threadSensors(ThreadWithStop):
 
                         # Process received data
                         self.frontSensorSender.send({
-                            "distance": data['f'][0],
+                            "distance": data['f'][0] if data['f'][0] != 0.0 else float('inf'),
                             "relative_speed": data['f'][1],
                         })
 
                         self.sideSensorSender.send({
-                            "left": data['l'],
-                            "right": data['r'],
+                            "left": data['l'] if data['l'] != 0.0 else float('inf'),
+                            "right": data['r'] if data['r'] != 0.0 else float('inf'),
                         })
                         
                 except json.JSONDecodeError:
