@@ -73,7 +73,7 @@ class Parking():
 
         return False
 
-    def run(self, parking_spot_detected, sideSensors):
+    def run(self, parking_spot_detected, side_sensors):
         parking_spot_detected = self.detect_parking_spot(parking_spot_detected)
 
         if self.state == "finish":
@@ -87,7 +87,7 @@ class Parking():
                 self.state = "search_and_evaluate"
 
         elif self.state == "search_and_evaluate":
-            if self.evaluate_side_sensors(sideSensors):
+            if self.evaluate_side_sensors(side_sensors):
                 self.state = "search_parking_spot"
             elif parking_spot_detected:
                 if not self.right_spot_taken:
@@ -122,10 +122,10 @@ class Parking():
 
         return self.angle, self.speed, self.state != "finish"
 
-    def evaluate_side_sensors(self, sideSensors):
+    def evaluate_side_sensors(self, side_sensors):
         # Implement logic to evaluate side sensors
-        left_spot = sideSensors["left"] != 0
-        right_spot = sideSensors["right"] != 0
+        left_spot = side_sensors["left"] != 0
+        right_spot = side_sensors["right"] != 0
 
         self.left_spot_taken = self.left_spot_taken or left_spot
         self.right_spot_taken = self.right_spot_taken or right_spot
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     
     running = True
     while running:
-    # for parkingSpotDetected, sideSensors in test_cases:
+    # for parkingSpotDetected, side_sensors in test_cases:
         angle, speed, running = parking_system.run(True, {"left": 0, "right": 0})
         print(f"Angle: {angle}, Speed: {speed}, Running: {running}")
         time.sleep(0.5)
