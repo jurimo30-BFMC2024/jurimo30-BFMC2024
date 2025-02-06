@@ -11,7 +11,7 @@ class IntersectionControl():
         self.debugging = debugging
         self.status = -1 # 0-nije startovano, 1 - startovano ide napred, 2 - startovano mota
         self.lastPoint = 0
-        self.navPint = 0
+        self.navPoint = 0
         self.smer = "None"
 
     def getControlData(self, navigate, signs, sign, oldAngle):
@@ -53,9 +53,13 @@ class IntersectionControl():
         if self.status == 0:
             if (time.time() - self.lastPoint) >= self.time0:
                 print("Krecem sa algoritmom")
-                self.smer = navigate[self.navPint]
-                print(f"Smer je {self.smer}")
-                self.navPint += 1
+                if len(navigate) != self.navPoint:
+                    self.smer = navigate[self.navPint]
+                    print(f"Smer je {self.smer}")
+                else:
+                    self.status = -1
+                    print("Izlazak iz opsega, staza je zavrsena")
+                self.navPoint += 1
                 self.lastPoint = time.time()
                 self.status = 1
                 self.angle = oldAngle

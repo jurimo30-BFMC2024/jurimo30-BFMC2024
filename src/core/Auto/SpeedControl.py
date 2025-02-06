@@ -47,7 +47,7 @@ class SpeedControl():
                 self.avgSpeed.add(70)
                 n += 1
 
-        if frontDistance < 30:
+        if frontDistance < 30 and frontDistance > 0:
             self.avgSpeed.add(0)
             return 0
 
