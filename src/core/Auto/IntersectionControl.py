@@ -39,12 +39,12 @@ class IntersectionControl():
             print("Pokmrenut manevar raskrsnice")
             self.status = 0
             self.lastPoint = time.time()
-            self.angle = oldAngle
+            self.angle = 0
             self.speed = 0
-            if sign == "stop sign":
+            if sign == "stop":
                 self.time0 = 3
                 print("Cekanje za znak stop")
-            elif sign == "priority sign":
+            elif sign == "priority":
                 self.time0 = 0
             else:
                 self.time0 = 0
@@ -54,7 +54,7 @@ class IntersectionControl():
             if (time.time() - self.lastPoint) >= self.time0:
                 print("Krecem sa algoritmom")
                 if len(navigate) != self.navPoint:
-                    self.smer = navigate[self.navPint]
+                    self.smer = navigate[self.navPoint]
                     print(f"Smer je {self.smer}")
                 else:
                     self.status = -1
@@ -62,7 +62,7 @@ class IntersectionControl():
                 self.navPoint += 1
                 self.lastPoint = time.time()
                 self.status = 1
-                self.angle = oldAngle
+                self.angle = 0
                 self.speed = 100
         elif self.status == 1:
             if (time.time() - self.lastPoint) >= time1:

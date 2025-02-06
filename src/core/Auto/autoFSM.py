@@ -38,17 +38,19 @@ class autoFSM(ControlModeThread):
         self.oldSpeed = 0
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
-        self.navigateCommand = pp.planPath()
+        self.navigateCommand = self.planer.planPath()
+
+        print(self.navigateCommand)
         self.traffic_signs = {
-            "stop sign": False,
-            "crosswalk sign": False,
-            "highway entrance sign": False,
-            "highway exit sign": False,
-            "one way road sign": False,
-            "no-entry road sign": False,
-            "parking sign": False,
-            "priority sign": False,
-            "round-about sign": False
+            "stop": False,
+            "crosswalk": False,
+            "highway_entrance": False,
+            "highway_exit": False,
+            "one_way": False,
+            "no_entry": False,
+            "parking": False,
+            "priority": False,
+            "round_about": False
         }
 
         self.intersection = False
@@ -77,23 +79,23 @@ class autoFSM(ControlModeThread):
 
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
         if not self.intersection:
-            if self.traffic_signs["stop sign"] or self.traffic_signs["priority sign"]:
+            if self.traffic_signs["stop"] or self.traffic_signs["priority"]:
                 if stopLine:
                     print("Krecemo sa raskrsnicom")
                     self.intersection = True
-                    if self.traffic_signs["stop sign"]:
-                        self.intersectionSign = "stop sign"
-                    if self.traffic_signs["priority sign"]:
-                        self.intersectionSign = "priority sign"
+                    if self.traffic_signs["stop"]:
+                        self.intersectionSign = "stop"
+                    if self.traffic_signs["priority"]:
+                        self.intersectionSign = "priority"
 
-        if not self.highway and self.traffic_signs["highway entrance sign"]:
+        if not self.highway and self.traffic_signs["highway_entrance"]:
             self.highway = True
-            self.traffic_signs["highway entrance sign"] = False
+            self.traffic_signs["highway_entrance"] = False
             print("Ulazak na autoput")
-        if self.highway and (self.traffic_signs["highway exit sign"]):
+        if self.highway and (self.traffic_signs["highway_exit"]):
             self.highway = False
-            self.traffic_signs["highway entrance sign"] = False
-            self.traffic_signs["highway exit sign"] = False
+            self.traffic_signs["highway_entrance"] = False
+            self.traffic_signs["highway_exit"] = False
             print("Izlazak sa auto puta")
 
 

@@ -29,7 +29,7 @@ class threadObjectDetection(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/runs /content/runs/detect/train/weights/best.pt')
+        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/runs/detect/train/weights/best.pt')
         self.streamer = VideoStream(0, 1)
         
         # State management variables
@@ -90,24 +90,46 @@ class threadObjectDetection(ThreadWithStop):
 
     def update_state(self, new_sign):
         """Update detection state and handle messaging."""
-        if self.current_sign:
-            if new_sign == self.current_sign:
+        # Reset counters if no sign detected
+        if new_sign is None:
+            self.lost_sign_count += 1
+            self.confirmation_counter = 0
+            if self.lost_sign_count >= self.lost_sign_threshold:
+                #if self.current_sign is not None:
+                    #self.objectDetectionSender.send(None)  # Signal sign lost
+                self.current_sign = None
                 self.lost_sign_count = 0
+            return
+
+        # Case 1: New potential sign while we have current sign
+        if self.current_sign is not None:
+            if new_sign == self.current_sign:
+                # Reset counters for current sign
+                self.lost_sign_count = 0
+                self.confirmation_counter = 0
             else:
-                self.lost_sign_count += 1
-                if self.lost_sign_count >= self.lost_sign_threshold:
-                    #self.objectDetectionSender.send(None)  # Sign lost
-                    self.current_sign = None
+                # Track confirmation for new candidate
+                self.confirmation_counter += 1
+                
+                # If new candidate confirmed before losing current
+                if self.confirmation_counter >= self.confirmation_threshold:
+                    # Send both lost and new sign
+                    #self.objectDetectionSender.send(None)    # Signal previous lost
+                    self.objectDetectionSender.send(new_sign)  # Send new sign
+                    self.current_sign = new_sign
+                    self.confirmation_counter = 0
                     self.lost_sign_count = 0
+
+        # Case 2: No current sign, new detection
         else:
             if new_sign:
                 self.confirmation_counter += 1
+                # Confirm new sign
                 if self.confirmation_counter >= self.confirmation_threshold:
                     self.objectDetectionSender.send(new_sign)
                     self.current_sign = new_sign
                     self.confirmation_counter = 0
-            else:
-                self.confirmation_counter = 0
+                    self.lost_sign_count = 0
 
     @staticmethod
     def decode_frame(encoded_data):
