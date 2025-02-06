@@ -40,15 +40,23 @@ class threadSensors(ThreadWithStop):
                         if self.debugging:
                             self.logging.info(f"Received from esp32: {data}")
 
-                        # Process received data
+                        # Extract front sensor data safely
+                        front_data = data.get('f', [float('inf'), 0.0])
+                        if not isinstance(front_data, list) or len(front_data) < 2:
+                            front_data = [float('inf'), 0.0]
+
+                        # Extract side sensor data safely
+                        left_data = data.get('l', float('inf'))
+                        right_data = data.get('r', float('inf'))
+
                         self.frontSensorSender.send({
-                            "distance": data['f'][0] if data['f'][0] != 0.0 else float('inf'),
-                            "relative_speed": data['f'][1],
+                            "distance": front_data[0] if front_data[0] != 0.0 else float('inf'),
+                            "relative_speed": front_data[1],
                         })
 
                         self.sideSensorSender.send({
-                            "left": data['l'] if data['l'] != 0.0 else float('inf'),
-                            "right": data['r'] if data['r'] != 0.0 else float('inf'),
+                            "left": left_data if isinstance(left_data, (int, float)) and left_data != 0.0 else float('inf'),
+                            "right": right_data if isinstance(right_data, (int, float)) and right_data != 0.0 else float('inf'),
                         })
                         
                 except json.JSONDecodeError:
@@ -60,12 +68,16 @@ class threadSensors(ThreadWithStop):
                 except KeyError as e:
                     if self.debugging:
                         self.logging.warning(f"Missing expected key in data: {e}")
+                except IndexError:
+                    if self.debugging:
+                        self.logging.warning("Received incomplete sensor data")
 
         except serial.SerialException as e:
             if self.debugging:
                 self.logging.error(f"Serial port error: {e}")
         finally:
-            if 'ser' in locals() and self.ser.is_open:
+            # Ensure serial port is closed safely
+            if hasattr(self, 'ser') and self.ser and self.ser.is_open:
                 self.ser.close()
 
     def subscribe(self):
