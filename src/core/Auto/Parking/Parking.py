@@ -146,17 +146,19 @@ if __name__ == "__main__":
     
     # Mock sensor data
     test_cases = [
-        (None, {"left": float('inf'), "right": float('inf')}),  # Searching for a parking spot
-        (True, {"left": float('inf'), "right": float('inf')}),  # Parking spot detected
-        (None, {"left": 10.0, "right": float('inf')}),  # Left side detected
-        (True, {"left": float('inf'), "right": float('inf')}),  # Both sides detected
-        (None, {"left": 10.0, "right": 10.0}),  # Both sides detected
-        (None, {"left": 10.0, "right": 10.0}),  # Both sides detected
+        (False, {"left": float('inf'), "right": float('inf')}),
+        (True, {"left": float('inf'), "right": float('inf')}),
+        (False, {"left": 10.0, "right": float('inf')}),
+        (False, {"left": float('inf'), "right": float('inf')}),
+        (True, {"left": float('inf'), "right": float('inf')}),
+        (False, {"left": 10.0, "right": 10.0}),
     ]
     
     running = True
     while running:
-    # for parkingSpotDetected, side_sensors in test_cases:
-        angle, speed, running = parking_system.run(True, {"left": 0, "right": 0})
-        print(f"Angle: {angle}, Speed: {speed}, Running: {running}")
-        time.sleep(0.5)
+        for parkingSpotDetected, side_sensors in test_cases:
+            angle, speed, running = parking_system.run(parkingSpotDetected, side_sensors)
+            print(f"Angle: {angle}, Speed: {speed}, Running: {running}")
+            if not running:
+                break
+            time.sleep(0.5)
