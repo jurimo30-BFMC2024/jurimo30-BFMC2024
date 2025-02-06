@@ -1,4 +1,5 @@
-
+import time
+from src.core.Auto.Parking.MotionScheduler import MotionScheduler
 
 class Parking():
     """This thread handles Parking.
@@ -19,13 +20,39 @@ class Parking():
 
         self.left_spot_taken = False
         self.right_spot_taken = False
+        self.parking_spot = "right"
 
+        self.motions = {
+            "park": {
+                "left": [
+                    
+                ],
+                "right": [
+
+                ],
+            },
+            "unpark": {
+                "left": [
+
+                ],
+                "right": [
+                    
+                ],
+            },
+            "wait": {
+                [
+                    (0, 0, 3) # wait parked for 3 seconds
+                ]
+            }
+        }
+
+        self.motionScheduler = MotionScheduler()
 
     def run(self, parkingSpotDetected, sideSensors):
 
         if self.state == "finish":
             self.state = "search_parking_spot"
-            self.angle, self.speed = 0, 0
+            self.angle, self.speed = None, 100
 
         elif self.state == "search_parking_spot":
             if parkingSpotDetected is not None:
@@ -34,18 +61,36 @@ class Parking():
                 self.state = "search_and_evaluate"
 
         elif self.state == "search_and_evaluate":
-            if self.evaluate_side_sensors():
+            if self.evaluate_side_sensors(sideSensors):
                 self.state = "search_parking_spot"
             elif parkingSpotDetected is not None:
-                self.state = "park"
+                if not self.right_spot_taken:
+                    self.parking_spot = "right"
+                else:
+                    self.parking_spot = "left"
 
+                self.logging.info(f"Performing parking maneuver in the {self.parking_spot} spot")
+                self.state = "park"
+                self.motionScheduler.set_schedule(self.motions[self.state][self.parking_spot])
+            
         elif self.state == "park":
-            self.perform_parking()
-            self.state = "unpark"
+            self.angle, self.speed, finished = self.motionScheduler.run()
+            if finished:
+                self.state = "wait"
+                self.motionScheduler.set_schedule(self.motions[self.state])
+
+        elif self.state == "wait":
+            self.angle, self.speed, finished = self.motionScheduler.run()
+            if finished:
+                self.logging.info(f"Performing unparking maneuver from the {self.parking_spot} spot")
+                self.state = "unpark"
+                self.motionScheduler.set_schedule(self.motions[self.state][self.parking_spot])
+
 
         elif self.state == "unpark":
-            self.perform_unparking()
-            self.state = "finish"
+            self.angle, self.speed, finished = self.motionScheduler.run()
+            if finished:
+                self.state = "finish"
 
         self.logging.debug(f"Current state: {self.state}")
 
@@ -61,10 +106,31 @@ class Parking():
 
         return self.left_spot_taken and self.right_spot_taken
 
-    def perform_parking(self):
-        self.logging.info("Performing parking maneuver...")
-        # Implement parking logic
-
-    def perform_unparking(self):
-        self.logging.info("Performing unparking maneuver...")
-        # Implement unparking logic
+if __name__ == "__main__":
+    import logging
+    # Setup logging
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger("ParkingTest")
+    
+    # Mock queue list (not used in this test)
+    queueList = {}
+    
+    # Initialize the Parking class
+    parking_system = Parking(queueList, logger, debugging=True)
+    
+    # Mock sensor data
+    test_cases = [
+        (None, {"left": 0, "right": 0}),  # Searching for a parking spot
+        (True, {"left": 0, "right": 0}),  # Parking spot detected
+        (None, {"left": 1, "right": 0}),  # Left side detected
+        (True, {"left": 0, "right": 0}),  # Both sides detected
+        (None, {"left": 1, "right": 1}),  # Both sides detected
+        (None, {"left": 1, "right": 1}),  # Both sides detected
+    ]
+    
+    running = True
+    while running:
+    # for parkingSpotDetected, sideSensors in test_cases:
+        angle, speed, running = parking_system.run(True, {"left": 0, "right": 0})
+        print(f"Angle: {angle}, Speed: {speed}, Running: {running}")
+        time.sleep(0.5)
