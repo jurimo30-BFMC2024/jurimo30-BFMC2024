@@ -39,11 +39,9 @@ class Parking():
                     
                 ],
             },
-            "wait": {
-                [
-                    (0, 0, 3) # wait parked for 3 seconds
-                ]
-            }
+            "wait": [
+                (0, 0, 3) # wait parked for 3 seconds
+            ]
         }
 
         self.motionScheduler = MotionScheduler()
