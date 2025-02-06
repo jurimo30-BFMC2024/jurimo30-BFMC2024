@@ -22,6 +22,9 @@ class Parking():
         self.right_spot_taken = False
         self.parking_spot = "right"
 
+        self.last_parking_spot_detected = False
+        self.last_detection_time = 0
+
         self.motions = {
             "park": {
                 "left": [
@@ -56,14 +59,29 @@ class Parking():
 
         self.motionScheduler = MotionScheduler()
 
-    def run(self, parkingSpotDetected, sideSensors):
+    def detect_parking_spot(self, parking_spot_detected: bool) -> bool:
+        current_time = time.time()
+        
+        if parking_spot_detected and not self.last_parking_spot_detected:
+            self.last_detection_time = current_time
+            self.last_parking_spot_detected = True
+            return True
+
+        if not parking_spot_detected:
+            if current_time - self.last_detection_time >= 0.5:
+                self.last_parking_spot_detected = False
+
+        return False
+
+    def run(self, parking_spot_detected, sideSensors):
+        parking_spot_detected = self.detect_parking_spot(parking_spot_detected)
 
         if self.state == "finish":
             self.state = "search_parking_spot"
             self.angle, self.speed = None, 100
 
         elif self.state == "search_parking_spot":
-            if parkingSpotDetected is not None:
+            if parking_spot_detected:
                 self.left_spot_taken = False
                 self.right_spot_taken = False
                 self.state = "search_and_evaluate"
@@ -71,7 +89,7 @@ class Parking():
         elif self.state == "search_and_evaluate":
             if self.evaluate_side_sensors(sideSensors):
                 self.state = "search_parking_spot"
-            elif parkingSpotDetected is not None:
+            elif parking_spot_detected:
                 if not self.right_spot_taken:
                     self.parking_spot = "right"
                 else:

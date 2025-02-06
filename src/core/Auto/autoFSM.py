@@ -71,7 +71,7 @@ class autoFSM(ControlModeThread):
             self.traffic_signs[sign] = True
             print(f"Preuzet je znak {sign}")
 
-        parkingSpotDetected = self.parkingSpotDetectionSubscriber.receive()
+        parking_spot_detected = self.parkingSpotDetectionSubscriber.receive() != None
 
         #ulaz obrade sa ESP
         frontSensors = self.frontSensorSubscriber.receiveWithBlock()
@@ -100,7 +100,7 @@ class autoFSM(ControlModeThread):
         
         #################         FSM            ############
         if self.parking:
-            park_angle, speed, self.parking = self.parkingController.run(parkingSpotDetected, sideSensors)
+            park_angle, speed, self.parking = self.parkingController.run(parking_spot_detected, sideSensors)
             if park_angle is not None:
                 angle = park_angle
         elif self.intersection:
