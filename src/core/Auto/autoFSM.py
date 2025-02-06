@@ -74,8 +74,8 @@ class autoFSM(ControlModeThread):
         parking_spot_detected = self.parkingSpotDetectionSubscriber.receive() != None
 
         #ulaz obrade sa ESP
-        frontSensors = self.frontSensorSubscriber.receiveWithBlock()
-        sideSensors = self.sideSensorSubscriber.receiveWithBlock()
+        front_sensors = self.frontSensorSubscriber.receiveWithBlock()
+        side_sensors = self.sideSensorSubscriber.receiveWithBlock()
         obstacle = False
         
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
@@ -100,7 +100,7 @@ class autoFSM(ControlModeThread):
         
         #################         FSM            ############
         if self.parking:
-            park_angle, speed, self.parking = self.parkingController.run(parking_spot_detected, sideSensors)
+            park_angle, speed, self.parking = self.parkingController.run(parking_spot_detected, side_sensors)
             if park_angle is not None:
                 angle = park_angle
         elif self.intersection:
