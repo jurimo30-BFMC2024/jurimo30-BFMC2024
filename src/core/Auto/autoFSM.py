@@ -11,10 +11,11 @@ from src.utils.messages.allMessages import (
     ObjectDetection,
     SideSensors,
     FrontSensors,
-    ParkingSpotDetect
+    ParkingSpotDetect,
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
+from src.core.Auto.pathPlanning.pathPlanning import PathPlanner as pp
 import time
 import enum
 
@@ -31,6 +32,8 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
 
+        self.planer = pp(10, 7, "pacman")
+
         self.subscribe()
         super().__init__()
 
@@ -39,17 +42,19 @@ class autoFSM(ControlModeThread):
         self.oldSpeed = 0
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
-        self.navigateCommand = ["Right", "Right", "Straight", "Right", "Left"]
+        self.navigateCommand = self.planer.planPath()
+
+        print(self.navigateCommand)
         self.traffic_signs = {
-            "stop sign": False,
-            "crosswalk sign": False,
-            "highway entrance sign": False,
-            "highway exit sign": False,
-            "one way road sign": False,
-            "no-entry road sign": False,
-            "parking sign": False,
-            "priority sign": False,
-            "round-about sign": False
+            "stop": False,
+            "crosswalk": False,
+            "highway_entrance": False,
+            "highway_exit": False,
+            "one_way": False,
+            "no_entry": False,
+            "parking": False,
+            "priority": False,
+            "round_about": False
         }
 
         self.intersection = False
@@ -69,31 +74,40 @@ class autoFSM(ControlModeThread):
         if self.signDetectionSubscriber.isDataInPipe():
             sign = self.signDetectionSubscriber.receive()
             self.traffic_signs[sign] = True
-            print(f"Preuzet je znak {sign}")
+            if self.debugging:
+                print(f"Preuzet je znak {sign}")
 
         parking_spot_detected = self.parkingSpotDetectionSubscriber.receive() != None
 
         #ulaz obrade sa ESP
         front_sensors = self.frontSensorSubscriber.receiveWithBlock()
         side_sensors = self.sideSensorSubscriber.receiveWithBlock()
-        obstacle = False
+
+        frontDistance = front_sensors["distance"]
         
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
         if not self.intersection:
-            if self.traffic_signs["stop sign"]:
+            if self.traffic_signs["stop"] or self.traffic_signs["priority"]:
                 if stopLine:
-                    print("Krecemo sa raskrsnicom")
+                    if self.debugging:
+                        print("Krecemo sa raskrsnicom")
                     self.intersection = True
-                    self.intersectionSign = "stop sign"
-        if not self.highway and self.traffic_signs["highway entrance sign"]:
+                    if self.traffic_signs["stop"]:
+                        self.intersectionSign = "stop"
+                    if self.traffic_signs["priority"]:
+                        self.intersectionSign = "priority"
+
+        if not self.highway and self.traffic_signs["highway_entrance"]:
             self.highway = True
-            self.traffic_signs["highway entrance sign"] = False
-            print("Ulazak na autoput")
-        if self.highway and (self.traffic_signs["highway exit sign"]):
+            self.traffic_signs["highway_entrance"] = False
+            if self.debugging:
+                print("Ulazak na autoput")
+        if self.highway and (self.traffic_signs["highway_exit"]):
             self.highway = False
-            self.traffic_signs["highway entrance sign"] = False
-            self.traffic_signs["highway exit sign"] = False
-            print("Izlazak sa auto puta")
+            self.traffic_signs["highway_entrance"] = False
+            self.traffic_signs["highway_exit"] = False
+            if self.debugging:
+                print("Izlazak sa auto puta")
 
         if not self._running.is_set():
             return
@@ -104,10 +118,10 @@ class autoFSM(ControlModeThread):
             if park_angle is not None:
                 angle = park_angle
         elif self.intersection:
-            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign)
+            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign, self.oldAngle)
             pass
         else:
-            speed = self.speedControler.getControlData(angle, stopLine, lowDistance, self.highway, False)
+            speed = self.speedControler.getControlData(angle, stopLine, lowDistance, self.highway, frontDistance)
 
         ############ Sending data ##############################
 

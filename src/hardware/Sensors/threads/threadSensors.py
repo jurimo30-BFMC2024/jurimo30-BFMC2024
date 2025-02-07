@@ -41,22 +41,22 @@ class threadSensors(ThreadWithStop):
                             self.logging.info(f"Received from esp32: {data}")
 
                         # Extract front sensor data safely
-                        front_data = data.get('f', [float('inf'), 0.0])
+                        front_data = data.get('f', [10000.0, 0.0])
                         if not isinstance(front_data, list) or len(front_data) < 2:
-                            front_data = [float('inf'), 0.0]
+                            front_data = [10000.0, 0.0]
 
                         # Extract side sensor data safely
-                        left_data = data.get('l', float('inf'))
-                        right_data = data.get('r', float('inf'))
+                        left_data = data.get('l', 10000.0)
+                        right_data = data.get('r', 10000.0)
 
                         self.frontSensorSender.send({
-                            "distance": front_data[0] if front_data[0] != 0.0 else float('inf'),
+                            "distance": front_data[0] if front_data[0] != 0.0 else 10000.0,
                             "relative_speed": front_data[1],
                         })
 
                         self.sideSensorSender.send({
-                            "left": left_data if isinstance(left_data, (int, float)) and left_data != 0.0 else float('inf'),
-                            "right": right_data if isinstance(right_data, (int, float)) and right_data != 0.0 else float('inf'),
+                            "left": left_data if isinstance(left_data, (int, float)) and left_data != 0.0 else 10000.0,
+                            "right": right_data if isinstance(right_data, (int, float)) and right_data != 0.0 else 10000.0,
                         })
                         
                 except json.JSONDecodeError:

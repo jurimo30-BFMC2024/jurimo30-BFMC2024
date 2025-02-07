@@ -45,7 +45,7 @@ class LaneFollow():
         if self.debugging:
             self.logging.info(f"Lane detect out: {self.finalAngle}")
 
-        #self.finalAngle = int(self.avgAngle.filter(self.finalAngle))
+        self.finalAngle = int(self.avgAngle.filter(self.finalAngle))
 
         return self.finalAngle
 
