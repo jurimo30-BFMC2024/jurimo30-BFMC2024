@@ -70,7 +70,8 @@ class autoFSM(ControlModeThread):
         if self.signDetectionSubscriber.isDataInPipe():
             sign = self.signDetectionSubscriber.receive()
             self.traffic_signs[sign] = True
-            print(f"Preuzet je znak {sign}")
+            if self.debugging:
+                print(f"Preuzet je znak {sign}")
 
         #ulaz obrade sa ESP
         
@@ -81,7 +82,8 @@ class autoFSM(ControlModeThread):
         if not self.intersection:
             if self.traffic_signs["stop"] or self.traffic_signs["priority"]:
                 if stopLine:
-                    print("Krecemo sa raskrsnicom")
+                    if self.debugging:
+                        print("Krecemo sa raskrsnicom")
                     self.intersection = True
                     if self.traffic_signs["stop"]:
                         self.intersectionSign = "stop"
@@ -91,12 +93,14 @@ class autoFSM(ControlModeThread):
         if not self.highway and self.traffic_signs["highway_entrance"]:
             self.highway = True
             self.traffic_signs["highway_entrance"] = False
-            print("Ulazak na autoput")
+            if self.debugging:
+                print("Ulazak na autoput")
         if self.highway and (self.traffic_signs["highway_exit"]):
             self.highway = False
             self.traffic_signs["highway_entrance"] = False
             self.traffic_signs["highway_exit"] = False
-            print("Izlazak sa auto puta")
+            if self.debugging:
+                print("Izlazak sa auto puta")
 
 
     

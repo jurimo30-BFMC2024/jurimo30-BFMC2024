@@ -36,14 +36,16 @@ class IntersectionControl():
             time2 = 100
 
         if self.status == -1:
-            print("Pokmrenut manevar raskrsnice")
+            if self.debugging:
+                print("Pokmrenut manevar raskrsnice")
             self.status = 0
             self.lastPoint = time.time()
             self.angle = 0
             self.speed = 0
             if sign == "stop":
                 self.time0 = 3
-                print("Cekanje za znak stop")
+                if self.debugging:
+                    print("Cekanje za znak stop")
             elif sign == "priority":
                 self.time0 = 0
             else:
@@ -52,13 +54,16 @@ class IntersectionControl():
 
         if self.status == 0:
             if (time.time() - self.lastPoint) >= self.time0:
-                print("Krecem sa algoritmom")
+                if self.debugging:
+                    print("Krecem sa algoritmom")
                 if len(navigate) != self.navPoint:
                     self.smer = navigate[self.navPoint]
-                    print(f"Smer je {self.smer}")
+                    if self.debugging:
+                        print(f"Smer je {self.smer}")
                 else:
                     self.status = -1
-                    print("Izlazak iz opsega, staza je zavrsena")
+                    if self.debugging:
+                        print("Izlazak iz opsega, staza je zavrsena")
                 self.navPoint += 1
                 self.lastPoint = time.time()
                 self.status = 1
@@ -66,14 +71,16 @@ class IntersectionControl():
                 self.speed = 100
         elif self.status == 1:
             if (time.time() - self.lastPoint) >= time1:
-                print("Krecem da motam")
+                if self.debugging:
+                    print("Krecem da motam")
                 self.status = 2
                 self.lastPoint = time.time()
                 self.angle = tangle
                 self.speed = 100
         elif self.status == 2:
             if (time.time() - self.lastPoint) >= time2:
-                print("kraj")
+                if self.debugging:
+                    print("kraj")
                 self.status = -1
                 intersection = False
                 self.angle = 0

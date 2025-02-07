@@ -27,7 +27,6 @@ class SpeedControl():
             if abs(angle) < 30:
                 speed = 250
             elif abs(angle) > 170:
-                print(f"angle: {angle} speed: 100")
                 speed = 100
             else:
                 speed = self.map_value(angle, 30, 170, 100, 250)
