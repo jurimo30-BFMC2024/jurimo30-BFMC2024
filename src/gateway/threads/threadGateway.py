@@ -88,13 +88,20 @@ class threadGateway(ThreadWithStop):
 
     def run(self):
         """Process messages in priority order."""
-        while self._running:
-            priority, message = self.handler.get()
-            if priority == "Config":
-                action = message["Subscribe/Unsubscribe"].lower()
-                if action == "subscribe":
-                    self.subscribe(message)
+        try:
+            while self._running:
+                priority, message = self.handler.get()
+                if priority == "Config":
+                    action = message["Subscribe/Unsubscribe"].lower()
+                    if action == "subscribe":
+                        self.subscribe(message)
+                    else:
+                        self.unsubscribe(message)
                 else:
-                    self.unsubscribe(message)
-            else:
-                self.send(message)
+                    self.send(message)
+        except:
+            pass
+
+    def stop(self):
+        self._running = False
+        self.handler.stop()

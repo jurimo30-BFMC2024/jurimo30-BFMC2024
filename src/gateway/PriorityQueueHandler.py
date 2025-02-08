@@ -22,6 +22,7 @@ class PriorityQueueHandler:
         self.debugging = True
         self.message_semaphore = Semaphore(0)
         self.priority_queue = queue.PriorityQueue()
+        self._running = True
         
         # Define priority levels based on the original check order
         self.priority_order = {
@@ -49,9 +50,18 @@ class PriorityQueueHandler:
 
         self.threads = []
         for priority in self.queue_list:
-            thread = Thread(target=self._queue_worker, args=(priority,), daemon=True)
+            thread = Thread(target=self._queue_worker, args=(priority,))
             thread.start()
             self.threads.append(thread)
+
+    def stop(self):
+        self._running = False
+        self.message_semaphore.release()
+        for priority in self.queue_list:
+            self.queue_list[priority].put(None)
+        
+        for thread in self.threads:
+            thread.join()
 
     def _queue_worker(self, priority):
         """
@@ -61,7 +71,7 @@ class PriorityQueueHandler:
             priority (str): The priority level this worker is responsible for.
         """
         try:
-            while True:
+            while self._running:
                 message = self.queue_list[priority].get()
                 level = self.priority_order[priority]
                 self.counter += 1  
@@ -84,7 +94,7 @@ class PriorityQueueHandler:
             tuple: (priority_name, message) where priority_name is the string name of the priority level.
         """
         self.message_semaphore.acquire()  # Block until a message is available
-        while True:
+        while self._running:
             try:
                 _, _, priority, message, rcv_t = self.priority_queue.get(True, 0.5)
 
@@ -115,6 +125,10 @@ class PriorityQueueHandler:
                 return priority, message
             except Exception as e:
                 self.logger.error(f"Exception[PQH_get]: {e}")
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt
+
+        raise Exception
 
     def get_debugging_statistics(self):
         """
