@@ -59,10 +59,7 @@ class messageHandlerSubscriber:
 
         Returns None if there no data in the Pipe
         """
-        if not self._pipeRecv.poll():
-            return None
-        else:
-            return self.receiveWithBlock()
+        return self._receive(False)
         
     def receiveWithBlock(self):
         """
@@ -71,22 +68,18 @@ class messageHandlerSubscriber:
         Returns:
             message's data type: The received message.
         """
+        return self._receive(True)
+        
+    def _receive(self, block):
+        self._pipeRecv.send(block)
         
         message = self._pipeRecv.recv()
         messageType = type(message["value"]).__name__
         
-        if self._deliveryMode == "fifo":
-            if messageType != self._message.msgType.value:
-                print("WARNING! Message type and value type are not matching.", self._message, "received:", messageType, "expected:", self._message.msgType.value)
-            return message["value"]
+        if messageType != self._message.msgType.value:
+            print("WARNING! Message type and value type are not matching.", self._message, "received:", messageType, "expected:", self._message.msgType.value)
         
-        elif self._deliveryMode == "lastonly":
-            while (self._pipeRecv.poll()):
-                message = self._pipeRecv.recv()
-
-            if messageType != self._message.msgType.value:
-                print("WARNING! Message type and value type are not matching.", self._message, "received:", messageType, "expected:", self._message.msgType.value)
-            return message["value"]
+        return message["value"]
         
     def empty(self):
         """
@@ -113,6 +106,12 @@ class messageHandlerSubscriber:
         """
         Unsubscribes from messages.
         """
+        try:
+            if self._pipeRecv:
+                self._pipeRecv.close()
+        except Exception:
+            pass
+        
         self._queuesList["Config"].put(
             {
                 "Subscribe/Unsubscribe": "unsubscribe",
