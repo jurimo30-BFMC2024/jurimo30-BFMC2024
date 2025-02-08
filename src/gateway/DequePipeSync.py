@@ -48,11 +48,16 @@ class DequePipeSync:
         """
         while True:
             try:
-                # Wait indefinitely for a boolean signal from the pipe.
-                block_flag = self.pipe_conn.recv()  # Expecting a bool
+                request = self.pipe_conn.recv()
             except EOFError:
                 # The pipe was closed. Exit the thread.
                 break
+
+            if request["mode"] == "recv":
+                block_flag = request["block"]
+            elif request["mode"] == "len":
+                self.pipe_conn.send(len(self.deque))
+                continue
 
             # Perform the pop operation with appropriate blocking behavior.
             with self.cond:

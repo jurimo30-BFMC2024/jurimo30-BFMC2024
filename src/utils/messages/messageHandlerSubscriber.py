@@ -71,9 +71,12 @@ class messageHandlerSubscriber:
         return self._receive(True)
         
     def _receive(self, block):
-        self._pipeRecv.send(block)
+        self._pipeRecv.send({"mode": "recv", "block": block})
         
         message = self._pipeRecv.recv()
+        if message is None:
+            return None
+
         messageType = type(message["value"]).__name__
         
         if messageType != self._message.msgType.value:
@@ -128,7 +131,9 @@ class messageHandlerSubscriber:
         Returns:
             bool: True if data is available, False otherwise.
         """
-        return self._pipeRecv.poll()
+        self._pipeRecv.send({"mode": "len"})
+
+        return self._pipeRecv.recv()
 
     def setDeliveryModeToFIFO(self):
         """
