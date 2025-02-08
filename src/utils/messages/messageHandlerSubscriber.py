@@ -42,7 +42,7 @@ class messageHandlerSubscriber:
         self._queuesList = queuesList
         self._message = message
         self._deliveryMode = str.lower(deliveryMode)
-        self._pipeRecv, self._pipeSend = Pipe(duplex=False)
+        self._pipeRecv, self._pipeSend = Pipe(duplex=True)
         self._receiver = inspect.currentframe().f_back.f_locals['self'].__class__.__name__
         
         if subscribe == True:
@@ -105,6 +105,7 @@ class messageHandlerSubscriber:
                 "Owner": self._message.Owner.value,
                 "msgID": self._message.msgID.value,
                 "To": {"receiver": self._receiver, "pipe": self._pipeSend},
+                "DeliveryMode": self._deliveryMode,
             }
         )
 
