@@ -84,7 +84,7 @@ class threadGateway(ThreadWithStop):
                 pipe.send(msg)
             
             if self.debugging:
-                self.logger.warning(f"Sent: ({msg["Owner"]}, {msg["id"]})")
+                self.logger.warning(f"Sent: ({msg['Owner']}, {msg['id']})")
 
     def run(self):
         """Process messages in priority order."""
