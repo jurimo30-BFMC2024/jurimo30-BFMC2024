@@ -90,6 +90,7 @@ if __name__ == "__main__":
             "Owner": "Camera",
             "msgID": 1,
             "To": {"receiver": 1, "pipe": pipeSend1},
+            "DeliveryMode": "lastonly",
         }
     )
     time.sleep(1)
@@ -101,6 +102,7 @@ if __name__ == "__main__":
             "Owner": "Camera",
             "msgID": 2,
             "To": {"receiver": 2, "pipe": pipeSend2},
+            "DeliveryMode": "fifo",
         }
     )
     time.sleep(1)
@@ -112,6 +114,7 @@ if __name__ == "__main__":
             "Owner": "Camera",
             "msgID": 3,
             "To": {"receiver": 3, "pipe": pipeSend3},
+            "DeliveryMode": "fifo",
         }
     )
     time.sleep(1)
@@ -122,6 +125,15 @@ if __name__ == "__main__":
             "msgID": 1,
             "msgType": "1111",
             "msgValue": "This is the text1",
+        }
+    )
+
+    queueList["Critical"].put(
+        {
+            "Owner": "Camera",
+            "msgID": 1,
+            "msgType": "1111",
+            "msgValue": "This is the text4",
         }
     )
 
@@ -145,10 +157,23 @@ if __name__ == "__main__":
     time.sleep(2)
 
     # Code to verify that the function send Owner threadGateway.py is working properly.
-
-    print(pipeReceive3.recv())
+    pipeReceive1.send(True)
     print(pipeReceive1.recv())
+    pipeReceive2.send(True)
     print(pipeReceive2.recv())
+    pipeReceive3.send(True)
+    print(pipeReceive3.recv())
+
+    queueList["Config"].put(
+        {
+            "Subscribe/Unsubscribe": "Unsubscribe",
+            "Owner": "Camera",
+            "msgID": 2,
+            "To": {"receiver": 2},
+        }
+    )
+
+    time.sleep(2)
 
     # ===================================== STAYING ALIVE ====================================
 
