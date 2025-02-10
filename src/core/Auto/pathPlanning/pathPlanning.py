@@ -24,7 +24,7 @@ class PathPlanner:
             raise ValueError("PathPlanner: mode must be either \"p2p\" or \"pacman\"")
         else:
             self.mode = mode
-        self.file_path = "Small_map.graphml" # change this to Competition_track_graph.graphml when in Romania
+        self.file_path = "src/core/Auto/pathPlanning/Small_map.graphml" # change this to Competition_track_graph.graphml when in Romania
         
 
     def planPath(self):
@@ -50,9 +50,11 @@ class PathPlanner:
         ns = {'graphml': 'http://graphml.graphdrawing.org/xmlns'}
         graph = nx.DiGraph()
         
-        collectibles = {"75", "128", "116", "98", "110", "185", "71", "25", "31", "29", "93", "80", "82", "136",
-        "419", "125", "403", "399", "343", "386", "363", "368", "318", "317", "56", "54", "261", "239", "228",
-        "225", "198", "42", "289", "6", "8"}
+        # collectibles = {"75", "128", "116", "98", "110", "185", "71", "25", "31", "29", "93", "80", "82", "136",
+        # "419", "125", "403", "399", "343", "386", "363", "368", "318", "317", "56", "54", "261", "239", "228",
+        # "225", "198", "42", "289", "6", "8"}
+
+        collectibles = {"32", "22", "14", "38", "7"}
         
         for node in root.findall(".//graphml:node", ns):
             node_id = node.get("id")
@@ -76,6 +78,9 @@ class PathPlanner:
         if self.file_path == "Competition_track_graph.graphml":
             graph.nodes["270"]['intersection'] = True
             graph.nodes["262"]['intersection'] = True
+        else:
+            graph.nodes["39"]['intersection'] = True
+            graph.nodes["33"]['intersection'] = True
 
 
         return graph
