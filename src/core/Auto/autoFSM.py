@@ -1,3 +1,4 @@
+from src.core.Auto.Parking.Parking import Parking
 from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.core.Auto.LaneFollow.LaneFollow import LaneFollow
 from src.core.Auto.SpeedControl import SpeedControl
@@ -8,7 +9,9 @@ from src.utils.messages.allMessages import (
     IntersectionDetect,
     IntersectionDetect2,
     ObjectDetection,
-    FrontSensors
+    SideSensors,
+    FrontSensors,
+    ParkingSpotDetect,
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -24,7 +27,8 @@ class autoFSM(ControlModeThread):
         self.laneFollowData = LaneFollow(self.queuesList, self.logging, False)
         self.speedControler = SpeedControl(self.logging, self.debugging)
         self.interCont = InterCont(queueList, logging, debugging)
-        
+        self.parkingController = Parking(queueList, logging, debugging)
+
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
 
@@ -73,16 +77,18 @@ class autoFSM(ControlModeThread):
             if self.debugging:
                 print(f"Preuzet je znak {sign}")
 
+        parking_spot_detected = self.parkingSpotDetectionSubscriber.receive() != None
+
         #ulaz obrade sa ESP
-        
-        frontDetect = self.frontDetector.receiveWithBlock()
-        frontDistance = frontDetect["distance"]
+        front_sensors = self.frontSensorSubscriber.receiveWithBlock()
+        side_sensors = self.sideSensorSubscriber.receiveWithBlock()
 
         if not self.parking:
             if self.traffic_signs["parking"]:
                 self.traffic_signs["parking"] = False
                 self.parking = True
-
+            
+        frontDistance = front_sensors["distance"]
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
         if not self.intersection:
             if self.traffic_signs["stop"] or self.traffic_signs["priority"]:
@@ -107,15 +113,14 @@ class autoFSM(ControlModeThread):
             if self.debugging:
                 print("Izlazak sa auto puta")
 
-
-    
         if not self._running.is_set():
             return
         
-
         #################         FSM            ############
         if self.parking:
-            pass
+            park_angle, speed, self.parking = self.parkingController.run(parking_spot_detected, side_sensors)
+            if park_angle is not None:
+                angle = park_angle
         elif self.intersection:
             angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign, self.oldAngle)
             pass
@@ -146,5 +151,7 @@ class autoFSM(ControlModeThread):
         self.intersectionDetectSubscriber = messageHandlerSubscriber(self.queuesList, IntersectionDetect, "LastOnly", True)
         self.intersectionDetectSubscriber2 = messageHandlerSubscriber(self.queuesList, IntersectionDetect2, "LastOnly", True)
         self.signDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ObjectDetection, "FIFO", True)
-        self.frontDetector = messageHandlerSubscriber(self.queuesList, FrontSensors, "LastOnly", True)
-        pass
+        self.sideSensorSubscriber = messageHandlerSubscriber(self.queuesList, SideSensors, "LastOnly", True)
+        self.frontSensorSubscriber = messageHandlerSubscriber(self.queuesList, FrontSensors, "LastOnly", True)
+        self.parkingSpotDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ParkingSpotDetect, "LastOnly", True)
+        
