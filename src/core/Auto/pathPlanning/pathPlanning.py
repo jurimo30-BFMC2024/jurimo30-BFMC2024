@@ -77,7 +77,7 @@ class PathPlanner:
         
         if self.file_path == "Competition_track_graph.graphml":
             graph.nodes["270"]['intersection'] = True
-            graph.nodes["262"]['intersection'] = True
+            graph.nodes["245"]['intersection'] = True
         else:
             graph.nodes["39"]['intersection'] = True
             graph.nodes["33"]['intersection'] = True
