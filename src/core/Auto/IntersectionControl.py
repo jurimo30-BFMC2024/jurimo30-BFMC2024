@@ -62,6 +62,8 @@ class IntersectionControl():
                         print(f"Smer je {self.smer}")
                 else:
                     self.status = -1
+                    self.speed = 0
+                    self.angle = 0
                     if self.debugging:
                         print("Izlazak iz opsega, staza je zavrsena")
                 self.navPoint += 1

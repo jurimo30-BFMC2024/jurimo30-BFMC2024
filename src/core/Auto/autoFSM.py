@@ -78,6 +78,11 @@ class autoFSM(ControlModeThread):
         frontDetect = self.frontDetector.receiveWithBlock()
         frontDistance = frontDetect["distance"]
 
+        if not self.parking:
+            if self.traffic_signs["parking"]:
+                self.traffic_signs["parking"] = False
+                self.parking = True
+
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
         if not self.intersection:
             if self.traffic_signs["stop"] or self.traffic_signs["priority"]:
