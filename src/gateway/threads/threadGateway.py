@@ -31,6 +31,7 @@ from threading import Lock
 from concurrent.futures import ThreadPoolExecutor
 from src.templates.threadwithstop import ThreadWithStop
 from src.gateway.PriorityQueueHandler import PriorityQueueHandler
+from src.gateway.DequePipeSync import DequePipeSync
 
 class threadGateway(ThreadWithStop):
     """Thread handling inter-process messages with priority queuing."""
@@ -42,8 +43,6 @@ class threadGateway(ThreadWithStop):
         self.sendingList = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
         self.handler = PriorityQueueHandler(queueList, logger, debugging)
         self.messageApproved = set()  # Use a set for O(1) lookups
-        self.executor = ThreadPoolExecutor(max_workers=4)  # Reusable thread pool
-        self.pipe_locks = defaultdict(Lock)  # Locks for each pipe
 
     def subscribe(self, message):
         """Add a receiver to the approved list."""
@@ -51,8 +50,9 @@ class threadGateway(ThreadWithStop):
         Id = message["msgID"]
         To = message["To"]["receiver"]
         Pipe = message["To"]["pipe"]
+        DeliveryMode = message["DeliveryMode"]  # fifo, lastonly
 
-        self.sendingList[Owner][Id][To] = Pipe
+        self.sendingList[Owner][Id][To] = DequePipeSync(None if DeliveryMode == "fifo" else 1, Pipe)
         self.messageApproved.add((Owner, Id))
 
         if self.debugging:
@@ -80,30 +80,28 @@ class threadGateway(ThreadWithStop):
         if (Owner, Id) in self.messageApproved:
             msg = {"Type": Type, "value": Value, "id": Id, "Owner": Owner}
             
-            # Submit send tasks to the thread pool
-            futures = []
             for receiver, pipe in self.sendingList[Owner][Id].items():
-                futures.append(
-                    self.executor.submit(self._send_to_pipe, pipe, msg)
-                )
+                pipe.send(msg)
             
             if self.debugging:
-                self.logger.warning(f"Sent: {msg}")
-
-    def _send_to_pipe(self, pipe, message):
-        """Thread-safe method to send a message through a pipe."""
-        with self.pipe_locks[pipe]:  # Lock the pipe for this thread
-            pipe.send(message)
+                self.logger.warning(f"Sent: ({msg['Owner']}, {msg['id']})")
 
     def run(self):
         """Process messages in priority order."""
-        while self._running:
-            priority, message = self.handler.get()
-            if priority == "Config":
-                action = message["Subscribe/Unsubscribe"].lower()
-                if action == "subscribe":
-                    self.subscribe(message)
+        try:
+            while self._running:
+                priority, message = self.handler.get()
+                if priority == "Config":
+                    action = message["Subscribe/Unsubscribe"].lower()
+                    if action == "subscribe":
+                        self.subscribe(message)
+                    else:
+                        self.unsubscribe(message)
                 else:
-                    self.unsubscribe(message)
-            else:
-                self.send(message)
+                    self.send(message)
+        except:
+            pass
+
+    def stop(self):
+        self._running = False
+        self.handler.stop()

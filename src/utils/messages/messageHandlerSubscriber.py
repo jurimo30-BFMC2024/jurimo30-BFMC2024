@@ -42,7 +42,7 @@ class messageHandlerSubscriber:
         self._queuesList = queuesList
         self._message = message
         self._deliveryMode = str.lower(deliveryMode)
-        self._pipeRecv, self._pipeSend = Pipe(duplex=False)
+        self._pipeRecv, self._pipeSend = Pipe(duplex=True)
         self._receiver = inspect.currentframe().f_back.f_locals['self'].__class__.__name__
         
         if subscribe == True:
@@ -59,10 +59,7 @@ class messageHandlerSubscriber:
 
         Returns None if there no data in the Pipe
         """
-        if not self._pipeRecv.poll():
-            return None
-        else:
-            return self.receiveWithBlock()
+        return self._receive(False)
         
     def receiveWithBlock(self):
         """
@@ -71,22 +68,21 @@ class messageHandlerSubscriber:
         Returns:
             message's data type: The received message.
         """
+        return self._receive(True)
+        
+    def _receive(self, block):
+        self._pipeRecv.send({"mode": "recv", "block": block})
         
         message = self._pipeRecv.recv()
+        if message is None:
+            return None
+
         messageType = type(message["value"]).__name__
         
-        if self._deliveryMode == "fifo":
-            if messageType != self._message.msgType.value:
-                print("WARNING! Message type and value type are not matching.", self._message, "received:", messageType, "expected:", self._message.msgType.value)
-            return message["value"]
+        if messageType != self._message.msgType.value:
+            print("WARNING! Message type and value type are not matching.", self._message, "received:", messageType, "expected:", self._message.msgType.value)
         
-        elif self._deliveryMode == "lastonly":
-            while (self._pipeRecv.poll()):
-                message = self._pipeRecv.recv()
-
-            if messageType != self._message.msgType.value:
-                print("WARNING! Message type and value type are not matching.", self._message, "received:", messageType, "expected:", self._message.msgType.value)
-            return message["value"]
+        return message["value"]
         
     def empty(self):
         """
@@ -105,6 +101,7 @@ class messageHandlerSubscriber:
                 "Owner": self._message.Owner.value,
                 "msgID": self._message.msgID.value,
                 "To": {"receiver": self._receiver, "pipe": self._pipeSend},
+                "DeliveryMode": self._deliveryMode,
             }
         )
 
@@ -112,6 +109,12 @@ class messageHandlerSubscriber:
         """
         Unsubscribes from messages.
         """
+        try:
+            if self._pipeRecv:
+                self._pipeRecv.close()
+        except Exception:
+            pass
+        
         self._queuesList["Config"].put(
             {
                 "Subscribe/Unsubscribe": "unsubscribe",
@@ -128,7 +131,9 @@ class messageHandlerSubscriber:
         Returns:
             bool: True if data is available, False otherwise.
         """
-        return self._pipeRecv.poll()
+        self._pipeRecv.send({"mode": "len"})
+
+        return self._pipeRecv.recv()
 
     def setDeliveryModeToFIFO(self):
         """
