@@ -49,7 +49,7 @@ class DequePipeSync:
         while True:
             try:
                 request = self.pipe_conn.recv()
-            except EOFError:
+            except:
                 # The pipe was closed. Exit the thread.
                 break
 
