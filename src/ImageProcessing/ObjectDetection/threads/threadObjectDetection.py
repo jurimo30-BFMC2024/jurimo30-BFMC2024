@@ -55,20 +55,27 @@ class threadObjectDetection(ThreadWithStop):
                 frame = self.decode_frame(videoData)
                 frame_cp = frame.copy()
 
-                # Obrada znaka (gornja desna polovina slike)
+                # Kropovanje za obradu znakova (gornja desna polovina)
                 frame_cropped = self.crop_top_right(frame_cp)
-                processed_frame, best_sign = self.process_frame_signs(frame_cropped)
 
-                # Obrada Stephany (cela slika)
-                processed_frame, best_steph = self.process_frame_steph(processed_frame)
+                # Obrada znakova na kropovanom delu
+                processed_cropped, best_sign = self.process_frame_signs(frame_cropped)
+
+                # Obrada Stephany na celom frejmu
+                processed_frame, best_steph = self.process_frame_steph(frame_cp)
+
+                # Spajanje rezultata obe detekcije na celom frejmu
+                # Kopiramo anotacije sa kropovanog dela na ceo frejm
+                h, w = frame_cp.shape[:2]
+                frame_cp[:h//2, w//2:] = processed_cropped  # Postavljamo anotacije znakova na gornju desnu polovinu
 
                 # Slanje podataka o znaku i Stephany
                 self.update_state(best_sign)
                 if best_steph:  
                     self.objectDetectionSender.send(best_steph)  # Slanje ako je Stephany detektovana
 
-                # Prikaz obrađenog frejma
-                self.streamer.display(processed_frame)
+                # Prikaz obrađenog frejma sa obema detekcijama
+                self.streamer.display(frame_cp)
 
             except Exception as e:
                 print(e)
