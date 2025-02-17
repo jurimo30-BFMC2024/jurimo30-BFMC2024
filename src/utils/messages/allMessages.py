@@ -98,12 +98,24 @@ class IntersectionDetect(Enum):
     msgID = 7
     msgType = "bool"
 
+class IntersectionDetect2(Enum):
+    Queue = "General"
+    Owner = "threadLaneDetect"
+    msgID = 8
+    msgType = "bool"
+
+class ParkingSpotDetect(Enum):
+    Queue = "General"
+    Owner = "threadLaneDetect"
+    msgID = 9
+    msgType = "bool"
+
 ################################# processObjectDetection ##################################
 class ObjectDetection(Enum):
     Queue = "General"
     Owner = "threadObjectDetection"
     msgID = 8
-    msgType = "list"
+    msgType = "str"
 
 ################################# processCarsAndSemaphores ##################################
 class Cars(Enum):
@@ -115,6 +127,19 @@ class Cars(Enum):
 class Semaphores(Enum):
     Queue = "General"
     Owner = "threadCarsAndSemaphores"
+    msgID = 2
+    msgType = "dict"
+
+################################# From ESP32 ##################################
+class FrontSensors(Enum):
+    Queue = "General"
+    Owner = "threadSensors"
+    msgID = 1
+    msgType = "dict"
+
+class SideSensors(Enum):
+    Queue = "General"
+    Owner = "threadSensors"
     msgID = 2
     msgType = "dict"
 

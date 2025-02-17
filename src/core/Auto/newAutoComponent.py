@@ -8,9 +8,6 @@ def main():
 
     file_path = os.path.join(directory_path, f"{package_name}.py")
     with open(file_path, 'w') as file:
-        file.write(f'from src.utils.messages.allMessages import (mainCamera)\n')
-        file.write(f'from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber\n')
-        file.write(f'from src.utils.messages.messageHandlerSender import messageHandlerSender\n\n')
         file.write(f'class {package_name}():\n')
         file.write(f'    """This thread handles {package_name}.\n')
         file.write(f'    Args:\n')
@@ -22,12 +19,6 @@ def main():
         file.write(f'        self.queuesList = queueList\n')
         file.write(f'        self.logging = logging\n')
         file.write(f'        self.debugging = debugging\n')
-        file.write(f'        self.subscribe()\n\n')
-        file.write(f'    def run(self):\n')
-        file.write(f'        pass\n\n')
-        file.write(f'    def subscribe(self):\n')
-        file.write(f'        """Subscribes to the messages you are interested in"""\n')
-        file.write(f'        pass\n')
 
     autoFSM_path = "autoFSM.py"
     if not os.path.exists(autoFSM_path):

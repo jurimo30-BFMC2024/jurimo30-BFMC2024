@@ -26,118 +26,82 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 
+from collections import defaultdict
+from threading import Lock
+from concurrent.futures import ThreadPoolExecutor
 from src.templates.threadwithstop import ThreadWithStop
 from src.gateway.PriorityQueueHandler import PriorityQueueHandler
+from src.gateway.DequePipeSync import DequePipeSync
 
 class threadGateway(ThreadWithStop):
-    """Thread which will handle processGateway functionalities.\n
-    Args:
-        queuesList (dictionary of multiprocessing.queues.Queue): Dictionary of queues where the ID is the type of messages.
-        logger (logging object): Made for debugging.
-        debugger (bool): A flag for debugging.
-    """
-
-    # ===================================== INIT =========================================
+    """Thread handling inter-process messages with priority queuing."""
 
     def __init__(self, queueList, logger, debugging):
-        super(threadGateway, self).__init__()
+        super().__init__()
         self.logger = logger
         self.debugging = debugging
-        self.sendingList = {}
-        # self.queuesList = queueList
-        self.handler = PriorityQueueHandler(queueList)
-        self.messageApproved = []
-
-    # =================================== SUBSCRIBE ======================================
+        self.sendingList = defaultdict(lambda: defaultdict(lambda: defaultdict(dict)))
+        self.handler = PriorityQueueHandler(queueList, logger, debugging)
+        self.messageApproved = set()  # Use a set for O(1) lookups
 
     def subscribe(self, message):
-        """This functin will add the pipe into the approved messages list and it will be added into the dictionary of sending
-        Args:
-            message(dictionary): Dictionary received from the multiprocessing queues ( the config one).
-        """
-        
-        # Declaration of variables:
+        """Add a receiver to the approved list."""
         Owner = message["Owner"]
         Id = message["msgID"]
         To = message["To"]["receiver"]
         Pipe = message["To"]["pipe"]
-        print(Owner, Id, To, Pipe)
-        if not Owner in self.sendingList.keys():
-            self.sendingList[Owner] = {}
-        if not Id in self.sendingList[Owner].keys():
-            self.sendingList[Owner][Id] = {}
-        if not To in self.sendingList[Owner][Id].keys():
-            self.sendingList[Owner][Id][To] = Pipe
-        self.messageApproved.append((Owner, Id))
-        # Debugging( you can comment this):
-        if self.debugging:
-            self.printList()
+        DeliveryMode = message["DeliveryMode"]  # fifo, lastonly
 
-    # ================================== UNSUBSCRIBE =====================================
+        self.sendingList[Owner][Id][To] = DequePipeSync(None if DeliveryMode == "fifo" else 1, Pipe)
+        self.messageApproved.add((Owner, Id))
+
+        if self.debugging:
+            self.logger.warning(f"Subscribed: {self.sendingList}")
 
     def unsubscribe(self, message):
-        """This functin will remove the pipe into the approved messages list and it will be added into the dictionary of sending
-        Args:
-            message(dictionary): Dictionary received from the multiprocessing queues ( the config one).
-        """
-
+        """Remove a receiver from the approved list."""
         Owner = message["Owner"]
         Id = message["msgID"]
         To = message["To"]["receiver"]
 
-        # We delete the value from Dictionary
         del self.sendingList[Owner][Id][To]
         self.messageApproved.remove((Owner, Id))
-        if self.debugging:
-            self.printList()
 
-    # =================================== SENDING ========================================
+        if self.debugging:
+            self.logger.warning(f"Unsubscribed: {self.sendingList}")
 
     def send(self, message):
-        """This functin will send the message on all the pipes that are in the sending list of the message ID.
-        Args:
-            message(dictionary): Dictionary received from the multiprocessing queues ( the config one).
-        """
-
+        """Send a message to all subscribed receivers in parallel."""
         Owner = message["Owner"]
         Id = message["msgID"]
         Type = message["msgType"]
         Value = message["msgValue"]
+
         if (Owner, Id) in self.messageApproved:
-            for element in self.sendingList[Owner][Id]:
-                # We send a dictionary that contain the type of the message and message
-                self.sendingList[Owner][Id][element].send(
-                    {"Type": Type, "value": Value, "id": Id, "Owner": Owner}
-                )
-                if self.debugging:
-                    self.logger.warning(message)
-
-    # ====================================================================================
-
-    # Function for debugging:
-    def printList(self):
-        """Made for debugging"""
-
-        self.logger.warning(self.sendingList)
-
-    # ==================================== RUN ===========================================
+            msg = {"Type": Type, "value": Value, "id": Id, "Owner": Owner}
+            
+            for receiver, pipe in self.sendingList[Owner][Id].items():
+                pipe.send(msg)
+            
+            if self.debugging:
+                self.logger.warning(f"Sent: ({msg['Owner']}, {msg['id']})")
 
     def run(self):
-        """This function will take the messages in priority order form the queues.\n
-        the prioirty is: Critical > Warning > General
-        """
-        
-        while self._running:
-            priority, message = self.handler.get()
-
-            if priority == "Config":
-                if str.lower(message["Subscribe/Unsubscribe"]) == "subscribe":
-                    self.subscribe(message)
+        """Process messages in priority order."""
+        try:
+            while self._running:
+                priority, message = self.handler.get()
+                if priority == "Config":
+                    action = message["Subscribe/Unsubscribe"].lower()
+                    if action == "subscribe":
+                        self.subscribe(message)
+                    else:
+                        self.unsubscribe(message)
                 else:
-                    self.unsubscribe(message)
-            else:
-                self.send(message)
-                
+                    self.send(message)
+        except:
+            pass
 
-
-# =====================================================================================
+    def stop(self):
+        self._running = False
+        self.handler.stop()

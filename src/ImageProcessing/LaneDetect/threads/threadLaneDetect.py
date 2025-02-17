@@ -6,12 +6,17 @@ from src.utils.messages.allMessages import (
     serialCamera,
     LaneDetect,
     IntersectionDetect,
+    IntersectionDetect2,
+    ParkingSpotDetect,
 )
-
 from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.ImageProcessing.LaneDetect.LaneDetector import LaneDetector
+from src.ImageProcessing.LaneDetect.imagePreProcessing import ImagePreProcessing as ImgProcessor
+from src.ImageProcessing.LaneDetect.StopLineDetector import StopLineDetector as StopDetect
+from src.ImageProcessing.LaneDetect.ParkingSpotDetector import ParkingSpotDetector
+from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream as vs
 
 class threadLaneDetect(ThreadWithStop):
     """This thread handles LaneDetect.
@@ -26,11 +31,17 @@ class threadLaneDetect(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.detector = LaneDetector(512, 270, logging)
+        self.laneDetector = LaneDetector(512, 270, logging, debugging, False)
+        self.imgProcessor = ImgProcessor(512, 270, logging, debugging, False)
+        self.stopLineDetector = StopDetect(512, 270, logging, debugging, False)
+        self.parkingSpotDetector = ParkingSpotDetector()
+        self.strm = vs(1, 0)
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
         self.intersectionDetectionSender = messageHandlerSender(self.queuesList, IntersectionDetect)
+        self.intersectionDetectionSender2 = messageHandlerSender(self.queuesList, IntersectionDetect2)
+        self.parkingSpotDetectionSender = messageHandlerSender(self.queuesList, ParkingSpotDetect)
         self.subscribe()
         
     def subscribe(self):
@@ -43,13 +54,23 @@ class threadLaneDetect(ThreadWithStop):
                 videoData = self.videoSubscriber.receiveWithBlock()
                 # Dekodiraj frejm iz base64
                 frame = self.decode_frame(videoData)
+                edges = self.imgProcessor.process_frame(frame)
+
+                # !!!!!!!!!!!!! edges ne treba mjenjati koristi se za dalju obradu nad njim
+                # !!!!!!!!!!! sva crtanja za debagovanje raditi nad frejmom on se salje na server
 
                 # obradi frejm
-                drawnFrame, angle, intersection = self.detector.process_frame(frame)
+                frame, intersection, intersectionA = self.stopLineDetector.process_frame(frame, edges)
+                frame, angle = self.laneDetector.process_frame(frame, edges)
+                frame, parking_line = self.parkingSpotDetector.process_frame(frame)
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
                 self.intersectionDetectionSender.send(bool(intersection))
+                self.intersectionDetectionSender2.send(bool(intersectionA))
+                if parking_line is not None:
+                    self.parkingSpotDetectionSender.send(True)
+                self.strm.display(frame)
             except Exception as e:
                 print(e)
 
