@@ -24,8 +24,9 @@ class PathPlanner:
             raise ValueError("PathPlanner: mode must be either \"p2p\" or \"pacman\"")
         else:
             self.mode = mode
-        self.file_path = "src/core/Auto/pathPlanning/Small_map.graphml" # change this to Competition_track_graph.graphml when in Romania
-        
+        self.file_path = "Competition_track_graph.graphml" # change this to Competition_track_graph.graphml when in Romania
+        self.roundabout_entries = ["317", "367", "397", "405"]
+        self.roundabout_exits = ["368", "342", "398", "318"]
 
     def planPath(self):
         '''Generates a queue of instructions'''
@@ -50,11 +51,11 @@ class PathPlanner:
         ns = {'graphml': 'http://graphml.graphdrawing.org/xmlns'}
         graph = nx.DiGraph()
         
-        # collectibles = {"75", "128", "116", "98", "110", "185", "71", "25", "31", "29", "93", "80", "82", "136",
-        # "419", "125", "403", "399", "343", "386", "363", "368", "318", "317", "56", "54", "261", "239", "228",
-        # "225", "198", "42", "289", "6", "8"}
+        collectibles = {"75", "128", "116", "98", "110", "185", "71", "25", "31", "29", "93", "80", "82", "136",
+        "419", "125", "403", "399", "343", "386", "363", "368", "318", "317", "56", "54", "261", "239", "228",
+        "225", "198", "42", "289", "6", "8"}
 
-        collectibles = {"32", "22", "14", "38", "7"}
+        #collectibles = {"32", "22", "14", "38", "7"}
         
         for node in root.findall(".//graphml:node", ns):
             node_id = node.get("id")
@@ -113,11 +114,35 @@ class PathPlanner:
 
     def determine_turns(self, graph, path):
         directions = []
-        for i in range(1, len(path) - 1):
+        i = 1
+        while i < len(path) - 1:
             prev_node, current_node, next_node = path[i-1], path[i], path[i+1]
-            
+
+            if current_node in self.roundabout_entries:
+                counter = 0
+                remaining_path = path[i+1:]
+                # counts how many nodes there are in between roundabout entry and exit
+                for node in remaining_path:
+                    if node in self.roundabout_exits:
+                        break
+                    counter += 1
+                if counter == 2:
+                    directions.append((current_node, "First exit"))
+                elif counter == 4:
+                    directions.append((current_node, "Second exit"))
+                elif counter == 6:
+                    directions.append((current_node, "Third exit"))
+                elif counter == 8:
+                    directions.append((current_node, "Fourth exit"))
+                else:
+                    print("ERROR: ROUNDABOUT CONFUSED. YOU ARE LIKELY STOPPING INSIDE THE ROUNDABOUT.")
+                #skip over already accounted for nodes in roundabout
+                i += counter + 1
+                continue
+
             # Skip if not an intersection
             if not graph.nodes[current_node].get('intersection', False):
+                i += 1
                 continue
             
             # Get coordinates for vectors
@@ -136,6 +161,7 @@ class PathPlanner:
             
             # Handle potential zero vectors
             if np.any(np.isnan(incoming_vec)) or np.any(np.isnan(outgoing_vec)):
+                i += 1
                 continue
             
             # Calculate angle difference using arctan2
@@ -161,5 +187,5 @@ class PathPlanner:
                 turn = "Straight"
             
             directions.append((current_node, turn))
-        
+            i += 1
         return directions
