@@ -24,7 +24,7 @@ class PathPlanner:
             raise ValueError("PathPlanner: mode must be either \"p2p\" or \"pacman\"")
         else:
             self.mode = mode
-        self.file_path = "Competition_track_graph.graphml" # change this to Competition_track_graph.graphml when in Romania
+        self.file_path = "src/core/Auto/pathPlanning/Competition_track_graph.graphml" # change Small_map.graphml to Competition_track_graph.graphml when in Romania
         self.roundabout_entries = ["317", "367", "397", "405"]
         self.roundabout_exits = ["368", "342", "398", "318"]
 
@@ -34,11 +34,8 @@ class PathPlanner:
         best_path = self.find_greedy_path(graph, self.start, self.goal)
         if best_path:
             instructionQueue = []
-            # print("Greedy Path Collecting All Collectibles:", best_path)
             turns = self.determine_turns(graph, best_path)
-            # print("Turn Instructions:")
             for node, direction in turns:
-                # print(f"Kod node-a {node}, idi {direction}")
                 instructionQueue.append(direction)
 
         return instructionQueue
@@ -136,7 +133,7 @@ class PathPlanner:
                     directions.append((current_node, "Fourth exit"))
                 else:
                     print("ERROR: ROUNDABOUT CONFUSED. YOU ARE LIKELY STOPPING INSIDE THE ROUNDABOUT.")
-                #skip over already accounted for nodes in roundabout
+                # skip over already accounted for nodes in roundabout
                 i += counter + 1
                 continue
 
