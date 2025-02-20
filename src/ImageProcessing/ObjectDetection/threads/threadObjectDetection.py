@@ -2,6 +2,8 @@ import cv2
 import base64
 import numpy as np
 import os
+import time
+
 
 os.environ['OMP_NUM_THREADS'] = "2"
 os.environ['MKL_NUM_THREADS'] = "2"
@@ -17,14 +19,9 @@ from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream as vs
 
-class threadObjectDetection(ThreadWithStop):
-    """This thread handles ObjectDetection.
-    Args:
-        queueList (dict of multiprocessing.queues.Queue): Dictionary of queues.
-        logging (logging object): For debugging.
-        debugging (bool, optional): Debugging flag. Defaults to False.
-    """
+import time  # Dodaj ovu liniju na početku skripte
 
+class threadObjectDetection(ThreadWithStop):
     def __init__(self, queueList, logging, debugging=False):
         self.queuesList = queueList
         self.logging = logging
@@ -34,19 +31,17 @@ class threadObjectDetection(ThreadWithStop):
         self.streamer = vs(0, 1)
 
         # State management variables
-        self.current_sign = None          # Currently active sign
-        self.confirmation_counter = 0     # Frames with consistent new sign
-        self.confirmation_threshold = 3   # Frames needed to confirm new sign
-        self.lost_sign_count = 0          # Frames without current sign
-        self.lost_sign_threshold = 17     # Frames to consider sign lost
-        
+        self.current_sign = None          
+        self.confirmation_counter = 0     
+        self.confirmation_threshold = 3   
+        self.lost_sign_count = 0          
+        self.lost_sign_threshold = 17     
+
+        self.crosswalk_detected_time = None  # Vreme poslednje detekcije "crosswalk"
+
         super(threadObjectDetection, self).__init__()
         self.objectDetectionSender = messageHandlerSender(self.queuesList, ObjectDetection)
         self.subscribe()
-
-    def subscribe(self):
-        """Subscribes to required messages."""
-        self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
 
     def run(self):
         while self._running:
@@ -55,30 +50,44 @@ class threadObjectDetection(ThreadWithStop):
                 frame = self.decode_frame(videoData)
                 frame_cp = frame.copy()
 
-                # Kropovanje za obradu znakova (gornja desna polovina)
+                # Kropovanje za obradu znakova
                 frame_cropped = self.crop_top_right(frame_cp)
 
-                # Obrada znakova na kropovanom delu
+                # Obrada znakova
                 processed_cropped, best_sign = self.process_frame_signs(frame_cropped)
 
-                # Obrada Stephany na celom frejmu
-                processed_frame, best_steph = self.process_frame_steph(frame_cp)
+                # Provera da li je detektovan "crosswalk"
+                if best_sign == "crosswalk":
+                    self.crosswalk_detected_time = time.time()  # Zabeleži vreme detekcije
 
-                # Spajanje rezultata obe detekcije na celom frejmu
-                # Kopiramo anotacije sa kropovanog dela na ceo frejm
+                # Pokreni Steph model samo ako je "crosswalk" detektovan u poslednjih 10 sekundi
+                best_steph = None
+                processed_frame = frame_cp  
+                if self.crosswalk_detected_time and time.time() - self.crosswalk_detected_time <= 10:
+                    processed_frame, best_steph = self.process_frame_steph(processed_frame)
+                    print("Ukljucujem Stefaniju")
+                else:
+                    self.crosswalk_detected_time = None  # Resetuj ako je prošlo više od 10 sekundi
+
+                # Spajanje rezultata detekcija
                 h, w = frame_cp.shape[:2]
-                frame_cp[:h//2, w//2:] = processed_cropped  # Postavljamo anotacije znakova na gornju desnu polovinu
+                frame_cp[:h//2, w//2:] = processed_cropped  
 
-                # Slanje podataka o znaku i Stephany
+                # Slanje podataka o znaku i Steph (samo ako je Steph detektovana)
                 self.update_state(best_sign)
-                if best_steph:  
-                    self.objectDetectionSender.send(best_steph)  # Slanje ako je Stephany detektovana
+                if best_steph:
+                    self.objectDetectionSender.send(best_steph)  
 
-                # Prikaz obrađenog frejma sa obema detekcijama
+                # Prikaz obrađenog frejma
                 self.streamer.display(frame_cp)
 
             except Exception as e:
                 print(e)
+
+
+    def subscribe(self):
+        """Subscribes to required messages."""
+        self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
 
     @staticmethod
     def decode_frame(encoded_data):
