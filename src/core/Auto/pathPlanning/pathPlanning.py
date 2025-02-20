@@ -24,7 +24,7 @@ class PathPlanner:
             raise ValueError("PathPlanner: mode must be either \"p2p\" or \"pacman\"")
         else:
             self.mode = mode
-        self.file_path = "src/core/Auto/pathPlanning/Competition_track_graph.graphml" # change Small_map.graphml to Competition_track_graph.graphml when in Romania
+        self.file_path = "Competition_track_graph.graphml" # change Small_map.graphml to Competition_track_graph.graphml when in Romania
         self.roundabout_entries = ["317", "367", "397", "405"]
         self.roundabout_exits = ["368", "342", "398", "318"]
 
@@ -132,7 +132,11 @@ class PathPlanner:
                 elif counter == 8:
                     directions.append((current_node, "Fourth exit"))
                 else:
-                    print("ERROR: ROUNDABOUT CONFUSED. YOU ARE LIKELY STOPPING INSIDE THE ROUNDABOUT.")
+                    if i + counter + 1 > len(path) - 1:
+                        print("W: Your end node is inside the roundabout (reconsider)")
+                    else:
+                        # theoretically this should never happen
+                        raise ValueError("ERROR: ROUNDABOUT MACHINE BROKE")
                 # skip over already accounted for nodes in roundabout
                 i += counter + 1
                 continue
