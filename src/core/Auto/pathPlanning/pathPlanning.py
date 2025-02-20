@@ -88,6 +88,9 @@ class PathPlanner:
         visited_collectibles = set()
         path = [start]
         current_node = start
+
+        if graph.nodes[goal]['intersection']:
+            print("W: Your final point is inside an intersection (reconsider)")
         
         # this part is skipped if p2p
         while visited_collectibles != collectibles:
@@ -190,3 +193,6 @@ class PathPlanner:
             directions.append((current_node, turn))
             i += 1
         return directions
+
+# pp = PathPlanner("315", "95", "p2p")
+# print(pp.planPath())
