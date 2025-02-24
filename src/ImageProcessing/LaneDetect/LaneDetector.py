@@ -13,8 +13,6 @@ class LaneDetector:
         self.height = height
         self.pc = pc
         self.currentAngle = 0
-        if not pc:
-            self.strm = vs(1, 0)
         
         self.roadReg = np.array([[
                 (int(self.width * 0.02), self.height - int(self.height * 0.2)),
@@ -113,13 +111,14 @@ class LaneDetector:
         cv2.rectangle(frame, (x1,y1), (x2,y2), (25, 200, 50), 2)
     
     def detect_lines(self, img, tres = 30):
-        return cv2.HoughLinesP(img, rho=1, theta=np.pi / 180, threshold=tres, minLineLength=15, maxLineGap=5)
-    
+        return cv2.HoughLinesP(img, rho=1, theta=np.pi / 180, threshold=tres, minLineLength=8, maxLineGap=25)
+
     def process_frame(self, frame: np.ndarray, edges):
         angle_degrees: float = 0.0
 
         roi = self.region_of_interest(edges)
-        lines = self.detect_lines(roi, 25)
+        lines = self.detect_lines(roi, 5)
+
         angle_degrees = float(self.calculate_steering_angle(lines, frame.shape[1], frame.shape[0]))
 
         if self.debugging:
