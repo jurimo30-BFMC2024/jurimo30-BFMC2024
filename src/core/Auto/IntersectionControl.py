@@ -70,7 +70,7 @@ class IntersectionControl():
                 self.lastPoint = time.time()
                 self.status = 1
                 self.angle = 0
-                self.speed = 100
+                self.speed = 168
         elif self.status == 1:
             if (time.time() - self.lastPoint) >= time1:
                 if self.debugging:
@@ -78,7 +78,7 @@ class IntersectionControl():
                 self.status = 2
                 self.lastPoint = time.time()
                 self.angle = tangle
-                self.speed = 100
+                self.speed = 168
         elif self.status == 2:
             if (time.time() - self.lastPoint) >= time2:
                 if self.debugging:
@@ -87,7 +87,7 @@ class IntersectionControl():
                 intersection = False
                 self.angle = 0
                 self.lastPoint = 0
-                self.speed = 100
+                self.speed = 168
                 signs[sign] = False
         
         return self.angle, self.speed, intersection
