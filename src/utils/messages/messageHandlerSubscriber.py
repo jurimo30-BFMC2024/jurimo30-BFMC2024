@@ -88,8 +88,8 @@ class messageHandlerSubscriber:
         """
         Empties the receiving pipe of any existing data.
         """
-        while self._pipeRecv.poll():
-            self._pipeRecv.recv()
+        while self.isDataInPipe():
+            self._receive(False)
 
     def subscribe(self):
         """
@@ -132,8 +132,9 @@ class messageHandlerSubscriber:
             bool: True if data is available, False otherwise.
         """
         self._pipeRecv.send({"mode": "len"})
+        data_length = self._pipeRecv.recv()
 
-        return self._pipeRecv.recv()
+        return data_length is not None and data_length > 0
 
     def setDeliveryModeToFIFO(self):
         """
