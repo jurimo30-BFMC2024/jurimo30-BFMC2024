@@ -24,7 +24,8 @@ class PathPlanner:
             raise ValueError("PathPlanner: mode must be either \"p2p\" or \"pacman\"")
         else:
             self.mode = mode
-        self.file_path = "Competition_track_graph.graphml" # change Small_map.graphml to Competition_track_graph.graphml when in Romania
+        # Small_map.graphml for test track/Competition_track_graph.graphml for Romania
+        self.file_path = "src/core/Auto/pathPlanning/Competition_track_graph.graphml" 
         self.roundabout_entries = ["317", "367", "397", "405"]
         self.roundabout_exits = ["368", "342", "398", "318"]
 
@@ -48,10 +49,12 @@ class PathPlanner:
         ns = {'graphml': 'http://graphml.graphdrawing.org/xmlns'}
         graph = nx.DiGraph()
         
+        # For competition map
         collectibles = {"75", "128", "116", "98", "110", "185", "71", "25", "31", "29", "93", "80", "82", "136",
         "419", "125", "403", "399", "343", "386", "363", "368", "318", "317", "56", "54", "261", "239", "228",
         "225", "198", "42", "289", "6", "8"}
 
+        # For small map
         #collectibles = {"32", "22", "14", "38", "7"}
         
         for node in root.findall(".//graphml:node", ns):
@@ -76,6 +79,8 @@ class PathPlanner:
         if self.file_path == "Competition_track_graph.graphml":
             graph.nodes["270"]['intersection'] = True
             graph.nodes["245"]['intersection'] = True
+            
+            # highway lane split nodes
             graph.nodes["401"]['intersection'] = False
             graph.nodes["423"]['intersection'] = False
         else:
@@ -184,7 +189,7 @@ class PathPlanner:
             # print(f"  Outgoing vector: {outgoing_vec}")
             # print(f"  Angle difference: {angle_diff:.2f}°")
             
-            # Determine turn direction with clear thresholds
+            # Determine turn direction
             if angle_diff > 45:
                 turn = "Left"
             elif angle_diff < -45:
