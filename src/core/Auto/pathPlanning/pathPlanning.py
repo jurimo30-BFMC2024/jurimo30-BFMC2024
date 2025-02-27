@@ -76,6 +76,8 @@ class PathPlanner:
         if self.file_path == "Competition_track_graph.graphml":
             graph.nodes["270"]['intersection'] = True
             graph.nodes["245"]['intersection'] = True
+            graph.nodes["401"]['intersection'] = False
+            graph.nodes["423"]['intersection'] = False
         else:
             graph.nodes["39"]['intersection'] = True
             graph.nodes["33"]['intersection'] = True
@@ -194,5 +196,5 @@ class PathPlanner:
             i += 1
         return directions
 
-# pp = PathPlanner("315", "95", "p2p")
+# pp = PathPlanner("315", "95", "pacman")
 # print(pp.planPath())
