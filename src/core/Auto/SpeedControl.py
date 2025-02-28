@@ -1,14 +1,13 @@
-from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
-from src.utils.messages.messageHandlerSender import messageHandlerSender
-from src.core.Auto.LaneFollow.MovingAverage import MovingAverage as ma
+from src.core.Auto.LaneFollow.MovingAverage import MovingAverage
 from src.core.Auto.PID import PIDController as pid
 
 class SpeedControl():
     def __init__(self, logging, debugging=False):
         self.logging = logging
         self.debugging = debugging
-        self.avgSpeed = ma(20)
-        self.pid = pid(0.5, 0.3, 0)
+        self.avgSpeed = MovingAverage(20)
+        self.pid = pid(1, 1, 0)
+        self.targetDistance = 60  # Desired following distance in cm
 
     def filter(self, angle, alpha = 0.3):
         self.oldAngle = angle * alpha + self.oldAngle * (1 - alpha)
@@ -38,7 +37,6 @@ class SpeedControl():
             else:
                 speed = self.map_value(angle, 70, 170, 200, 350)
 
-
         if lowDistance:
             n = 0
             speed = 50
@@ -46,10 +44,17 @@ class SpeedControl():
                 self.avgSpeed.add(70)
                 n += 1
 
-        if frontDistance < 30 and frontDistance > 0:
+        if 0 < frontDistance < 30:
             self.avgSpeed.add(0)
             return 0
+        
+        pid_adjustment = 0
+        if 0 < frontDistance <= 100:  # Use PID only if an object is within 80 cm
+            distanceError = self.targetDistance - frontDistance
+            pid_adjustment = self.pid.update(distanceError)
 
+        follow_speed = max(speed + pid_adjustment, speed)
+        speed = max(0, min(min(speed, follow_speed), 350))  # Constrain speed within range
         speed = int(self.avgSpeed.filter(speed))
 
         return speed
