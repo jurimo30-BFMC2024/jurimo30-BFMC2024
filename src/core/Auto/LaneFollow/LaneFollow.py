@@ -18,7 +18,7 @@ class LaneFollow():
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.avgAngle = ma(5)
+        self.avgAngle = ma(2)
         self.subscribe()
         self.pid = pid(0.5, 0.3, 0)
         self.oldAngle = 0

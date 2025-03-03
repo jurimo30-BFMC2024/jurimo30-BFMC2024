@@ -63,10 +63,10 @@ class LaneDetector:
 
                 if slope < -0.4:
                     if self.isPointInSquare(x1, y1, self.squareRight) or self.isPointInSquare(x2, y2, self.squareRight):
-                        return 0
+                        return 15
                 if slope > 0.4:
                     if self.isPointInSquare(x1, y1, self.squareLeft) or self.isPointInSquare(x2, y2, self.squareLeft):
-                        return 0
+                        return -15
 
 
         if left_x == 0 and right_x != img_width:
