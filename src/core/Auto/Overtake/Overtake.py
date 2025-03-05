@@ -36,16 +36,15 @@ class Overtake():
     def run(self, angle, front_sensors, side_sensors):
         if self.state == "finish":
             self.state = "close_distance"
-            self.angle, self.speed = None, 500
 
-        elif self.state == "close_distance":
+        if self.state == "close_distance":
             if front_sensors["distance"] <= 60:
                 self.state = "change_lane_left"
                 self.motionScheduler.set_schedule(self.motions["move_left"])
         
         elif self.state == "change_lane_left":
             self.angle, self.speed, finished = self.motionScheduler.run()
-            self.angle += angle
+            # self.angle += angle
             if finished:
                 self.state = "catch_up"
                 self.angle, self.speed = None, 500
@@ -69,7 +68,7 @@ class Overtake():
 
         elif self.state == "change_lane_right":
             self.angle, self.speed, finished = self.motionScheduler.run()
-            self.angle += angle
+            # self.angle += angle
             if finished:
                 self.state = "finish"
                 self.angle, self.speed = None, 500
