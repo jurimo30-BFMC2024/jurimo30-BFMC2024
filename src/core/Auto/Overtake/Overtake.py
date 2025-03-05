@@ -23,24 +23,36 @@ class Overtake():
         self.motionScheduler = MotionScheduler()
 
         self.motions = {
-            "move_left": [
-                (-150, 500, 1),
-                (150, 500, 1),
-            ],
-            "move_right": [
-                (150, 500, 1),
-                (-150, 500, 1),
-            ],
+            "overtake": {
+                "move_left": [
+                    (-150, 600, 1),
+                    (150, 600, 1),
+                ],
+                "move_right": [
+                    (150, 600, 1),
+                    (-150, 600, 1),
+                ],
+            },
+            "pass_obstacle": {
+                "move_left": [
+                    (-150, 200, 1),
+                    (150, 200, 1),
+                ],
+                "move_right": [
+                    (150, 200, 1),
+                    (-150, 200, 1),
+                ],
+            }
         }
 
-    def run(self, angle, front_sensors, side_sensors):
+    def run(self, highway, front_sensors, side_sensors):
         if self.state == "finish":
             self.state = "close_distance"
 
         if self.state == "close_distance":
             if front_sensors["distance"] <= 60:
                 self.state = "change_lane_left"
-                self.motionScheduler.set_schedule(self.motions["move_left"])
+                self.motionScheduler.set_schedule(self.motions["overtake" if highway else "pass_obstacle"]["move_left"])
         
         elif self.state == "change_lane_left":
             self.angle, self.speed, finished = self.motionScheduler.run()
@@ -64,7 +76,7 @@ class Overtake():
                 self.state = "pass"
             elif time.time() - self.passed_at_time > self.passed_at_time - self.caught_up_at_time: # drive the same amount of time after passing the car to ensure that the we can merge back
                 self.state = "change_lane_right"
-                self.motionScheduler.set_schedule(self.motions["move_right"])
+                self.motionScheduler.set_schedule(self.motions["overtake" if highway else "pass_obstacle"]["move_right"])
 
         elif self.state == "change_lane_right":
             self.angle, self.speed, finished = self.motionScheduler.run()

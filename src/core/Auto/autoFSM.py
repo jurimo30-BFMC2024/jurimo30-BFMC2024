@@ -59,6 +59,9 @@ class autoFSM(ControlModeThread):
             "round_about": False
         }
 
+        self.obstacle = False
+        self.obstacle_start_time = None
+
         self.intersection = False
         self.crosswalk = False
         self.highway = False
@@ -116,8 +119,18 @@ class autoFSM(ControlModeThread):
             if self.debugging:
                 print("Izlazak sa auto puta")
 
-        if self.highway and front_sensors["distance"] <= 80:
+        self.obstacle = front_sensors["distance"] <= 80
+
+        if self.highway and self.obstacle:
             self.overtake = True
+        elif self.obstacle and self.oldSpeed == 0 and not self.highway:
+            if not hasattr(self, 'obstacle_start_time'):
+                self.obstacle_start_time = time.time()
+            
+            if time.time() - self.obstacle_start_time >= 3:
+                self.overtake = True
+        else:
+            self.obstacle_start_time = None  # Reset if obstacle is not present
 
         if not self._running.is_set():
             return
@@ -131,7 +144,7 @@ class autoFSM(ControlModeThread):
             angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign, self.oldAngle)
             pass
         elif self.overtake:
-            overtake_angle, speed, self.overtake = self.overtakeController.run(angle, front_sensors, side_sensors)
+            overtake_angle, speed, self.overtake = self.overtakeController.run(self.highway, front_sensors, side_sensors)
             if overtake_angle is not None:
                 angle = overtake_angle
         else:
