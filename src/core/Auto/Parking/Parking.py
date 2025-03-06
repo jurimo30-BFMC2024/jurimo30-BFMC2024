@@ -28,28 +28,28 @@ class Parking():
         self.motions = {
             "park": {
                 "left": [
-                    (None, 100, 4),
-                    (-230, -100, 4),
-                    (230, -100, 4),
-                    (0, 100, 1),
+                    (None, 300, 2.5),
+                    (-250, -300, 2),
+                    (250, -300, 2),
+                    (0, 300, .3),
                 ],
                 "right": [
-                    (None, 100, 4),
-                    (230, -100, 4),
-                    (-230, -100, 4),
-                    (0, 100, 1),
+                    (None, 300, 2.5),
+                    (250, -300, 2),
+                    (-250, -300, 2),
+                    (0, 300, .3),
                 ],
             },
             "unpark": {
                 "left": [
-                    (0, -100, 1),
-                    (230, 100, 3),
-                    (-230, 100, 3),
+                    (0, -300, .3),
+                    (250, 300, 2),
+                    (-250, 300, 2),
                 ],
                 "right": [
-                    (0, -100, 1),
-                    (-230, 100, 3),
-                    (230, 100, 3),
+                    (0, -300, .3),
+                    (-250, 300, 2),
+                    (250, 300, 2),
                 ],
             },
             "wait": [
@@ -78,7 +78,7 @@ class Parking():
 
         if self.state == "finish":
             self.state = "search_parking_spot"
-            self.angle, self.speed = None, 100
+            self.angle, self.speed = None, 300
 
         elif self.state == "search_parking_spot":
             if parking_spot_detected:
