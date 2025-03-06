@@ -123,11 +123,13 @@ class autoFSM(ControlModeThread):
 
         if self.highway and self.obstacle:
             self.overtake = True
+            print("Overtake on highway")
         elif self.obstacle and self.oldSpeed == 0 and not self.highway:
-            if not hasattr(self, 'obstacle_start_time'):
+            if self.obstacle_start_time is None:
                 self.obstacle_start_time = time.time()
             
             if time.time() - self.obstacle_start_time >= 3:
+                print("Pass static obstacle start")
                 self.overtake = True
         else:
             self.obstacle_start_time = None  # Reset if obstacle is not present
