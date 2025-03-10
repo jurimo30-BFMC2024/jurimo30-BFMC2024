@@ -6,12 +6,14 @@ class SpeedControl():
         self.logging = logging
         self.debugging = debugging
         self.avgSpeed = MovingAverage(20)
-        self.pid = pid(10, 7, 0.5)
-        self.followDistance = 50  # Desired following distance in cm
-        self.emergencyStopDistance = 30  # Desired following distance in cm
+        self.pid = pid(20, 7, 0.5)
+        self.followDistance = 40  # Desired following distance in cm
+        self.emergencyStopDistance = 20  # Emergency stop threshold in cm
+        self.emergency_stop_threshold = 3  # Consecutive readings required
+        self.consecutive_emergency = 0
         self.stop = False
 
-    def filter(self, angle, alpha = 0.3):
+    def filter(self, angle, alpha=0.3):
         self.oldAngle = angle * alpha + self.oldAngle * (1 - alpha)
         return self.oldAngle
 
@@ -20,10 +22,10 @@ class SpeedControl():
         return out_min + (out_max - out_min) * (value - in_min) / (in_max - in_min)
 
     def getControlData(self, angle, stopLine, lowDistance, highway, frontDistance):
-
         if stopLine:
             return 65
 
+        # Speed calculation based on highway mode and angle
         if not highway:
             if abs(angle) < 30:
                 speed = 380
@@ -39,6 +41,7 @@ class SpeedControl():
             else:
                 speed = self.map_value(angle, 70, 170, 420, 580)
 
+        # Low distance override
         if lowDistance:
             n = 0
             speed = 50
@@ -46,30 +49,45 @@ class SpeedControl():
                 self.avgSpeed.add(70)
                 n += 1
 
-        if not self.stop and frontDistance < self.emergencyStopDistance:
-            print(f"[{frontDistance}cm] set emergency stop")
-            self.stop = True
-            self.avgSpeed.add(0)
-            return 0
-        elif self.stop and frontDistance > self.emergencyStopDistance + 10:
-            print("stop emergency stop")
-            self.stop = False
-        elif self.stop:
-            print(f"[{frontDistance}cm] hold emergency stop")
-            self.avgSpeed.add(0)
-            return 0
+        # Emergency stop logic
+        if frontDistance >= 10:  # Only consider readings ≥10cm
+            if not self.stop:
+                # Update consecutive counter
+                if frontDistance < self.emergencyStopDistance:
+                    self.consecutive_emergency += 1
+                    if self.consecutive_emergency >= self.emergency_stop_threshold:
+                        print(f"EMERGENCY STOP [{frontDistance}cm] Triggered after {self.consecutive_emergency} readings")
+                        self.stop = True
+                        self.consecutive_emergency = 0
+                        self.avgSpeed.add(0)
+                        return 0
+                else:
+                    self.consecutive_emergency = 0
+            else:
+                # Check clearance condition
+                if frontDistance > self.emergencyStopDistance + 10:
+                    print(f"EMERGENCY CLEAR [{frontDistance}cm]")
+                    self.stop = False
+                else:
+                    self.avgSpeed.add(0)
+                    return 0
+        else:
+            # Ignore readings below 10cm
+            if self.debugging:
+                print(f"Ignoring low measurement: {frontDistance}cm")
 
+        # PID speed adjustment
         pid_adjustment = 0
-        if frontDistance <= 80:  # Use PID only if an object is within target distance in cm
+        if frontDistance <= 80:
             distanceError = self.followDistance - frontDistance
             pid_adjustment = self.pid.update(distanceError)
         else:
             self.pid.reset()
             
         follow_speed = speed - pid_adjustment
-        print(f"[{frontDistance}cm] {int(pid_adjustment)}, {int(speed)} {int(follow_speed)}")
+        final_speed = max(0, min(min(speed, follow_speed), 600))
+        
+        if self.debugging:
+            print(f"[{frontDistance}cm] PID: {int(pid_adjustment)}, Base: {int(speed)} Final: {int(final_speed)}")
 
-        speed = max(0, min(min(speed, follow_speed), 600))  # Constrain speed within range
-        speed = int(self.avgSpeed.filter(speed))
-        print(f"return speed: {speed}")
-        return speed
+        return int(self.avgSpeed.filter(final_speed))
