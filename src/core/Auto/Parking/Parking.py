@@ -24,32 +24,31 @@ class Parking():
 
         self.last_parking_spot_detected = False
         self.last_detection_time = 0
+        self.start_evaluate = 0
 
         self.motions = {
             "park": {
                 "left": [
-                    (None, 300, 2.5),
-                    (-250, -300, 2),
+                    (None, 300, 2.3),
+                    (-250, -300, 1.7),
                     (250, -300, 2),
-                    (0, 300, .3),
                 ],
                 "right": [
-                    (None, 300, 2.5),
-                    (250, -300, 2),
+                    (None, 300, 2.3),
+                    (250, -300, 1.7),
                     (-250, -300, 2),
-                    (0, 300, .3),
                 ],
             },
             "unpark": {
                 "left": [
-                    (0, -300, .3),
-                    (250, 300, 2),
-                    (-250, 300, 2),
+                    (0, -300, .4),
+                    (250, 300, 1.5),
+                    (-250, 300, 1.5),
                 ],
                 "right": [
-                    (0, -300, .3),
-                    (-250, 300, 2),
-                    (250, 300, 2),
+                    (0, -300, .4),
+                    (-250, 300, 1.5),
+                    (250, 300, 1.5),
                 ],
             },
             "wait": [
@@ -78,26 +77,28 @@ class Parking():
 
         if self.state == "finish":
             self.state = "search_parking_spot"
-            self.angle, self.speed = None, 300
+            self.angle, self.speed = None, 200
 
         elif self.state == "search_parking_spot":
             if parking_spot_detected:
                 self.left_spot_taken = False
                 self.right_spot_taken = False
                 self.state = "search_and_evaluate"
+                self.start_evaluate = time.time()
 
         elif self.state == "search_and_evaluate":
-            if self.evaluate_side_sensors(side_sensors):
-                self.state = "search_parking_spot"
-            elif parking_spot_detected:
-                if not self.right_spot_taken:
-                    self.parking_spot = "right"
-                else:
-                    self.parking_spot = "left"
+            if time.time() - self.start_evaluate > .5:
+                if self.evaluate_side_sensors(side_sensors):
+                    self.state = "search_parking_spot"
+                elif parking_spot_detected:
+                    if not self.right_spot_taken:
+                        self.parking_spot = "right"
+                    else:
+                        self.parking_spot = "left"
 
-                self.logging.info(f"Performing parking maneuver in the {self.parking_spot} spot")
-                self.state = "park"
-                self.motionScheduler.set_schedule(self.motions[self.state][self.parking_spot])
+                    self.logging.info(f"Performing parking maneuver in the {self.parking_spot} spot")
+                    self.state = "park"
+                    self.motionScheduler.set_schedule(self.motions[self.state][self.parking_spot])
             
         elif self.state == "park":
             self.angle, self.speed, finished = self.motionScheduler.run()
