@@ -27,9 +27,9 @@ class SpeedControl():
             if abs(angle) < 30:
                 speed = 380
             elif abs(angle) > 145:
-                speed = 220
+                speed = 150
             else:
-                speed = self.map_value(angle, 30, 145, 220, 380)
+                speed = self.map_value(angle, 30, 145, 200, 380)
         else:
             if abs(angle) < 70:
                 speed = 580

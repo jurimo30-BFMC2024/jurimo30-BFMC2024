@@ -22,6 +22,7 @@ class LaneFollow():
         self.subscribe()
         self.pid = pid(0.5, 0.3, 0)
         self.oldAngle = 0
+        self.finalAngle = 0
 
     def filter(self, angle, alpha = 0.3):
         self.oldAngle = angle * alpha + self.oldAngle * (1 - alpha)
@@ -35,7 +36,13 @@ class LaneFollow():
     def getControlData(self):
         angle = int(self.laneDetectSubscriber.receiveWithBlock() * 10)
 
-        self.finalAngle = angle
+        if abs(self.finalAngle) > 225 and abs(self.finalAngle - angle) > 5:
+            if self.finalAngle < 0:
+                self.finalAngle = angle - 5
+            else:
+                self.finalAngle = angle + 5
+        else:
+            self.finalAngle = angle
 
         if self.finalAngle > 250:
             self.finalAngle = 240
