@@ -128,7 +128,7 @@ class autoFSM(ControlModeThread):
             if self.obstacle_start_time is None:
                 self.obstacle_start_time = time.time()
             
-            if time.time() - self.obstacle_start_time >= 3:
+           # if time.time() - self.obstacle_start_time >= 1:
                 print("Pass static obstacle start")
                 self.overtake = True
         else:
