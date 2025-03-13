@@ -46,6 +46,7 @@ class IntersectionControl():
                 if trafficLights["green"]:
                     self.status = 0
                     trafficLights["green"] = False
+                    self.time0 = 0
                 else:
                     self.status = -1
             else:
@@ -61,7 +62,7 @@ class IntersectionControl():
 
 
         if self.status == 0:
-            if (time.time() - self.lastPoint) >= self.time0:
+            if ((time.time() - self.lastPoint) >= self.time0) or trafficLightFlag:
                 if self.debugging:
                     print("Krecem sa algoritmom")
                 if len(navigate) != self.navPoint:

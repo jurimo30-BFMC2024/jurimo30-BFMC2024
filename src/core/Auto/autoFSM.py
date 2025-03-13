@@ -69,7 +69,6 @@ class autoFSM(ControlModeThread):
 
         self.obstacle = False
         self.obstacle_start_time = None
-        self.trafficLightStates = False
         self.trafficLight = False
 
         self.intersection = False
