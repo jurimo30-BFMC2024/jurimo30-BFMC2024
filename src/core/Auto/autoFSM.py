@@ -89,14 +89,14 @@ class autoFSM(ControlModeThread):
         front_sensors = self.frontSensorSubscriber.receiveWithBlock()
         side_sensors = self.sideSensorSubscriber.receiveWithBlock()
 
-        if not self.parking:
+        if not self.parking and not self.overtake and not self.intersection:
             if self.traffic_signs["parking"]:
                 self.traffic_signs["parking"] = False
                 self.parking = True
             
         frontDistance = front_sensors["distance"]
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
-        if not self.intersection:
+        if not self.intersection and not self.parking and not self.overtake:
             if self.traffic_signs["stop"] or self.traffic_signs["priority"]:
                 if stopLine:
                     if self.debugging:
@@ -107,12 +107,12 @@ class autoFSM(ControlModeThread):
                     if self.traffic_signs["priority"]:
                         self.intersectionSign = "priority"
 
-        if not self.highway and self.traffic_signs["highway_entrance"]:
+        if not self.highway and self.traffic_signs["highway_entrance"] and not self.parking and not self.overtake and not self.intersection:
             self.highway = True
             self.traffic_signs["highway_entrance"] = False
             if self.debugging:
                 print("Ulazak na autoput")
-        if self.highway and (self.traffic_signs["highway_exit"]):
+        if self.highway and (self.traffic_signs["highway_exit"]) and not self.parking and not self.overtake and not self.intersection:
             self.highway = False
             self.traffic_signs["highway_entrance"] = False
             self.traffic_signs["highway_exit"] = False
@@ -121,10 +121,10 @@ class autoFSM(ControlModeThread):
 
         self.obstacle = front_sensors["distance"] <= 80
 
-        if self.highway and self.obstacle:
+        if self.highway and self.obstacle and not self.parking and not self.intersection:
             self.overtake = True
             print("Overtake on highway")
-        elif self.obstacle and self.oldSpeed == 0 and not self.highway:
+        elif self.obstacle and self.oldSpeed == 0 and not self.highway and not self.parking and not self.intersection:
             if self.obstacle_start_time is None:
                 self.obstacle_start_time = time.time()
             
@@ -179,4 +179,3 @@ class autoFSM(ControlModeThread):
         self.sideSensorSubscriber = messageHandlerSubscriber(self.queuesList, SideSensors, "LastOnly", True)
         self.frontSensorSubscriber = messageHandlerSubscriber(self.queuesList, FrontSensors, "LastOnly", True)
         self.parkingSpotDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ParkingSpotDetect, "LastOnly", True)
-        
