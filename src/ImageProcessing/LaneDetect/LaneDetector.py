@@ -15,14 +15,14 @@ class LaneDetector:
         self.currentAngle = 0
         
         self.roadReg = np.array([[
-                (int(self.width * 0.02), self.height - int(self.height * 0.2)),
-                (int(self.width * 0.98), self.height - int(self.height * 0.2)),
-                (int(self.width * 0.8), self.height // 2 - int(self.height * 0.05)),
-                (int(self.width * 0.2), self.height // 2 - int(self.height * 0.05))
+                (int(self.width * 0.02), self.height - int(self.height * 0.25)),
+                (int(self.width * 0.98), self.height - int(self.height * 0.25)),
+                (int(self.width * 0.85), self.height // 2 + int(self.height * 0.05)),
+                (int(self.width * 0.15), self.height // 2 + int(self.height * 0.05))
             ]], np.int32)
         
-        self.squareLeft = (100, 180, 190, 220)
-        self.squareRight = (320, 180, 410, 220)
+        self.squareLeft = (120, 180, 220, 220)
+        self.squareRight = (290, 180, 390, 220)
 
     def calculate_steering_angle(self, lines, img_width, img_height):
         if lines is None:
@@ -50,7 +50,7 @@ class LaneDetector:
         right_avg_slope = np.mean(right_slopes) if right_slopes else 0
         right_avg_intercept = np.mean(right_intercepts) if right_intercepts else 0
 
-        y = img_height // 2
+        y = img_height // 2 +40
 
         left_x = self.extrapolate_missing_lane(left_avg_slope, left_avg_intercept, y, img_width) if left_avg_slope != 0 else 0
         right_x = self.extrapolate_missing_lane(right_avg_slope, right_avg_intercept, y, img_width) if right_avg_slope != 0 else img_width
@@ -63,10 +63,10 @@ class LaneDetector:
 
                 if slope < -0.4:
                     if self.isPointInSquare(x1, y1, self.squareRight) or self.isPointInSquare(x2, y2, self.squareRight):
-                        return 0
+                        return 13
                 if slope > 0.4:
                     if self.isPointInSquare(x1, y1, self.squareLeft) or self.isPointInSquare(x2, y2, self.squareLeft):
-                        return 0
+                        return -13
 
 
         if left_x == 0 and right_x != img_width:
@@ -77,8 +77,8 @@ class LaneDetector:
             return 0
 
         center_x = (left_x + right_x) // 2
-        angle = np.arctan2(center_x - img_width // 2, img_width // 2)
-        angle_degrees = np.degrees(angle)
+        angle = np.arctan2(center_x - (img_width // 2 - 20), img_width // 2 - 20)
+        angle_degrees = np.degrees(angle) * 1.2
         max_angle = 25
         scaled_angle = max(-max_angle, min(max_angle, angle_degrees)) -1
         return scaled_angle

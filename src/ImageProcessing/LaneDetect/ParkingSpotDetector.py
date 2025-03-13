@@ -43,10 +43,7 @@ class ParkingSpotDetector:
             return x1, y1, x2, y2
         return None
 
-    def detect_parking_spots(self, frame):
-        imgray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(imgray, 240, 255, cv2.THRESH_BINARY)
-        edges = cv2.Canny(thresh, 20, 180)
+    def detect_parking_spots(self, edges):
         lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 20, minLineLength=20, maxLineGap=10)
 
         horizontal_lines = []
@@ -59,8 +56,8 @@ class ParkingSpotDetector:
             return self.make_parking_line(horizontal_lines)
         return None
 
-    def process_frame(self, frame):
-        roi = self.region_of_interest(frame)
+    def process_frame(self, frame, edges):
+        roi = self.region_of_interest(edges)
         line = self.detect_parking_spots(roi)
         if line:
             x1, y1, x2, y2 = line

@@ -1,4 +1,5 @@
 from src.core.Auto.Parking.Parking import Parking
+from src.core.Auto.Overtake.Overtake import Overtake
 from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.core.Auto.LaneFollow.LaneFollow import LaneFollow
 from src.core.Auto.SpeedControl import SpeedControl
@@ -28,6 +29,7 @@ class autoFSM(ControlModeThread):
         self.speedControler = SpeedControl(self.logging, self.debugging)
         self.interCont = InterCont(queueList, logging, debugging)
         self.parkingController = Parking(queueList, logging, debugging)
+        self.overtakeController = Overtake(queueList, logging, debugging)
 
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
@@ -57,10 +59,14 @@ class autoFSM(ControlModeThread):
             "round_about": False
         }
 
+        self.obstacle = False
+        self.obstacle_start_time = None
+
         self.intersection = False
         self.crosswalk = False
         self.highway = False
         self.parking = False
+        self.overtake = False
 
         super().start()
     
@@ -113,6 +119,21 @@ class autoFSM(ControlModeThread):
             if self.debugging:
                 print("Izlazak sa auto puta")
 
+        self.obstacle = front_sensors["distance"] <= 80
+
+        if self.highway and self.obstacle:
+            self.overtake = True
+            print("Overtake on highway")
+        elif self.obstacle and self.oldSpeed == 0 and not self.highway:
+            if self.obstacle_start_time is None:
+                self.obstacle_start_time = time.time()
+            
+           # if time.time() - self.obstacle_start_time >= 1:
+                print("Pass static obstacle start")
+                self.overtake = True
+        else:
+            self.obstacle_start_time = None  # Reset if obstacle is not present
+
         if not self._running.is_set():
             return
         
@@ -124,6 +145,10 @@ class autoFSM(ControlModeThread):
         elif self.intersection:
             angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign, self.oldAngle)
             pass
+        elif self.overtake:
+            overtake_angle, speed, self.overtake = self.overtakeController.run(self.highway, front_sensors, side_sensors)
+            if overtake_angle is not None:
+                angle = overtake_angle
         else:
             speed = self.speedControler.getControlData(angle, stopLine, lowDistance, self.highway, frontDistance)
 
