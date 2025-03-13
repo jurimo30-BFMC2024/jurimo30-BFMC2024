@@ -29,10 +29,10 @@ class SpeedControl():
         if not highway:
             if abs(angle) < 30:
                 speed = 380
-            elif abs(angle) > 170:
-                speed = 220
+            elif abs(angle) > 145:
+                speed = 150
             else:
-                speed = self.map_value(angle, 30, 170, 220, 380)
+                speed = self.map_value(angle, 30, 145, 200, 380)
         else:
             if abs(angle) < 70:
                 speed = 580
@@ -44,7 +44,7 @@ class SpeedControl():
         # Low distance override
         if lowDistance:
             n = 0
-            speed = 50
+            speed = 120
             while n < 3 and self.avgSpeed.get_average() > 120:
                 self.avgSpeed.add(70)
                 n += 1
