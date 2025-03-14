@@ -45,6 +45,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
         self.navigateCommand = self.planer.planPath()
+        #self.navigateCommand = ["Left", "Left", "Left", "Left"]
 
         print(self.navigateCommand)
         self.traffic_signs = {
@@ -84,7 +85,7 @@ class autoFSM(ControlModeThread):
         super().stop()
 
     def loop(self):
-        angle = self.laneFollowData.getControlData()
+        angle = self.laneFollowData.getControlData(self.highway)
         stopLine = self.intersectionDetectSubscriber.receiveWithBlock()
         lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
         if self.signDetectionSubscriber.isDataInPipe():
@@ -146,14 +147,14 @@ class autoFSM(ControlModeThread):
 
         self.obstacle = front_sensors["distance"] <= 80
 
-        if self.highway and self.obstacle and not self.parking and not self.intersection:
-            self.overtake = True
-            print("Overtake on highway")
-        elif self.obstacle and self.oldSpeed == 0 and not self.highway and not self.parking and not self.intersection:
+        #if self.highway and self.obstacle and not self.parking and not self.intersection:
+            #self.overtake = True
+            #print("Overtake on highway")
+        if self.obstacle and self.oldSpeed == 0 and not self.highway and not self.parking and not self.intersection:
             if self.obstacle_start_time is None:
                 self.obstacle_start_time = time.time()
             
-           # if time.time() - self.obstacle_start_time >= 1:
+            if time.time() - self.obstacle_start_time >= 1:
                 print("Pass static obstacle start")
                 self.overtake = True
         else:

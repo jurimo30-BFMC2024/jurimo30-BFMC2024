@@ -24,8 +24,8 @@ class IntersectionControl():
             time2 = 6.2
         elif(self.smer == "Left"):
             tangle = -230
-            time1 = 2.2
-            time2 = 6
+            time1 = 3.5
+            time2 = 5.5
         elif(self.smer == "Straight"):
             tangle = 0
             time1 = 1

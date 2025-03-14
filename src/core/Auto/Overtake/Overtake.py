@@ -35,10 +35,10 @@ class Overtake():
             },
             "pass_obstacle": {
                 "move_left": [
-                    (-250, self.normal_speed, 2),
+                    (-250, self.normal_speed, 2.5),
                 ],
                 "move_right": [
-                    (250, self.normal_speed, 3.5),
+                    (250, self.normal_speed, 3),
                 ],
             }
         }
@@ -78,7 +78,7 @@ class Overtake():
             if side_sensors["right"] < 50:
                 self.state = "pass"
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
-            elif time.time() - self.passed_at_time > (self.passed_at_time - self.caught_up_at_time) // 2 - 0.5: # drive the same amount of time after passing the car to ensure that the we can merge back
+            elif time.time() - self.passed_at_time > (self.passed_at_time - self.caught_up_at_time) // 2: # drive the same amount of time after passing the car to ensure that the we can merge back
                 self.state = "change_lane_right"
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
                 self.motionScheduler.set_schedule(self.motions["overtake" if highway else "pass_obstacle"]["move_right"])

@@ -7,8 +7,8 @@ class SpeedControl():
         self.debugging = debugging
         self.avgSpeed = MovingAverage(20)
         self.pid = pid(20, 7, 0.5)
-        self.followDistance = 40  # Desired following distance in cm
-        self.emergencyStopDistance = 20  # Emergency stop threshold in cm
+        self.followDistance = 50  # Desired following distance in cm
+        self.emergencyStopDistance = 35  # Emergency stop threshold in cm
         self.emergency_stop_threshold = 3  # Consecutive readings required
         self.consecutive_emergency = 0
         self.stop = False
@@ -28,18 +28,18 @@ class SpeedControl():
         # Speed calculation based on highway mode and angle
         if not highway:
             if abs(angle) < 30:
-                speed = 380
+                speed = 350
             elif abs(angle) > 145:
                 speed = 150
             else:
-                speed = self.map_value(angle, 30, 145, 200, 380)
+                speed = self.map_value(angle, 30, 145, 200, 350)
         else:
             if abs(angle) < 70:
-                speed = 580
+                speed = 520
             elif abs(angle) > 170:
                 speed = 420
             else:
-                speed = self.map_value(angle, 70, 170, 420, 580)
+                speed = self.map_value(angle, 70, 170, 420, 520)
 
         # Low distance override
         if lowDistance:
