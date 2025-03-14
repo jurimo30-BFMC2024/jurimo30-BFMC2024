@@ -76,6 +76,7 @@ class autoFSM(ControlModeThread):
         self.highway = False
         self.parking = False
         self.overtake = False
+        self.stephanie = False
 
         super().start()
     
@@ -88,6 +89,9 @@ class autoFSM(ControlModeThread):
         lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
         if self.signDetectionSubscriber.isDataInPipe():
             sign = self.signDetectionSubscriber.receive()
+
+            if sign == "stefanija":
+                self.stephanie = True
             if sign in self.trafficLightStates:
                 for key in self.trafficLightStates:
                     self.trafficLightStates[key] = False
@@ -155,6 +159,12 @@ class autoFSM(ControlModeThread):
         else:
             self.obstacle_start_time = None  # Reset if obstacle is not present
 
+        #temp solution
+        if self.traffic_signs["crosswalk"] and self.stephanie and stopLine and not self.crosswalk:
+            self.crosswalk = True
+            self.crosswalkStart = time.time()
+            
+
         if not self._running.is_set():
             return
         
@@ -170,6 +180,13 @@ class autoFSM(ControlModeThread):
             overtake_angle, speed, self.overtake = self.overtakeController.run(self.highway, front_sensors, side_sensors)
             if overtake_angle is not None:
                 angle = overtake_angle
+        elif self.crosswalk:
+            angle = 0
+            speed = 0
+            if time.time() - self.crosswalkStart >= 3:
+                self.crosswalk = False
+                self.stephanie = False
+                self.traffic_signs["crosswalk"] = False
         else:
             speed = self.speedControler.getControlData(angle, stopLine, lowDistance, self.highway, frontDistance)
 
