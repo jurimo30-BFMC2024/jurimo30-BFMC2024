@@ -59,8 +59,17 @@ class autoFSM(ControlModeThread):
             "round_about": False
         }
 
+        self.trafficLightStates = {
+            "red": False,
+            "green": False,
+            "yellow": False,
+            "red_yellow": False
+        }
+
+
         self.obstacle = False
         self.obstacle_start_time = None
+        self.trafficLight = False
 
         self.intersection = False
         self.crosswalk = False
@@ -79,7 +88,12 @@ class autoFSM(ControlModeThread):
         lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
         if self.signDetectionSubscriber.isDataInPipe():
             sign = self.signDetectionSubscriber.receive()
+            if sign in self.trafficLightStates:
+                for key in self.trafficLightStates:
+                    self.trafficLightStates[key] = False
+                self.trafficLightStates[sign] = True
             self.traffic_signs[sign] = True
+
             if self.debugging:
                 print(f"Preuzet je znak {sign}")
 
@@ -94,10 +108,13 @@ class autoFSM(ControlModeThread):
                 self.traffic_signs["parking"] = False
                 self.parking = True
             
+        self.trafficLight = any(self.trafficLightStates.values())
+
         frontDistance = front_sensors["distance"]
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
         if not self.intersection and not self.parking and not self.overtake:
-            if self.traffic_signs["stop"] or self.traffic_signs["priority"]:
+            if self.traffic_signs["stop"] or self.traffic_signs["priority"] or self.trafficLight:
+
                 if stopLine:
                     if self.debugging:
                         print("Krecemo sa raskrsnicom")
@@ -106,6 +123,10 @@ class autoFSM(ControlModeThread):
                         self.intersectionSign = "stop"
                     if self.traffic_signs["priority"]:
                         self.intersectionSign = "priority"
+                    
+                    if self.trafficLight:
+                        self.intersectionSign = "None"
+                        
 
         if not self.highway and self.traffic_signs["highway_entrance"] and not self.parking and not self.overtake and not self.intersection:
             self.highway = True
@@ -143,7 +164,7 @@ class autoFSM(ControlModeThread):
             if park_angle is not None:
                 angle = park_angle
         elif self.intersection:
-            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign, self.oldAngle)
+            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign, self.trafficLightStates, self.trafficLight)
             pass
         elif self.overtake:
             overtake_angle, speed, self.overtake = self.overtakeController.run(self.highway, front_sensors, side_sensors)
