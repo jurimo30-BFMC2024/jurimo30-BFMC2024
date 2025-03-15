@@ -87,7 +87,7 @@ class Parking():
                 self.start_evaluate = time.time()
 
         elif self.state == "search_and_evaluate":
-            if time.time() - self.start_evaluate > .5:
+            if time.time() - self.start_evaluate > 1:
                 if self.evaluate_side_sensors(side_sensors):
                     self.state = "search_parking_spot"
                 elif parking_spot_detected:
