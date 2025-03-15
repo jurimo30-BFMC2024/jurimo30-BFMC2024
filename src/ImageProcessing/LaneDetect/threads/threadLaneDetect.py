@@ -62,7 +62,7 @@ class threadLaneDetect(ThreadWithStop):
                 # obradi frejm
                 frame, intersection, intersectionA = self.stopLineDetector.process_frame(frame, edges)
                 frame, angle = self.laneDetector.process_frame(frame, edges)
-                frame, parking_line = self.parkingSpotDetector.process_frame(frame)
+                frame, parking_line = self.parkingSpotDetector.process_frame(frame, edges)
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)

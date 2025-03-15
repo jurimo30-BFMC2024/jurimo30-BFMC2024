@@ -18,10 +18,11 @@ class LaneFollow():
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.avgAngle = ma(5)
+        self.avgAngle = ma(2)
         self.subscribe()
         self.pid = pid(0.5, 0.3, 0)
         self.oldAngle = 0
+        self.finalAngle = 0
 
     def filter(self, angle, alpha = 0.3):
         self.oldAngle = angle * alpha + self.oldAngle * (1 - alpha)
@@ -32,20 +33,37 @@ class LaneFollow():
         value = max(min(value, in_max), in_min)
         return out_min + (out_max - out_min) * (value - in_min) / (in_max - in_min)
 
-    def getControlData(self):
+    def getControlData(self, highway, stop_line):
         angle = int(self.laneDetectSubscriber.receiveWithBlock() * 10)
 
-        self.finalAngle = angle
+        if not highway:
+            if abs(self.finalAngle) > 225 and abs(self.finalAngle - angle) > 5:
+                if self.finalAngle < 0:
+                    self.finalAngle = angle - 5
+                else:
+                    self.finalAngle = angle + 5
+            else:
+                self.finalAngle = angle
+            if stop_line:
+                self.finalAngle = self.finalAngle*2.5
+            self.finalAngle = int(self.avgAngle.filter(self.finalAngle) * 1.1) 
+        else:
+            if abs(self.finalAngle - angle) > 40:
+                if angle > self.finalAngle:
+                    self.finalAngle += 40
+                else:
+                    self.finalAngle -= 40
+            else:
+                self.finalAngle = int(angle*0.8)
+
 
         if self.finalAngle > 250:
             self.finalAngle = 240
         if self.finalAngle < -250:
             self.finalAngle = -240
-
         if self.debugging:
             self.logging.info(f"Lane detect out: {self.finalAngle}")
 
-        self.finalAngle = int(self.avgAngle.filter(self.finalAngle))
 
         return self.finalAngle
 

@@ -177,6 +177,9 @@ class processDashboard(WorkerProcess):
             for msg in self.messages:
                 resp = self.messages[msg]["obj"].receive()
                 if resp is not None:
+                    if msg == "FrontSensors" or msg == "SideSensors":
+                        resp = str(resp)
+                        
                     self.socketio.emit(msg, {"value": resp})
                     if self.debugging:
                         self.logger.info(str(msg))
