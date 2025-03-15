@@ -25,11 +25,11 @@ class threadVideoStream(ThreadWithStop):
         self.subscribe()
         super(threadVideoStream, self).__init__()
         self.displayThreads = [
-            Thread(target=self.displayRawCamera, daemon=True, kwargs={
-                "subscriber": messageHandlerSubscriber(self.queuesList, serialCamera, "lastOnly", True), 
-                "row": 0,
-                "col": 0,
-            }),
+            # Thread(target=self.displayRawCamera, daemon=True, kwargs={
+            #     "subscriber": messageHandlerSubscriber(self.queuesList, serialCamera, "lastOnly", True), 
+            #     "row": 0,
+            #     "col": 0,
+            # }),
             # Thread(target=self.displayRawCamera, daemon=True, kwargs={
             #     "subscriber": messageHandlerSubscriber(self.queuesList, mainCamera, "lastOnly", True), 
             #     "row": 1,

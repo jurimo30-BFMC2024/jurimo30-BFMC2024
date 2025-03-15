@@ -21,7 +21,7 @@ class SpeedControl():
         value = max(min(value, in_max), in_min)
         return out_min + (out_max - out_min) * (value - in_min) / (in_max - in_min)
 
-    def getControlData(self, angle, stopLine, lowDistance, highway, frontDistance):
+    def getControlData(self, angle, stopLine, lowDistance, highway, frontDistance, enable_emergency_stop):
         if stopLine:
             return 65
 
@@ -30,9 +30,9 @@ class SpeedControl():
             if abs(angle) < 30:
                 speed = 350
             elif abs(angle) > 145:
-                speed = 150
+                speed = 220
             else:
-                speed = self.map_value(angle, 30, 145, 200, 350)
+                speed = self.map_value(angle, 30, 145, 280, 350)
         else:
             if abs(angle) < 70:
                 speed = 520
@@ -50,31 +50,32 @@ class SpeedControl():
                 n += 1
 
         # Emergency stop logic
-        if frontDistance >= 10:  # Only consider readings ≥10cm
-            if not self.stop:
-                # Update consecutive counter
-                if frontDistance < self.emergencyStopDistance:
-                    self.consecutive_emergency += 1
-                    if self.consecutive_emergency >= self.emergency_stop_threshold:
-                        print(f"EMERGENCY STOP [{frontDistance}cm] Triggered after {self.consecutive_emergency} readings")
-                        self.stop = True
+        if enable_emergency_stop:
+            if frontDistance >= 10:  # Only consider readings ≥10cm
+                if not self.stop:
+                    # Update consecutive counter
+                    if frontDistance < self.emergencyStopDistance:
+                        self.consecutive_emergency += 1
+                        if self.consecutive_emergency >= self.emergency_stop_threshold:
+                            print(f"EMERGENCY STOP [{frontDistance}cm] Triggered after {self.consecutive_emergency} readings")
+                            self.stop = True
+                            self.consecutive_emergency = 0
+                            self.avgSpeed.add(0)
+                            return 0
+                    else:
                         self.consecutive_emergency = 0
+                else:
+                    # Check clearance condition
+                    if frontDistance > self.emergencyStopDistance + 10:
+                        print(f"EMERGENCY CLEAR [{frontDistance}cm]")
+                        self.stop = False
+                    else:
                         self.avgSpeed.add(0)
                         return 0
-                else:
-                    self.consecutive_emergency = 0
             else:
-                # Check clearance condition
-                if frontDistance > self.emergencyStopDistance + 10:
-                    print(f"EMERGENCY CLEAR [{frontDistance}cm]")
-                    self.stop = False
-                else:
-                    self.avgSpeed.add(0)
-                    return 0
-        else:
-            # Ignore readings below 10cm
-            if self.debugging:
-                print(f"Ignoring low measurement: {frontDistance}cm")
+                # Ignore readings below 10cm
+                if self.debugging:
+                    print(f"Ignoring low measurement: {frontDistance}cm")
 
         # PID speed adjustment
         pid_adjustment = 0

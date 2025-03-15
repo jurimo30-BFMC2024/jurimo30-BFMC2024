@@ -9,8 +9,8 @@ class ParkingSpotDetector:
     def region_of_interest(self, image):
         height, width = image.shape[:2]
         polygons = np.array([
-            [(0, height), (width * 0.2, height), (width * 0.2, height - height * 0.22), (0, height - height * 0.22)],
-            [(width * 0.8, height), (width, height), (width, height - height * 0.22), (width * 0.8, height - height * 0.22)],
+            [(0, height), (width * 0.2, height), (width * 0.2, height - height * 0.33), (0, height - height * 0.33)],
+            [(width * 0.8, height), (width, height), (width, height - height * 0.33), (width * 0.8, height - height * 0.33)],
         ], dtype=np.int32)
         mask = np.zeros_like(image)
         cv2.fillPoly(mask, polygons, (255, 255, 255))

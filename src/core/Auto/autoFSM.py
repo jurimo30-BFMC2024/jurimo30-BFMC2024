@@ -26,7 +26,7 @@ class autoFSM(ControlModeThread):
         self.logging = logging
         self.debugging = debugging
         self.laneFollowData = LaneFollow(self.queuesList, self.logging, False)
-        self.speedControler = SpeedControl(self.logging, self.debugging)
+        self.speedControler = SpeedControl(self.logging, False)
         self.interCont = InterCont(queueList, logging, debugging)
         self.parkingController = Parking(queueList, logging, debugging)
         self.overtakeController = Overtake(queueList, logging, debugging)
@@ -34,7 +34,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
 
-        self.planer = pp(10, 7, "pacman")
+        self.planer = pp(43, 10, "pacman")
 
         self.subscribe()
         super().__init__()
@@ -71,6 +71,7 @@ class autoFSM(ControlModeThread):
         self.obstacle = False
         self.obstacle_start_time = None
         self.trafficLight = False
+        self.lowDistance = False
 
         self.intersection = False
         self.crosswalk = False
@@ -85,9 +86,9 @@ class autoFSM(ControlModeThread):
         super().stop()
 
     def loop(self):
-        angle = self.laneFollowData.getControlData(self.highway)
+        angle = self.laneFollowData.getControlData(self.highway, self.lowDistance)
         stopLine = self.intersectionDetectSubscriber.receiveWithBlock()
-        lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
+        self.lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
         if self.signDetectionSubscriber.isDataInPipe():
             sign = self.signDetectionSubscriber.receive()
 
@@ -138,7 +139,7 @@ class autoFSM(ControlModeThread):
             self.traffic_signs["highway_entrance"] = False
             if self.debugging:
                 print("Ulazak na autoput")
-        if self.highway and (self.traffic_signs["highway_exit"]) and not self.parking and not self.overtake and not self.intersection:
+        if self.highway and (self.traffic_signs["highway_exit"] or stopLine or self.lowDistance) and not self.parking and not self.overtake and not self.intersection:
             self.highway = False
             self.traffic_signs["highway_entrance"] = False
             self.traffic_signs["highway_exit"] = False
@@ -189,21 +190,21 @@ class autoFSM(ControlModeThread):
                 self.stephanie = False
                 self.traffic_signs["crosswalk"] = False
         else:
-            speed = self.speedControler.getControlData(angle, stopLine, lowDistance, self.highway, frontDistance)
+            speed = self.speedControler.getControlData(angle, stopLine, self.lowDistance, self.highway, frontDistance, (not(any(self.traffic_signs.values()) or any(self.trafficLightStates.values()))))
 
         ############ Sending data ##############################
 
         if angle != self.oldAngle:
             self.steerMotorSender.send(f"{angle}")
             self.oldAngle = angle
-            if self.debugging:
-                self.logging.info(f"New steering angle: {angle}")
+            # if self.debugging:
+            #     self.logging.info(f"New steering angle: {angle}")
 
         if speed != self.oldSpeed:
             self.speedMotorSender.send(f"{speed}")
             self.oldSpeed = speed
-            if self.debugging:
-                self.logging.info(f"New speed: {speed}")
+            # if self.debugging:
+            #     self.logging.info(f"New speed: {speed}")
         
         time.sleep(0.05)
 

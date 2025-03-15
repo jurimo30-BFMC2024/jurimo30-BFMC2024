@@ -33,7 +33,7 @@ class LaneFollow():
         value = max(min(value, in_max), in_min)
         return out_min + (out_max - out_min) * (value - in_min) / (in_max - in_min)
 
-    def getControlData(self, highway):
+    def getControlData(self, highway, stop_line):
         angle = int(self.laneDetectSubscriber.receiveWithBlock() * 10)
 
         if not highway:
@@ -44,6 +44,8 @@ class LaneFollow():
                     self.finalAngle = angle + 5
             else:
                 self.finalAngle = angle
+            if stop_line:
+                self.finalAngle = self.finalAngle*2.5
             self.finalAngle = int(self.avgAngle.filter(self.finalAngle) * 1.1) 
         else:
             if abs(self.finalAngle - angle) > 40:

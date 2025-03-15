@@ -30,7 +30,7 @@ class threadObjectDetection(ThreadWithStop):
         self.logging = logging
         self.debugging = debugging
         self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/runs_version_2.2/detect/train/weights/best.pt')
-        self.streamer = VideoStream(0, 1)
+        self.streamer = VideoStream(0, 0)
         
         # State management variables
         self.current_sign = None          # Currently active sign

@@ -18,7 +18,7 @@ class processVideoStream(WorkerProcess):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.streamer = VideoGridStreamer(grid_rows=2, grid_cols=2)
+        self.streamer = VideoGridStreamer(grid_rows=2, grid_cols=1)
         self.streamer.start(host='0.0.0.0', port=4201)
         super(processVideoStream, self).__init__(self.queuesList)
 

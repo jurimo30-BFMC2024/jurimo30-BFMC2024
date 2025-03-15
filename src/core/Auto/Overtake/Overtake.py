@@ -30,7 +30,7 @@ class Overtake():
                     (-250, self.highway_speed, .4),
                 ],
                 "move_right": [
-                    (250, self.highway_speed, .4),
+                    (250, self.highway_speed, .3),
                 ],
             },
             "pass_obstacle": {
@@ -59,11 +59,12 @@ class Overtake():
             # self.angle += angle
             if finished:
                 self.state = "catch_up"
+                self.caught_up_at_time = time.time()  # Start ignore period
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
                 self.angle, self.speed = None, self.highway_speed if highway else self.normal_speed
         
         elif self.state == "catch_up":
-            if side_sensors["right"] < 50:
+            if side_sensors["right"] < 50 and time.time() - self.caught_up_at_time > 2:  # Ignore sensors for some period
                 self.caught_up_at_time = time.time()
                 self.state = "pass"
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')

@@ -3,6 +3,7 @@ from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.core.Auto.LaneFollow.MovingAverage import MovingAverage as ma
 from src.core.Auto.PID import PIDController as pid
 import time
+import socket
 
 class IntersectionControl():
     def __init__(self, queueList, logging, debugging=False):
@@ -14,21 +15,38 @@ class IntersectionControl():
         self.navPoint = 0
         self.smer = "None"
 
+    def send_udp_packet(self, node_id, ip='127.0.0.1', port=12345):
+        """
+        Send a node ID via UDP to trigger visualization updates.
+        
+        Args:
+            node_id (str): The ID of the node to highlight
+            ip (str): Destination IP address (default: localhost)
+            port (int): Destination UDP port (default: 12345)
+        """
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            try:
+                # Encode the node ID to bytes and send
+                sock.sendto(node_id.encode(), (ip, port))
+                print(f"Sent UDP packet for node {node_id} to {ip}:{port}")
+            except Exception as e:
+                print(f"Error sending UDP packet: {e}")
+
     def getControlData(self, navigate, signs, sign, trafficLights, trafficLightFlag):
         self.lastStatus = self.status
         intersection = True
 
         if(self.smer == "Right"):
             tangle = 230
-            time1 = 0.5
-            time2 = 6.2
+            time1 = 0.8
+            time2 = 6.4
         elif(self.smer == "Left"):
             tangle = -230
             time1 = 3.5
-            time2 = 5.5
+            time2 = 5.8
         elif(self.smer == "Straight"):
             tangle = 0
-            time1 = 1
+            time1 = 5
             time2 = 4
         else:
             tangle = 0
@@ -66,6 +84,7 @@ class IntersectionControl():
                 if self.debugging:
                     print("Krecem sa algoritmom")
                 if len(navigate) != self.navPoint:
+                    # self.send_udp_packet(navigate[self.navPoint])
                     self.smer = navigate[self.navPoint]
                     if self.debugging:
                         print(f"Smer je {self.smer}")
@@ -98,5 +117,6 @@ class IntersectionControl():
                 self.lastPoint = 0
                 self.speed = 168
                 signs[sign] = False
+                trafficLights = {key: False for key in trafficLights}
         
         return self.angle, self.speed, intersection
