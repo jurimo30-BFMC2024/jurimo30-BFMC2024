@@ -29,8 +29,8 @@ class threadObjectDetection(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/runs/detect/train/weights/best.pt')
-        self.streamer = VideoStream(0, 1)
+        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/runs_version_2.2/detect/train/weights/best.pt')
+        self.streamer = VideoStream(0, 0)
         
         # State management variables
         self.current_sign = None          # Currently active sign
@@ -52,8 +52,8 @@ class threadObjectDetection(ThreadWithStop):
             try:
                 videoData = self.videoSubscriber.receiveWithBlock()
                 frame = self.decode_frame(videoData)
-                frame_cropped = self.crop_top_right(frame)
-                
+                frame_cropped = self.crop_frame(frame)
+                frame_cropped = cv2.resize(frame_cropped, (256,256), interpolation=cv2.INTER_AREA)
                 # Process frame and get best detection
                 processed_frame, best_sign = self.process_frame(frame_cropped)
                 
@@ -139,10 +139,10 @@ class threadObjectDetection(ThreadWithStop):
         return cv2.imdecode(np_array, cv2.IMREAD_COLOR)
 
     @staticmethod
-    def crop_top_right(frame):
+    def crop_frame(frame):
         """Crop top-right quadrant of frame."""
-        h, w = frame.shape[:2]
-        return frame[:h//2, w//2:]
+        h, _ = frame.shape[:2]
+        return frame[0:h-63, :]
 
     def annotate_boxes(self, frame, results):
         """Draw detection boxes on frame."""
@@ -151,8 +151,12 @@ class threadObjectDetection(ThreadWithStop):
             label = self.model.model.names[int(box.cls[0])]
             conf = box.conf[0].item()
             
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, f"{label} {conf:.2f}", 
-                       (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, 
-                       0.4, (0, 255, 0), 2)
+            if conf > 0.75:
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                cv2.putText(frame, f"{label} {conf:.2f}", 
+                        (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.4, (0, 255, 0), 2)
+            else:
+                continue
+            
         return frame

@@ -1,0 +1,95 @@
+from src.core.Auto.Parking.MotionScheduler import MotionScheduler
+import time
+
+class Overtake():
+    """This class handles overtaking.
+    Args:
+        queueList (dictionary of multiprocessing.queues.Queue): Dictionary of queues where the ID is the type of messages.
+        logging (logging object): Made for debugging.
+        debugging (bool, optional): A flag for debugging. Defaults to False.
+    """
+
+    def __init__(self, queueList, logging, debugging=False, normal_speed=200, highway_speed=500):
+        self.queuesList = queueList
+        self.logging = logging
+        self.debugging = debugging
+        self.normal_speed = normal_speed
+        self.highway_speed = highway_speed
+
+        self.angle = 0
+        self.speed = 0
+        self.state = "finish"
+        self.caught_up_at_time = 0
+        self.passed_at_time = 0
+        
+        self.motionScheduler = MotionScheduler()
+
+        self.motions = {
+            "overtake": {
+                "move_left": [
+                    (-250, self.highway_speed, .4),
+                ],
+                "move_right": [
+                    (250, self.highway_speed, .3),
+                ],
+            },
+            "pass_obstacle": {
+                "move_left": [
+                    (-250, self.normal_speed, 2.5),
+                ],
+                "move_right": [
+                    (250, self.normal_speed, 3),
+                ],
+            }
+        }
+
+    def run(self, highway, front_sensors, side_sensors):
+        print(side_sensors["right"])
+        if self.state == "finish":
+            self.state = "close_distance"
+
+        if self.state == "close_distance":
+            if front_sensors["distance"] <= 60:
+                self.state = "change_lane_left"
+                print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
+                self.motionScheduler.set_schedule(self.motions["overtake" if highway else "pass_obstacle"]["move_left"])
+        
+        elif self.state == "change_lane_left":
+            self.angle, self.speed, finished = self.motionScheduler.run()
+            # self.angle += angle
+            if finished:
+                self.state = "catch_up"
+                self.caught_up_at_time = time.time()  # Start ignore period
+                print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
+                self.angle, self.speed = None, self.highway_speed if highway else self.normal_speed
+        
+        elif self.state == "catch_up":
+            if side_sensors["right"] < 50 and time.time() - self.caught_up_at_time > 2:  # Ignore sensors for some period
+                self.caught_up_at_time = time.time()
+                self.state = "pass"
+                print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
+
+        elif self.state == "pass":
+            if side_sensors["right"] > 50:
+                self.passed_at_time = time.time()
+                self.state = "get_distance"
+                print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
+
+        elif self.state == "get_distance":
+            if side_sensors["right"] < 50:
+                self.state = "pass"
+                print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
+            elif time.time() - self.passed_at_time > (self.passed_at_time - self.caught_up_at_time) // 2: # drive the same amount of time after passing the car to ensure that the we can merge back
+                self.state = "change_lane_right"
+                print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
+                self.motionScheduler.set_schedule(self.motions["overtake" if highway else "pass_obstacle"]["move_right"])
+
+        elif self.state == "change_lane_right":
+            self.angle, self.speed, finished = self.motionScheduler.run()
+            # self.angle += angle
+            if finished:
+                self.state = "finish"
+                print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
+                self.angle, self.speed = None, self.highway_speed if highway else self.normal_speed
+
+        return self.angle, self.speed, self.state != "finish"
