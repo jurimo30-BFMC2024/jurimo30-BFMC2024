@@ -19,6 +19,8 @@ from src.ImageProcessing.LaneDetect.imagePreProcessing import ImagePreProcessing
 from src.ImageProcessing.LaneDetect.StopLineDetector import StopLineDetector as StopDetect
 from src.ImageProcessing.LaneDetect.ParkingSpotDetector import ParkingSpotDetector
 from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream as vs
+from src.ImageProcessing.LaneDetect.RoundaboutNavigator import RoundaboutNavigator  # Import the new module
+
 
 class threadLaneDetect(ThreadWithStop):
     """This thread handles LaneDetect.
@@ -38,14 +40,17 @@ class threadLaneDetect(ThreadWithStop):
         self.stopLineDetector = StopDetect(512, 270, logging, debugging, False)
         self.parkingSpotDetector = ParkingSpotDetector()
         self.strm = vs(1, 0)
+        self.roundAboutDetector = RoundaboutNavigator(512, 270, logging, debugging, False)  # Initialize RoundAboutDetector
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
         self.intersectionDetectionSender = messageHandlerSender(self.queuesList, IntersectionDetect)
         self.intersectionDetectionSender2 = messageHandlerSender(self.queuesList, IntersectionDetect2)
         self.parkingSpotDetectionSender = messageHandlerSender(self.queuesList, ParkingSpotDetect)
+        self.roundAboutExitSender = messageHandlerSender(self.queuesList, RoundAboutExit)
+        self.roundAboutAngleSender = messageHandlerSender(self.queuesList, RoundAboutAngle)
         self.subscribe()
-        
+
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
         self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
@@ -65,6 +70,7 @@ class threadLaneDetect(ThreadWithStop):
                 frame, intersection, intersectionA = self.stopLineDetector.process_frame(frame, edges)
                 frame, angle = self.laneDetector.process_frame(frame, edges)
                 frame, parking_line = self.parkingSpotDetector.process_frame(frame, edges)
+                frame, roundaboutExitDetected, roundaboutAngle = self.roundAboutDetector.process_frame(frame, edges)
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
@@ -72,6 +78,8 @@ class threadLaneDetect(ThreadWithStop):
                 self.intersectionDetectionSender2.send(bool(intersectionA))
                 if parking_line is not None:
                     self.parkingSpotDetectionSender.send(True)
+                self.roundAboutExitSender.send(roundaboutExitDetected)
+                self.roundAboutAngleSender.send(roundaboutAngle)
                 self.strm.display(frame)
             except Exception as e:
                 print(e)
