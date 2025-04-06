@@ -8,6 +8,8 @@ from src.utils.messages.allMessages import (
     IntersectionDetect,
     IntersectionDetect2,
     ParkingSpotDetect,
+    RoundAboutExit,
+    RoundAboutAngle
 )
 from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
