@@ -21,24 +21,28 @@ class RoundaboutControl():
             self.speed = 150  # Fixed forward speed
 
         elif self.status == 0:  # Moving forward
-            if (time.time() - self.lastPoint) >= 2:  # Fixed forward duration
+            if (time.time() - self.lastPoint) >= 1.8:  # Fixed forward duration
                 if self.debugging:
                     print("Switching to right turn")
                 self.lastPoint = time.time()
                 self.status = 1
-                self.angle = 0
+                self.angle = 220
                 self.speed = 168  # Fixed right turn speed
 
         elif self.status == 1:  # Turning right
-            if (time.time() - self.lastPoint) >= 1.5:  # Fixed right turn duration
+            if (time.time() - self.lastPoint) >= 3:  # Fixed right turn duration
                 if self.debugging:
                     print("Adjusting angle for roundabout")
                 self.status = 2
                 self.lastPoint = time.time()
-                self.angle = angleForRoundabout  # Adjust to stay in the roundabout
-                self.speed = 168
+                self.angle = int(angleForRoundabout*10) 
+                print(self.angle)
+                self.speed = 150
 
-        elif self.status == 2:  # Adjusting angle
+        elif self.status == 2:  # Adjusting 
+            self.angle = int(angleForRoundabout*10) 
+            print(self.angle)
+            self.speed = 150
             if exitFlag and not getattr(self, 'exitHandled', False):  # React only on first True
                 if self.debugging:
                     print("Exit detected")

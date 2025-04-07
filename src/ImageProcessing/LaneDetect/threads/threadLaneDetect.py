@@ -40,7 +40,7 @@ class threadLaneDetect(ThreadWithStop):
         self.stopLineDetector = StopDetect(512, 270, logging, debugging, False)
         self.parkingSpotDetector = ParkingSpotDetector()
         self.strm = vs(1, 0)
-        self.roundAboutDetector = RoundaboutNavigator(512, 270, logging, debugging, False)  # Initialize RoundAboutDetector
+        self.roundAboutDetector = RoundaboutNavigator(512, 270, logging, debugging)  # Initialize RoundAboutDetector
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
@@ -70,7 +70,7 @@ class threadLaneDetect(ThreadWithStop):
                 frame, intersection, intersectionA = self.stopLineDetector.process_frame(frame, edges)
                 frame, angle = self.laneDetector.process_frame(frame, edges)
                 frame, parking_line = self.parkingSpotDetector.process_frame(frame, edges)
-                frame, roundaboutExitDetected, roundaboutAngle = self.roundAboutDetector.process_frame(frame, edges)
+                frame, roundaboutAngle, roundaboutExitDetected = self.roundAboutDetector.process_frame(frame, edges)
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
@@ -79,7 +79,7 @@ class threadLaneDetect(ThreadWithStop):
                 if parking_line is not None:
                     self.parkingSpotDetectionSender.send(True)
                 self.roundAboutExitSender.send(roundaboutExitDetected)
-                self.roundAboutAngleSender.send(roundaboutAngle)
+                self.roundAboutAngleSender.send(float(roundaboutAngle))
                 self.strm.display(frame)
             except Exception as e:
                 print(e)

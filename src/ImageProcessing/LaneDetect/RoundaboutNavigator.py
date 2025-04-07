@@ -7,7 +7,7 @@ class RoundaboutNavigator:
         self.height = height
         self.logging = logging
         self.debugging = debugging
-        self.target_distance_from_left = width * 0.30  # Podešavanje razmaka od leve linije
+        self.target_distance_from_left = width * 0.2 # Podešavanje razmaka od leve linije
         self.exit_region = (int(width * 0.70), int(height * 0.2), int(width*0.95), int(height * 0.8))  # Gornji desni deo slike
         self.left_search_region = (0, int(height * 0.6), int(width * 0.4), height)  # Donji levi deo slike
         self.oldAngle = 0
