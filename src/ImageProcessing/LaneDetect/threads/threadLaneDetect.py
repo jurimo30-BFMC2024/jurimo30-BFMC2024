@@ -8,7 +8,6 @@ from src.utils.messages.allMessages import (
     IntersectionDetect,
     IntersectionDetect2,
     ParkingSpotDetect,
-    RoundAboutExit,
     RoundAboutAngle
 )
 from src.templates.threadwithstop import ThreadWithStop
@@ -47,7 +46,6 @@ class threadLaneDetect(ThreadWithStop):
         self.intersectionDetectionSender = messageHandlerSender(self.queuesList, IntersectionDetect)
         self.intersectionDetectionSender2 = messageHandlerSender(self.queuesList, IntersectionDetect2)
         self.parkingSpotDetectionSender = messageHandlerSender(self.queuesList, ParkingSpotDetect)
-        self.roundAboutExitSender = messageHandlerSender(self.queuesList, RoundAboutExit)
         self.roundAboutAngleSender = messageHandlerSender(self.queuesList, RoundAboutAngle)
         self.subscribe()
 
@@ -79,7 +77,6 @@ class threadLaneDetect(ThreadWithStop):
                 self.intersectionDetectionSender2.send(bool(intersectionA))
                 if parking_line is not None:
                     self.parkingSpotDetectionSender.send(True)
-                self.roundAboutExitSender.send(roundaboutExitDetected)
                 self.roundAboutAngleSender.send(float(roundaboutAngle))
                 self.strm.display(frame)
             except Exception as e:

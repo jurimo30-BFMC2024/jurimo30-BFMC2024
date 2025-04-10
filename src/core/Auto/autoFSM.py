@@ -14,8 +14,7 @@ from src.utils.messages.allMessages import (
     SideSensors,
     FrontSensors,
     ParkingSpotDetect,
-    RoundAboutAngle,
-    RoundAboutExit
+    RoundAboutAngle
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender

@@ -29,7 +29,7 @@ class threadObjectDetection(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/runs_version_2.2/detect/train/weights/best.pt')
+        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_2.6/detect/train/weights/best.pt')
         self.streamer = VideoStream(0, 0)
         
         # State management variables
@@ -75,10 +75,16 @@ class threadObjectDetection(ThreadWithStop):
         detections = []
         for box in results.boxes.data:
             x1, y1, x2, y2, conf, cls = box.tolist()
-            if conf > 0.75:
-                label = self.model.model.names[int(cls)]
-                area = (x2 - x1) * (y2 - y1)
-                detections.append((conf, area, label))
+            if self.model.model.names[int(cls)] != "exit":
+                if conf > 0.75:
+                    label = self.model.model.names[int(cls)]
+                    area = (x2 - x1) * (y2 - y1)
+                    detections.append((conf, area, label))
+            else:
+                if conf > 0.3 and y2 > 200:
+                    label = self.model.model.names[int(cls)]
+                    area = (x2 - x1) * (y2 - y1)
+                    detections.append((conf, area, label))
         
         if detections:
             # Sort by confidence (desc), then area (desc)
@@ -151,12 +157,21 @@ class threadObjectDetection(ThreadWithStop):
             label = self.model.model.names[int(box.cls[0])]
             conf = box.conf[0].item()
             
-            if conf > 0.75:
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(frame, f"{label} {conf:.2f}", 
-                        (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, 
-                        0.4, (0, 255, 0), 2)
+            if label != exit:
+                if conf > 0.75:
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(frame, f"{label} {conf:.2f}", 
+                            (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, 
+                            0.4, (0, 255, 0), 2)
+                else:
+                    continue
             else:
-                continue
+                if conf > 0.3 and y2 > 200:
+                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    cv2.putText(frame, f"{label} {conf:.2f}", 
+                            (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, 
+                            0.4, (0, 255, 0), 2)
+                else:
+                    continue
             
         return frame
