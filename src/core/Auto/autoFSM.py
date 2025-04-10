@@ -49,7 +49,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
         #self.navigateCommand = self.planer.planPath()
-        self.navigateCommand = ["Straight", "Right", "Straight", "Right"]
+        self.navigateCommand = ["Left", "Left", "Left", "Left"]
 
         print(self.navigateCommand)
         self.traffic_signs = {
@@ -100,6 +100,8 @@ class autoFSM(ControlModeThread):
 
             if sign == "stefanija":
                 self.stephanie = True
+            if sign == "exit":
+                self.roundaboutExitFlag = True
             if sign in self.trafficLightStates:
                 for key in self.trafficLightStates:
                     self.trafficLightStates[key] = False
@@ -114,6 +116,9 @@ class autoFSM(ControlModeThread):
         #ulaz obrade sa ESP
         front_sensors = self.frontSensorSubscriber.receiveWithBlock()
         side_sensors = self.sideSensorSubscriber.receiveWithBlock()
+
+        # Receive roundabout-related messages
+        roundabout_angle = self.roundaboutAngleSubscriber.receiveWithBlock()  # Corrected to RoundAboutAngle
 
         if not self.parking and not self.overtake and not self.intersection:
             if self.traffic_signs["parking"]:
@@ -175,14 +180,10 @@ class autoFSM(ControlModeThread):
 
         if not self._running.is_set():
             return
-        
-        # Receive roundabout-related messages
-        roundabout_angle = self.roundaboutAngleSubscriber.receiveWithBlock()  # Corrected to RoundAboutAngle
-        self.roundaboutExitFlag = self.roundaboutExitSubscriber.receiveWithBlock()  # Corrected to RoundAboutExit
 
         if not self.roundabout and not self.parking and not self.overtake and not self.intersection:
             if self.traffic_signs["round_about"]:
-                if stopLine:
+                if roundabout_angle is not None:
                     if self.debugging:
                         print("Entering roundabout")
                     self.roundabout = True
@@ -204,8 +205,10 @@ class autoFSM(ControlModeThread):
             angle, speed, self.roundabout = self.roundaboutController.getControlData(
                 angleForRoundabout=roundabout_angle,  # Use the received angle
                 navigate=self.navigateCommand,
-                exitFlag= False
+                exitFlag=self.roundaboutExitFlag
             )
+            if roundabout_angle is not None:
+                angle = roundabout_angle
         elif self.crosswalk:
             angle = 0
             speed = 0
@@ -244,4 +247,3 @@ class autoFSM(ControlModeThread):
         self.frontSensorSubscriber = messageHandlerSubscriber(self.queuesList, FrontSensors, "LastOnly", True)
         self.parkingSpotDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ParkingSpotDetect, "LastOnly", True)
         self.roundaboutAngleSubscriber = messageHandlerSubscriber(self.queuesList, RoundAboutAngle, "LastOnly", True)  # Corrected to RoundAboutAngle
-        self.roundaboutExitSubscriber = messageHandlerSubscriber(self.queuesList, RoundAboutExit, "LastOnly", True)  # Corrected to RoundAboutExit
