@@ -26,8 +26,8 @@ class RoundaboutControl():
                     print("Switching to right turn")
                 self.lastPoint = time.time()
                 self.status = 1
-                self.angle = 220
-                self.speed = 168  # Fixed right turn speed
+                self.angle = 240
+                self.speed = 150  # Fixed right turn speed
 
         elif self.status == 1:  # Turning right
             if (time.time() - self.lastPoint) >= 3:  # Fixed right turn duration

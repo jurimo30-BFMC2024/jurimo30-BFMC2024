@@ -70,7 +70,8 @@ class threadLaneDetect(ThreadWithStop):
                 frame, intersection, intersectionA = self.stopLineDetector.process_frame(frame, edges)
                 frame, angle = self.laneDetector.process_frame(frame, edges)
                 frame, parking_line = self.parkingSpotDetector.process_frame(frame, edges)
-                frame, roundaboutAngle, roundaboutExitDetected = self.roundAboutDetector.process_frame(frame, edges)
+                frame, roundaboutAngle = self.roundAboutDetector.process_frame(frame, edges)
+                roundaboutExitDetected = False
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
