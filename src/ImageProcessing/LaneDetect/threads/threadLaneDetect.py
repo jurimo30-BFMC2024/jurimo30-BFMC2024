@@ -50,15 +50,20 @@ class threadLaneDetect(ThreadWithStop):
         self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
 
     def run(self):
+        frame_count = 0
+        start_time_second = time.time()
+
         while self._running:
             try:
                 videoData = self.videoSubscriber.receiveWithBlock()
                 # Dekodiraj frejm iz base64
                 frame = self.decode_frame(videoData)
 
+                total_start_time = time.time()
+
                 start_time = time.time()
                 edges = self.imgProcessor.process_frame(frame)
-                self.logging.info(f"Image processing time: {time.time() - start_time:.4f} seconds")
+                self.logging.info(f"Image processing time: {(time.time() - start_time) * 1000:.4f} ms")
 
                 # !!!!!!!!!!!!! edges ne treba mjenjati koristi se za dalju obradu nad njim
                 # !!!!!!!!!!! sva crtanja za debagovanje raditi nad frejmom on se salje na server
@@ -66,15 +71,27 @@ class threadLaneDetect(ThreadWithStop):
                 # obradi frejm
                 start_time = time.time()
                 frame, intersection, intersectionA = self.stopLineDetector.process_frame(frame, edges)
-                self.logging.info(f"Stop line detection time: {time.time() - start_time:.4f} seconds")
+                self.logging.info(f"Stop line detection time: {(time.time() - start_time) * 1000:.4f} ms")
 
                 start_time = time.time()
                 frame, angle = self.laneDetector.process_frame(frame, edges)
-                self.logging.info(f"Lane detection time: {time.time() - start_time:.4f} seconds")
+                self.logging.info(f"Lane detection time: {(time.time() - start_time) * 1000:.4f} ms")
 
                 start_time = time.time()
                 frame, parking_line = self.parkingSpotDetector.process_frame(frame, edges)
-                self.logging.info(f"Parking spot detection time: {time.time() - start_time:.4f} seconds")
+                self.logging.info(f"Parking spot detection time: {(time.time() - start_time) * 1000:.4f} ms")
+
+                total_processing_time = (time.time() - total_start_time) * 1000
+                self.logging.info(f"Total processing time: {total_processing_time:.4f} ms\n\n")
+
+                # Increment frame count
+                frame_count += 1
+
+                # Check if one second has passed
+                if time.time() - start_time_second >= 1:
+                    self.logging.info(f"Frames processed in the last second: {frame_count}")
+                    frame_count = 0
+                    start_time_second = time.time()
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
