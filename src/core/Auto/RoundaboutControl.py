@@ -8,9 +8,12 @@ class RoundaboutControl():
         self.lastPoint = 0
         self.angle = 0
         self.speed = 0
+        self.exiting = False
+        self.exitFlag = False  # Initialize exitFlag
 
     def getControlData(self, angleForRoundabout, navigate, exitFlag):
         roundAbout = True
+        self.exitFlag = exitFlag  # Update instance attribute instead of local variable
 
         if self.status == -1:  # Initial state
             if self.debugging:
@@ -28,6 +31,7 @@ class RoundaboutControl():
                 self.status = 1
                 self.angle = 240
                 self.speed = 150  # Fixed right turn speed
+                self.exitFlag = False  # Update instance attribute instead of local variable
 
         elif self.status == 1:  # Turning right
             if (time.time() - self.lastPoint) >= 3:  # Fixed right turn duration
@@ -36,40 +40,26 @@ class RoundaboutControl():
                 self.status = 2
                 self.lastPoint = time.time()
                 self.angle = int(angleForRoundabout*10) 
-                print(self.angle)
                 self.speed = 150
 
         elif self.status == 2:  # Adjusting 
             self.angle = int(angleForRoundabout*10) 
-            print(self.angle)
             self.speed = 150
-            if exitFlag and not getattr(self, 'exitHandled', False):  # React only on first True
-                if self.debugging:
-                    print("Exit detected")
-                if navigate:  # Ensure navigate is not empty
-                    direction = navigate.pop(0)  # Get and remove the first direction
-                    if direction == "Straight":
-                        if self.debugging:
-                            print("Continuing in roundabout")
-                        self.status = 2  # Continue adjusting angle
-                    elif direction == "Right":
-                        if self.debugging:
-                            print("Exiting roundabout to the right")
-                        self.status = 3  # Transition to fixed right turn for exit
-                        self.lastPoint = time.time()
-                        self.angle = 230
-                        self.speed = 168
+            if self.exitFlag:  # Use instance attribute
+                print("Modul detektovao izlaz")
+                if navigate.pop(0) == "Right":
+                    print("Izlazim iz kruznog toka")
+                    self.angle = 250
+                    self.speed = 150
+                    self.status = 3
+                    self.lastPoint = time.time()
                 else:
-                    if self.debugging:
-                        print("No directions left in navigate")
-                self.exitHandled = True  # Mark exit as handled
-            elif not exitFlag:
-                self.exitHandled = False  # Reset when exitFlag returns to False
-                if self.debugging:
-                    print("Waiting for exit flag")
+                    self.status = 2
+                    print("Ostajem u kruznom toku")
+                self.exitFlag = False  # Reset instance attribute
 
         elif self.status == 3:  # Exiting roundabout
-            if (time.time() - self.lastPoint) >= 1.5:  # Fixed right turn duration for exit
+            if (time.time() - self.lastPoint) >= 2.5:  # Fixed right turn duration for exit
                 if self.debugging:
                     print("Exiting roundabout completely")
                 roundAbout = False  # Exit roundabout
@@ -77,4 +67,4 @@ class RoundaboutControl():
                 self.angle = 0
                 self.speed = 0
 
-        return self.angle, self.speed, roundAbout
+        return self.angle, self.speed, roundAbout, self.exitFlag  # Return instance attribute

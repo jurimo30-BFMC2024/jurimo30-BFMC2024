@@ -81,7 +81,7 @@ class threadObjectDetection(ThreadWithStop):
                     area = (x2 - x1) * (y2 - y1)
                     detections.append((conf, area, label))
             else:
-                if conf > 0.15:
+                if conf > 0.15 and (y2 > 180 and x2 > 180):
                     label = self.model.model.names[int(cls)]
                     area = (x2 - x1) * (y2 - y1)
                     detections.append((conf, area, label))
@@ -151,27 +151,25 @@ class threadObjectDetection(ThreadWithStop):
         return frame[0:h-63, :]
 
     def annotate_boxes(self, frame, results):
+        cv2.rectangle(frame, (180, 180), (255, 255), (150, 255, 150), 3)
         """Draw detection boxes on frame."""
         for box in results.boxes:
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
             label = self.model.model.names[int(box.cls[0])]
             conf = box.conf[0].item()
-            
-            if label != exit:
+
+            if label != "exit":
                 if conf > 0.75:
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                     cv2.putText(frame, f"{label} {conf:.2f}", 
                             (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, 
                             0.4, (0, 255, 0), 2)
-                else:
-                    continue
+            elif conf > 0.15 and (y2 > 180 and x2 > 180):
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 150), 2)
+                cv2.putText(frame, f"{label} {conf:.2f}", 
+                       (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, 
+                        0.4, (0, 255, 0), 2)
             else:
-                if conf > 0.15:
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(frame, f"{label} {conf:.2f}", 
-                            (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, 
-                            0.4, (0, 255, 0), 2)
-                else:
-                    continue
+                continue
             
         return frame

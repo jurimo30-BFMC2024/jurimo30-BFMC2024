@@ -48,7 +48,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
         #self.navigateCommand = self.planer.planPath()
-        self.navigateCommand = ["Straight", "Straight", "Right", "Left"]
+        self.navigateCommand = ["Straight", "Straight", "Straight", "Straight", "Right", "Left"]
 
         print(self.navigateCommand)
         self.traffic_signs = {
@@ -101,14 +101,15 @@ class autoFSM(ControlModeThread):
                 self.stephanie = True
             if sign == "exit":
                 self.roundaboutExitFlag = True
+                print("Exit from roundabout is received in AUTO FSM")
             if sign in self.trafficLightStates:
                 for key in self.trafficLightStates:
                     self.trafficLightStates[key] = False
                 self.trafficLightStates[sign] = True
             self.traffic_signs[sign] = True
 
-            if self.debugging:
-                print(f"Preuzet je znak {sign}")
+          
+            print(f"Preuzet je znak {sign}")
 
         parking_spot_detected = self.parkingSpotDetectionSubscriber.receive() != None
 
@@ -201,7 +202,7 @@ class autoFSM(ControlModeThread):
             if overtake_angle is not None:
                 angle = overtake_angle
         elif self.roundabout:
-            angle, speed, self.roundabout = self.roundaboutController.getControlData(
+            angle, speed, self.roundabout, self.roundaboutExitFlag  = self.roundaboutController.getControlData(
                 angleForRoundabout=roundabout_angle,  # Use the received angle
                 navigate=self.navigateCommand,
                 exitFlag=self.roundaboutExitFlag
