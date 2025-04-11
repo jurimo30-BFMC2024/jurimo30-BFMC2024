@@ -59,7 +59,7 @@ class RoundaboutControl():
                 self.exitFlag = False  # Reset instance attribute
 
         elif self.status == 3:  # Exiting roundabout
-            if (time.time() - self.lastPoint) >= 2.5:  # Fixed right turn duration for exit
+            if (time.time() - self.lastPoint) >= 3:  # Fixed right turn duration for exit
                 if self.debugging:
                     print("Exiting roundabout completely")
                 roundAbout = False  # Exit roundabout
