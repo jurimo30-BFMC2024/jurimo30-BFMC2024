@@ -1,6 +1,7 @@
 import cv2
 import base64
 import numpy as np
+import time
 
 from src.utils.messages.allMessages import (
     serialCamera,
@@ -54,15 +55,26 @@ class threadLaneDetect(ThreadWithStop):
                 videoData = self.videoSubscriber.receiveWithBlock()
                 # Dekodiraj frejm iz base64
                 frame = self.decode_frame(videoData)
+
+                start_time = time.time()
                 edges = self.imgProcessor.process_frame(frame)
+                self.logging.info(f"Image processing time: {time.time() - start_time:.4f} seconds")
 
                 # !!!!!!!!!!!!! edges ne treba mjenjati koristi se za dalju obradu nad njim
                 # !!!!!!!!!!! sva crtanja za debagovanje raditi nad frejmom on se salje na server
 
                 # obradi frejm
+                start_time = time.time()
                 frame, intersection, intersectionA = self.stopLineDetector.process_frame(frame, edges)
+                self.logging.info(f"Stop line detection time: {time.time() - start_time:.4f} seconds")
+
+                start_time = time.time()
                 frame, angle = self.laneDetector.process_frame(frame, edges)
+                self.logging.info(f"Lane detection time: {time.time() - start_time:.4f} seconds")
+
+                start_time = time.time()
                 frame, parking_line = self.parkingSpotDetector.process_frame(frame, edges)
+                self.logging.info(f"Parking spot detection time: {time.time() - start_time:.4f} seconds")
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
