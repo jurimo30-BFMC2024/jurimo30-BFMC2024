@@ -70,9 +70,9 @@ class LaneDetector:
 
 
         if left_x == 0 and right_x != img_width:
-            return -21
+            return -18.8
         elif right_x == img_width and left_x != 0:
-            return 23
+            return 20.8
         elif left_x == 0 and right_x == img_width:
             return 0
 

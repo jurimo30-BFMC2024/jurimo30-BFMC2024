@@ -48,7 +48,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
         #self.navigateCommand = self.planer.planPath()
-        self.navigateCommand = ["Straight", "Straight", "Straight", "Right", "Right", "Left"]
+        self.navigateCommand = ["Straight", "Straight", "Straight", "Straight", "Right", "Left"]
 
         print(self.navigateCommand)
         self.traffic_signs = {
@@ -60,7 +60,8 @@ class autoFSM(ControlModeThread):
             "no_entry": False,
             "parking": False,
             "priority": False,
-            "round_about": False
+            "round_about": False,
+            "round_about2": False
         }
 
         self.trafficLightStates = {
@@ -182,12 +183,13 @@ class autoFSM(ControlModeThread):
             return
 
         if not self.roundabout and not self.parking and not self.overtake and not self.intersection:
-            if self.traffic_signs["round_about"]:
-                if roundabout_angle is not None:
+            if self.traffic_signs["round_about"] or self.traffic_signs["round_about2"]:
+                if stopLine:
                     if self.debugging:
                         print("Entering roundabout")
                     self.roundabout = True
                     self.traffic_signs["round_about"] = False
+                    self.traffic_signs["round_about2"] = False
 
         #################         FSM            ############
         if self.parking:

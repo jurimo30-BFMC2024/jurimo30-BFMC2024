@@ -29,7 +29,7 @@ class threadObjectDetection(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_2.6/detect/train/weights/best.pt')
+        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_2.7/detect/train/weights/best.pt')
         self.streamer = VideoStream(0, 0)
         
         # State management variables
@@ -151,7 +151,7 @@ class threadObjectDetection(ThreadWithStop):
         return frame[0:h-63, :]
 
     def annotate_boxes(self, frame, results):
-        cv2.rectangle(frame, (180, 180), (255, 255), (150, 255, 150), 3)
+        cv2.rectangle(frame, (200, 200), (255, 255), (150, 255, 150), 3)
         """Draw detection boxes on frame."""
         for box in results.boxes:
             x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
