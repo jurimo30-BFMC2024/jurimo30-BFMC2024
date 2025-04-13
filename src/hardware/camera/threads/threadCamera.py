@@ -123,8 +123,6 @@ class threadCamera(ThreadWithStop):
     # ================================ RUN ================================================
     def run(self):
         """This function will run while the running flag is True. It captures the image from camera and make the required modifies and then it send the data to process gateway."""
-
-        send = True
         while self._running:
             try:
                 recordRecv = self.recordSubscriber.receive()
@@ -146,26 +144,22 @@ class threadCamera(ThreadWithStop):
             except Exception as e:
                 print(e)
 
-            if send:
-                # mainRequest = self.camera.capture_array("main")
-                serialRequest = self.camera.capture_array("lores")  # Will capture an array that can be used by OpenCV library
+            # mainRequest = self.camera.capture_array("main")
+            serialRequest = self.camera.capture_array("lores")  # Will capture an array that can be used by OpenCV library
 
-                #serialRequest = cv2.cvtColor(serialRequest, cv2.COLOR_YUV2BGR_I420)
-                
-                if self.recording == True:
-                    self.video_writer.write(serialRequest)
+            #serialRequest = cv2.cvtColor(serialRequest, cv2.COLOR_YUV2BGR_I420)
+            
+            if self.recording == True:
+                self.video_writer.write(serialRequest)
 
-                #_, mainEncodedImg = cv2.imencode(".jpg", mainRequest)                   
-                _, serialEncodedImg = cv2.imencode(".jpg", serialRequest)
+            #_, mainEncodedImg = cv2.imencode(".jpg", mainRequest)                   
+            _, serialEncodedImg = cv2.imencode(".jpg", serialRequest)
 
-                # mainEncodedImageData = base64.b64encode(mainEncodedImg).decode("utf-8")
-                serialEncodedImageData = base64.b64encode(serialEncodedImg).decode("utf-8")
+            # mainEncodedImageData = base64.b64encode(mainEncodedImg).decode("utf-8")
+            serialEncodedImageData = base64.b64encode(serialEncodedImg).decode("utf-8")
 
-                # self.mainCameraSender.send(mainEncodedImageData)
-                self.serialCameraSender.send(serialEncodedImageData)
-
-            send = not send
-            time.sleep(0.05)
+            # self.mainCameraSender.send(mainEncodedImageData)
+            self.serialCameraSender.send(serialEncodedImageData)
 
     # =============================== START ===============================================
     def start(self):
