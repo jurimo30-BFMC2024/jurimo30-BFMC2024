@@ -71,7 +71,8 @@ class autoFSM(ControlModeThread):
             "red_yellow": False
         }
 
-
+        self.obstacle_counter = 0
+        self.sign_car_detected = False
         self.obstacle = False
         self.obstacle_start_time = None
         self.trafficLight = False
@@ -100,14 +101,17 @@ class autoFSM(ControlModeThread):
 
             if sign == "stefanija":
                 self.stephanie = True
-            if sign == "exit":
+            elif sign == "exit":
                 self.roundaboutExitFlag = True
                 print("Exit from roundabout is received in AUTO FSM")
-            if sign in self.trafficLightStates:
+            elif sign == "car":
+                self.sign_car_detected = True
+            elif sign in self.trafficLightStates:
                 for key in self.trafficLightStates:
                     self.trafficLightStates[key] = False
                 self.trafficLightStates[sign] = True
-            self.traffic_signs[sign] = True
+            else:
+                self.traffic_signs[sign] = True
 
           
             print(f"Preuzet je znak {sign}")
@@ -128,7 +132,6 @@ class autoFSM(ControlModeThread):
             
         self.trafficLight = any(self.trafficLightStates.values())
 
-        frontDistance = front_sensors["distance"]
         #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
         if not self.intersection and not self.parking and not self.overtake:
             if self.traffic_signs["stop"] or self.traffic_signs["priority"] or self.trafficLight:
@@ -158,7 +161,16 @@ class autoFSM(ControlModeThread):
             if self.debugging:
                 print("Izlazak sa auto puta")
 
-        self.obstacle = front_sensors["distance"] <= 80
+        if front_sensors["distance"] <= 80:
+            self.obstacle_counter += 1
+        else:
+            self.obstacle_counter = 0
+
+        # Latching obstacle if:
+        # - distance is low 3+ times, and
+        # - either car or stefanija (when not at crosswalk) is detected
+        valid_sign_obstacle = self.sign_car_detected or (self.stephanie and not self.traffic_signs["crosswalk"])
+        self.obstacle = self.obstacle_counter >= 3 and valid_sign_obstacle
 
         #if self.highway and self.obstacle and not self.parking and not self.intersection:
             #self.overtake = True
@@ -170,6 +182,8 @@ class autoFSM(ControlModeThread):
             if time.time() - self.obstacle_start_time >= 1:
                 print("Pass static obstacle start")
                 self.overtake = True
+                self.sign_car_detected = False
+                self.stephanie = False
         else:
             self.obstacle_start_time = None  # Reset if obstacle is not present
 
@@ -217,7 +231,7 @@ class autoFSM(ControlModeThread):
                 self.stephanie = False
                 self.traffic_signs["crosswalk"] = False
         else:
-            speed = self.speedControler.getControlData(angle, stopLine, self.lowDistance, self.highway, frontDistance, (not(any(self.traffic_signs.values()) or any(self.trafficLightStates.values()))))
+            speed = self.speedControler.getControlData(angle, stopLine, self.lowDistance, self.highway, front_sensors["distance"], (not(any(self.traffic_signs.values()) or any(self.trafficLightStates.values()))), self.sign_car_detected, (self.stephanie and not self.traffic_signs["crosswalk"]))
 
         ############ Sending data ##############################
 
