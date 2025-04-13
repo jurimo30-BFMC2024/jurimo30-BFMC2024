@@ -20,11 +20,11 @@ class IntersectionControl():
         intersection = True
 
         if(self.smer == "Right"):
-            tangle = 230
+            tangle = 190
             time1 = 0.8
             time2 = 6.4
         elif(self.smer == "Left"):
-            tangle = -230
+            tangle = -190
             time1 = 3.5
             time2 = 5.8
         elif(self.smer == "Straight"):

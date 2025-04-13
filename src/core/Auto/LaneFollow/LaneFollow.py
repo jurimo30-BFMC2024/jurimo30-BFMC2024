@@ -54,7 +54,7 @@ class LaneFollow():
                 else:
                     self.finalAngle -= 40
             else:
-                self.finalAngle = int(angle*0.8)
+                self.finalAngle = int(angle*0.65)
 
 
         if self.finalAngle > 250:

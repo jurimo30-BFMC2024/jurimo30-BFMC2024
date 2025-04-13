@@ -27,18 +27,18 @@ class Overtake():
         self.motions = {
             "overtake": {
                 "move_left": [
-                    (-250, self.highway_speed, .4),
+                    (-230, self.highway_speed, .4),
                 ],
                 "move_right": [
-                    (250, self.highway_speed, .3),
+                    (230, self.highway_speed, .3),
                 ],
             },
             "pass_obstacle": {
                 "move_left": [
-                    (-250, self.normal_speed, 2.5),
+                    (-230, self.normal_speed, 2.5),
                 ],
                 "move_right": [
-                    (250, self.normal_speed, 3),
+                    (230, self.normal_speed, 3),
                 ],
             }
         }

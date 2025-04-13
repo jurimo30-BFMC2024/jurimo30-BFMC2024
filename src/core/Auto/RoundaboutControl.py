@@ -32,7 +32,7 @@ class RoundaboutControl():
                 self.speed = 150  # Fixed forward speed
 
         elif self.status == 0:  # Moving forward
-            if (time.time() - self.lastPoint) >= 1.9:  # Fixed forward duration
+            if (time.time() - self.lastPoint) >= 1.6:  # Fixed forward duration
                 if self.debugging:
                     print("Switching to right turn")
                 self.lastPoint = time.time()
