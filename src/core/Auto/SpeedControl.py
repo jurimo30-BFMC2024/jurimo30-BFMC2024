@@ -51,7 +51,7 @@ class SpeedControl():
                 n += 1
 
         # Emergency stop logic (only if Stephanie or car is in front)
-        print(f"enable_emergency_stop: {enable_emergency_stop}, stephanie_in_front: {stephanie_in_front}, car_in_front: {car_in_front}")
+        # print(f"enable_emergency_stop: {enable_emergency_stop}, stephanie_in_front: {stephanie_in_front}, car_in_front: {car_in_front}")
         if enable_emergency_stop and (stephanie_in_front or car_in_front):
             if frontDistance >= 10:
                 if not self.stop:
