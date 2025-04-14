@@ -38,11 +38,8 @@ class PathPlanner:
         best_path = self.find_greedy_path(graph, self.start, self.goal)
         if best_path:
             instructionQueue = []
-            # print("Greedy Path Collecting All Collectibles:", best_path)
             turns = self.determine_turns(graph, best_path)
-            # print("Turn Instructions:")
             for node, direction in turns:
-                # print(f"Kod node-a {node}, idi {direction}")
                 instructionQueue.append(direction)
 
         return instructionQueue
@@ -160,7 +157,6 @@ class PathPlanner:
                         raise ValueError("ERROR: ROUNDABOUT MACHINE BROKE")
                 # skip over already accounted for nodes in roundabout
                 i += counter + 1
-                # print(path[i])
                 continue
 
             # Skip if not an intersection
