@@ -84,6 +84,10 @@ class PathPlanner:
         if self.file_path == "Competition_track_graph.graphml":
             graph.nodes["270"]['intersection'] = True
             graph.nodes["245"]['intersection'] = True
+
+            # highway lane split nodes
+            graph.nodes["401"]['intersection'] = False
+            graph.nodes["423"]['intersection'] = False
         else:
             graph.nodes["39"]['intersection'] = True
             graph.nodes["33"]['intersection'] = True
@@ -96,6 +100,9 @@ class PathPlanner:
         visited_collectibles = set()
         path = [start]
         current_node = start
+
+        if graph.nodes[goal]['intersection']:
+            print("W: Your final point is inside an intersection (reconsider)")
         
         # this part is skipped if p2p
         while visited_collectibles != collectibles:
@@ -146,8 +153,12 @@ class PathPlanner:
                     directions.append((current_node, "Straight"))
                     directions.append((current_node, "Right"))
                 else:
-                    print("ERROR: ROUNDABOUT CONFUSED. YOU ARE LIKELY STOPPING INSIDE THE ROUNDABOUT.")
-                #skip over already accounted for nodes in roundabout
+                    if i + counter + 1 > len(path) - 1:
+                        print("W: Your end node is inside the roundabout (reconsider)")
+                    else:
+                        # theoretically this should never happen
+                        raise ValueError("ERROR: ROUNDABOUT MACHINE BROKE")
+                # skip over already accounted for nodes in roundabout
                 i += counter + 1
                 # print(path[i])
                 continue
