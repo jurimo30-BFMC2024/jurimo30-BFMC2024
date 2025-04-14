@@ -70,29 +70,40 @@ class threadObjectDetection(ThreadWithStop):
         # Get YOLO results
         results = self.model(frame, verbose=self.debugging)[0]
         
-        # Find best detection
+        h, w = frame.shape[:2]
+        center_box = (w // 2 - 60, 0, w // 2 + 60, h)  # 60x60 center region
+
         best_sign = None
         detections = []
+
         for box in results.boxes.data:
             x1, y1, x2, y2, conf, cls = box.tolist()
-            if self.model.model.names[int(cls)] != "exit":
-                if conf > 0.75:
-                    label = self.model.model.names[int(cls)]
+            label = self.model.model.names[int(cls)]
+
+            # Compute center of the bounding box
+            box_cx = (x1 + x2) / 2
+            box_cy = (y1 + y2) / 2
+            in_center = (center_box[0] <= box_cx <= center_box[2]) and (center_box[1] <= box_cy <= center_box[3])
+
+            if label == "car":
+                if conf > 0.75 and in_center:
+                    area = (x2 - x1) * (y2 - y1)
+                    detections.append((conf, area, label))
+            elif label == "exit":
+                if conf > 0.15 and (y2 > 180 and x2 > 180):
                     area = (x2 - x1) * (y2 - y1)
                     detections.append((conf, area, label))
             else:
-                if conf > 0.15 and (y2 > 180 and x2 > 180):
-                    label = self.model.model.names[int(cls)]
+                if conf > 0.75:
                     area = (x2 - x1) * (y2 - y1)
                     detections.append((conf, area, label))
-        
+
         if detections:
-            # Sort by confidence (desc), then area (desc)
             detections.sort(key=lambda x: (-x[0], -x[1]))
             best_sign = detections[0][2]
 
-        # Annotate frame
         return self.annotate_boxes(frame, results), best_sign
+
 
     def update_state(self, new_sign):
         """Update detection state and handle messaging."""

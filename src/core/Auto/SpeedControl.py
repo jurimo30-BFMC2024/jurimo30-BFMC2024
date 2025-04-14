@@ -21,7 +21,8 @@ class SpeedControl():
         value = max(min(value, in_max), in_min)
         return out_min + (out_max - out_min) * (value - in_min) / (in_max - in_min)
 
-    def getControlData(self, angle, stopLine, lowDistance, highway, frontDistance, enable_emergency_stop):
+    def getControlData(self, angle, stopLine, lowDistance, highway, frontDistance,
+                   enable_emergency_stop, car_in_front, stephanie_in_front):
         if stopLine:
             return 65
 
@@ -49,11 +50,11 @@ class SpeedControl():
                 self.avgSpeed.add(70)
                 n += 1
 
-        # Emergency stop logic
-        if enable_emergency_stop:
-            if frontDistance >= 10:  # Only consider readings ≥10cm
+        # Emergency stop logic (only if Stephanie or car is in front)
+        # print(f"enable_emergency_stop: {enable_emergency_stop}, stephanie_in_front: {stephanie_in_front}, car_in_front: {car_in_front}")
+        if enable_emergency_stop and (stephanie_in_front or car_in_front):
+            if frontDistance >= 10:
                 if not self.stop:
-                    # Update consecutive counter
                     if frontDistance < self.emergencyStopDistance:
                         self.consecutive_emergency += 1
                         if self.consecutive_emergency >= self.emergency_stop_threshold:
@@ -65,7 +66,6 @@ class SpeedControl():
                     else:
                         self.consecutive_emergency = 0
                 else:
-                    # Check clearance condition
                     if frontDistance > self.emergencyStopDistance + 10:
                         print(f"EMERGENCY CLEAR [{frontDistance}cm]")
                         self.stop = False
@@ -73,21 +73,20 @@ class SpeedControl():
                         self.avgSpeed.add(0)
                         return 0
             else:
-                # Ignore readings below 10cm
                 if self.debugging:
                     print(f"Ignoring low measurement: {frontDistance}cm")
 
-        # PID speed adjustment
+        # PID speed adjustment (only if car in front)
         pid_adjustment = 0
-        if frontDistance <= 80:
+        if car_in_front and frontDistance <= 80:
             distanceError = self.followDistance - frontDistance
             pid_adjustment = self.pid.update(distanceError)
         else:
             self.pid.reset()
-            
+
         follow_speed = speed - pid_adjustment
         final_speed = max(0, min(min(speed, follow_speed), 600))
-        
+
         if self.debugging:
             print(f"[{frontDistance}cm] PID: {int(pid_adjustment)}, Base: {int(speed)} Final: {int(final_speed)}")
 
