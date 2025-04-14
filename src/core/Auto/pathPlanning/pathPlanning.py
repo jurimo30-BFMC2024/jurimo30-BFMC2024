@@ -24,10 +24,13 @@ class PathPlanner:
             raise ValueError("PathPlanner: mode must be either \"p2p\" or \"pacman\"")
         else:
             self.mode = mode
-        # Small_map.graphml for test track/Competition_track_graph.graphml for Romania
-        self.file_path = "src/core/Auto/pathPlanning/Small_map.graphml" 
-        self.roundabout_entries = ["317", "367", "397", "405"]
-        self.roundabout_exits = ["368", "342", "398", "318"]
+        self.file_path = "Small_map_roundabout.graphml" # change this to Competition_track_graph.graphml when in Romania
+        if self.file_path == "Small_map_roundabout.graphml":
+            self.roundabout_entries = ["14", "49", "22"]
+            self.roundabout_exits = ["24", "34", "40", "48"]
+        else:   
+            self.roundabout_entries = ["317", "367", "397", "405"]
+            self.roundabout_exits = ["368", "342", "398", "318"]
 
     def planPath(self):
         '''Generates a queue of instructions'''
@@ -35,8 +38,11 @@ class PathPlanner:
         best_path = self.find_greedy_path(graph, self.start, self.goal)
         if best_path:
             instructionQueue = []
+            # print("Greedy Path Collecting All Collectibles:", best_path)
             turns = self.determine_turns(graph, best_path)
+            # print("Turn Instructions:")
             for node, direction in turns:
+                # print(f"Kod node-a {node}, idi {direction}")
                 instructionQueue.append(direction)
 
         return instructionQueue
@@ -49,14 +55,12 @@ class PathPlanner:
         ns = {'graphml': 'http://graphml.graphdrawing.org/xmlns'}
         graph = nx.DiGraph()
         
-        # For competition map
-        # collectibles = {"75", "128", "116", "98", "110", "185", "71", "25", "31", "29", "93", "80", "82", "136",
-        # "419", "125", "403", "399", "343", "386", "363", "368", "318", "317", "56", "54", "261", "239", "228",
-        # "225", "198", "42", "289", "6", "8"}
-
-
-        # For small map
-        collectibles = {"32", "22", "14", "38", "7"}
+        if self.file_path == "Competition_track_graph.graphml":
+            collectibles = {"75", "128", "116", "98", "110", "185", "71", "25", "31", "29", "93", "80", "82", "136",
+            "419", "125", "403", "399", "343", "386", "363", "368", "318", "317", "56", "54", "261", "239", "228",
+            "225", "198", "42", "289", "6", "8"}
+        else:
+            collectibles = {"32", "22", "14", "38", "7"}
         
         for node in root.findall(".//graphml:node", ns):
             node_id = node.get("id")
@@ -80,10 +84,6 @@ class PathPlanner:
         if self.file_path == "Competition_track_graph.graphml":
             graph.nodes["270"]['intersection'] = True
             graph.nodes["245"]['intersection'] = True
-            
-            # highway lane split nodes
-            graph.nodes["401"]['intersection'] = False
-            graph.nodes["423"]['intersection'] = False
         else:
             graph.nodes["39"]['intersection'] = True
             graph.nodes["33"]['intersection'] = True
@@ -96,9 +96,6 @@ class PathPlanner:
         visited_collectibles = set()
         path = [start]
         current_node = start
-
-        if graph.nodes[goal]['intersection']:
-            print("W: Your final point is inside an intersection (reconsider)")
         
         # this part is skipped if p2p
         while visited_collectibles != collectibles:
@@ -135,21 +132,24 @@ class PathPlanner:
                         break
                     counter += 1
                 if counter == 2:
-                    directions.append((current_node, "First exit"))
+                    directions.append((current_node, "Right"))
                 elif counter == 4:
-                    directions.append((current_node, "Second exit"))
+                    directions.append((current_node, "Straight"))
+                    directions.append((current_node, "Right"))
                 elif counter == 6:
-                    directions.append((current_node, "Third exit"))
+                    directions.append((current_node, "Straight"))
+                    directions.append((current_node, "Straight"))
+                    directions.append((current_node, "Right"))
                 elif counter == 8:
-                    directions.append((current_node, "Fourth exit"))
+                    directions.append((current_node, "Straight"))
+                    directions.append((current_node, "Straight"))
+                    directions.append((current_node, "Straight"))
+                    directions.append((current_node, "Right"))
                 else:
-                    if i + counter + 1 > len(path) - 1:
-                        print("W: Your end node is inside the roundabout (reconsider)")
-                    else:
-                        # theoretically this should never happen
-                        raise ValueError("ERROR: ROUNDABOUT MACHINE BROKE")
-                # skip over already accounted for nodes in roundabout
+                    print("ERROR: ROUNDABOUT CONFUSED. YOU ARE LIKELY STOPPING INSIDE THE ROUNDABOUT.")
+                #skip over already accounted for nodes in roundabout
                 i += counter + 1
+                # print(path[i])
                 continue
 
             # Skip if not an intersection
@@ -190,7 +190,6 @@ class PathPlanner:
             # print(f"  Outgoing vector: {outgoing_vec}")
             # print(f"  Angle difference: {angle_diff:.2f}°")
             
-            # Determine turn direction
             if angle_diff > 45:
                 turn = "Left"
             elif angle_diff < -45:
@@ -201,6 +200,3 @@ class PathPlanner:
             directions.append((current_node, turn))
             i += 1
         return directions
-
-# pp = PathPlanner("315", "95", "pacman")
-# print(pp.planPath())
