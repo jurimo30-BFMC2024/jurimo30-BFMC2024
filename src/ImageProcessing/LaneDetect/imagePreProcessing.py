@@ -12,12 +12,23 @@ class ImagePreProcessing:
         self.height = height
         self.pc = pc
 
+        # self.roadReg = np.array([[
+        #     (int(self.width * 0.01), self.height * 0.45),
+        #     (int(self.width * 0.99), self.height * 0.45),
+        #     (int(self.width * 0.99), self.height * 0.85),
+        #     (int(self.width * 0.01), self.height * 0.85)
+        # ]], np.int32)
+
         self.roadReg = np.array([[
-            (int(self.width * 0.01), self.height * 0.45),
-            (int(self.width * 0.99), self.height * 0.45),
-            (int(self.width * 0.99), self.height * 0.85),
-            (int(self.width * 0.01), self.height * 0.85)
-        ]], np.int32)
+                (int(self.width * 0.01), self.height - int(self.height * 0.05)),
+                (int(self.width * 0.25), self.height - int(self.height * 0.05)),
+                (int(self.width * 0.3), self.height - int(self.height * 0.2)),
+                (int(self.width * 0.7), self.height - int(self.height * 0.2)),
+                (int(self.width * 0.75), self.height - int(self.height * 0.05)),
+                (int(self.width * 0.99), self.height - int(self.height * 0.05)),
+                (int(self.width * 0.99), self.height * 0.45),
+                (int(self.width * 0.01), self.height * 0.45)
+            ]], np.int32)
 
         self.gamma_lut = self._create_gamma_lut(13)  # Precompute LUT for gamma correction
         self.mask = self._create_roi_mask()  # Precompute ROI mask

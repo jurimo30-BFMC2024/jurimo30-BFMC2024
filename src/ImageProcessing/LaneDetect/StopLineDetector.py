@@ -47,7 +47,7 @@ class StopLineDetector:
 
     def region_of_interest(self, img, Reg):
         mask = np.zeros_like(img, dtype=np.uint8)
-        cv2.fillPoly(mask, Reg, (555, 255, 255)) # Mask now matches BGR format
+        cv2.fillPoly(mask, Reg, (255, 255, 255)) # Mask now matches BGR format
         masked_image = cv2.bitwise_and(img, mask)
         return masked_image
     
