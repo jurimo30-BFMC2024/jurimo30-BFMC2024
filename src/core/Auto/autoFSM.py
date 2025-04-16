@@ -216,7 +216,7 @@ class autoFSM(ControlModeThread):
             angle, speed, self.roundabout, self.roundaboutExitFlag  = self.roundaboutController.getControlData(
                 angleForRoundabout=roundabout_angle,  # Use the received angle
                 navigate=self.navigateCommand,
-                exitFlag=self.roundaboutExitFlag
+                exitFlag=self.roundaboutExitFlag,
                 stopLine=stopLine
             )
         elif self.crosswalk:
