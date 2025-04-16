@@ -94,6 +94,8 @@ class autoFSM(ControlModeThread):
     def loop(self):
         angle = self.laneFollowData.getControlData(self.highway, self.lowDistance)
         stopLine = self.intersectionDetectSubscriber.receiveWithBlock()
+        # stopLine je sad tuple (intersection(bool), slope_degrees (float))
+
         self.lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
         if self.signDetectionSubscriber.isDataInPipe():
             sign = self.signDetectionSubscriber.receive()
@@ -133,7 +135,7 @@ class autoFSM(ControlModeThread):
         if not self.intersection and not self.parking and not self.overtake:
             if self.traffic_signs["stop"] or self.traffic_signs["priority"] or self.trafficLight:
 
-                if stopLine:
+                if stopLine[0]:
                     if self.debugging:
                         print("Krecemo sa raskrsnicom")
                     self.intersection = True
@@ -151,7 +153,7 @@ class autoFSM(ControlModeThread):
             self.traffic_signs["highway_entrance"] = False
             if self.debugging:
                 print("Ulazak na autoput")
-        if self.highway and (self.traffic_signs["highway_exit"] or stopLine or self.lowDistance) and not self.parking and not self.overtake and not self.intersection:
+        if self.highway and (self.traffic_signs["highway_exit"] or stopLine[0] or self.lowDistance) and not self.parking and not self.overtake and not self.intersection:
             self.highway = False
             self.traffic_signs["highway_entrance"] = False
             self.traffic_signs["highway_exit"] = False
@@ -174,7 +176,7 @@ class autoFSM(ControlModeThread):
             self.obstacle_start_time = None  # Reset if obstacle is not present
 
         #temp solution
-        if self.traffic_signs["crosswalk"] and self.stephanie and stopLine and not self.crosswalk:
+        if self.traffic_signs["crosswalk"] and self.stephanie and stopLine[0] and not self.crosswalk:
             self.crosswalk = True
             self.crosswalkStart = time.time()
             
@@ -184,7 +186,7 @@ class autoFSM(ControlModeThread):
 
         if not self.roundabout and not self.parking and not self.overtake and not self.intersection:
             if self.traffic_signs["round_about"] or self.traffic_signs["round_about2"]:
-                if stopLine:
+                if stopLine[0]:
                     if self.debugging:
                         print("Entering roundabout")
                     self.roundabout = True
@@ -197,7 +199,7 @@ class autoFSM(ControlModeThread):
             if park_angle is not None:
                 angle = park_angle
         elif self.intersection:
-            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign, self.trafficLightStates, self.trafficLight)
+            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign, self.trafficLightStates, self.trafficLight, stopLine)
             pass
         elif self.overtake:
             overtake_angle, speed, self.overtake = self.overtakeController.run(self.highway, front_sensors, side_sensors)
@@ -217,7 +219,7 @@ class autoFSM(ControlModeThread):
                 self.stephanie = False
                 self.traffic_signs["crosswalk"] = False
         else:
-            speed = self.speedControler.getControlData(angle, stopLine, self.lowDistance, self.highway, frontDistance, (not(any(self.traffic_signs.values()) or any(self.trafficLightStates.values()))))
+            speed = self.speedControler.getControlData(angle, stopLine[0], self.lowDistance, self.highway, frontDistance, (not(any(self.traffic_signs.values()) or any(self.trafficLightStates.values()))))
 
         ############ Sending data ##############################
 
