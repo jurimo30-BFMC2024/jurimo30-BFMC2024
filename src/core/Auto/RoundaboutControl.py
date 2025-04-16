@@ -1,29 +1,83 @@
 import time
+import math
 
 class RoundaboutControl():
     def __init__(self, logging, debugging=False):
         self.logging = logging
         self.debugging = debugging
-        self.status = -2  # -1: not started, 0: moving forward, 1: turning right, 2: adjusting angle
+        self.status = -3  # -2: not started, -1: fix the car angle, 0: moving forward, 1: turning right, 2: adjusting angle, 3: exiting
         self.lastPoint = 0
         self.angle = 0
         self.speed = 0
         self.exiting = False
         self.exitFlag = False  # Initialize exitFlag
+        self.slope_degrees = 0
+        self.straighten_time = 0
 
-    def getControlData(self, angleForRoundabout, navigate, exitFlag):
+    def calculate_distance_to_straighten(self, alpha_deg, wheelbase=26, max_steering_angle=25):
+        """
+        Izračunava dužinu puta (u cm) koju model auta treba da pređe dok se ne ispravi.
+    
+        Parametri:
+        alpha_deg (float): Ugao između auta i zaustavne linije u stepenima (-90 do 90).
+        speed_cm_s (float): Brzina kretanja auta napred u cm/s.
+        wheelbase (float): Međuosovinsko rastojanje u cm (default 26 cm).
+        max_steering_angle (float): Maksimalni ugao skretanja točkova u stepenima (default 25°).
+    
+        Returns:
+        float: Dužina puta u cm koja je potrebna da se auto ispravi.
+        """
+        # Konvertujemo uglove u radijane
+        alpha_rad = math.radians(alpha_deg)
+        steering_angle_rad = math.radians(max_steering_angle)
+    
+        # Poluprečnik kružne putanje (aproksimacija)
+        R = wheelbase / math.tan(steering_angle_rad)
+    
+        # Dužina luka potrebna da se auto ispravi
+        distance = R * abs(alpha_rad)
+
+        #po brzini 168, ovaj manevar ce trajati distance/168 sekundi
+        #jbg izracunaj sam dole
+
+
+        return distance
+
+    def getControlData(self, angleForRoundabout, navigate, exitFlag, stopLine):
         roundAbout = True
         self.exitFlag = exitFlag  # Update instance attribute instead of local variable
+        if stopLine[0]:
+            self.slope_degrees = stopLine[1]
 
-        if self.status == -2:
+        if self.status == -3:
             if self.debugging:
                 print("Starting roundabout maneuver")
             self.speed = 0
-            self.status = -1
+            self.status = -2
             self.angle = 0
             self.lastPoint = time.time()
-        elif self.status == -1:  # Initial state
+            
+        elif self.status == -2:  # Initial state
             if (time.time() - self.lastPoint) >= 0.2:
+                straighten_distance = self.calculate_distance_to_straighten(self.slope_degrees)
+                # Assume speed is 300 cm/s — calculate duration
+                self.straighten_time = (straighten_distance / 30)
+                print("krecem sa ispravljanjem")
+                print(f'straighten_distance: {straighten_distance}, self.straighten_time: {self.straighten_time}')
+
+                if self.slope_degrees < 0:
+                    self.angle = -250
+                elif self.slope_degrees > 0:
+                    self.angle = 250
+                else:
+                    self.angle = 0
+                self.speed = 300
+                self.lastPoint = time.time()
+                self.status = -1
+                print("angle, speed, slope", self.angle, self.speed, self.slope_degrees)
+
+        elif self.status == -1: # fix the car angle
+            if (time.time() - self.lastPoint) >= self.straighten_time:
                 if self.debugging:
                     print("Starting roundabout maneuver speed")
                 self.lastPoint = time.time()
@@ -32,7 +86,7 @@ class RoundaboutControl():
                 self.speed = 150  # Fixed forward speed
 
         elif self.status == 0:  # Moving forward
-            if (time.time() - self.lastPoint) >= 1.2:  # Fixed forward duration
+            if (time.time() - self.lastPoint) >= 1.2 - self.straighten_time:  # Fixed forward duration
                 if self.debugging:
                     print("Switching to right turn")
                 self.lastPoint = time.time()
@@ -71,7 +125,7 @@ class RoundaboutControl():
                 if self.debugging:
                     print("Exiting roundabout completely")
                 roundAbout = False  # Exit roundabout
-                self.status = -2  # Reset to initial state
+                self.status = -3  # Reset to initial state
                 self.angle = 0
                 self.speed = 0
 
