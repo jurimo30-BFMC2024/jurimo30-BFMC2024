@@ -14,8 +14,8 @@ class StopLineDetector:
         self.pc = pc
         
         self.stopReg = np.array([[
-                (self.width*0.75, self.height*0.68),
-                (self.width*0.25, self.height*0.68),
+                (self.width*0.75, self.height*0.64),
+                (self.width*0.25, self.height*0.64),
                 (self.width*0.25, self.height*0.83),
                 (self.width*0.75, self.height*0.83)
             ]], np.int32)
@@ -23,8 +23,8 @@ class StopLineDetector:
         self.interStopReg = np.array([[
                 (self.width*0.68, self.height*0.40),
                 (self.width*0.32, self.height*0.40),
-                (self.width*0.25, self.height*0.68),
-                (self.width*0.75, self.height*0.68)
+                (self.width*0.25, self.height*0.64),
+                (self.width*0.75, self.height*0.64)
             ]], np.int32)
 
     def detectIntersection(self, lines):
@@ -45,7 +45,7 @@ class StopLineDetector:
                 else:
                     slope = 0  # Used only for filtering, real angle from atan2
 
-                if -0.2 < slope < 0.2 and distance > 50:
+                if -0.3 < slope < 0.3 and distance > 50:
                     lines2.append([(x1, y1), (x2, y2)])
                     slope_degrees = math.degrees(math.atan2(dy, dx))
 
@@ -67,8 +67,8 @@ class StopLineDetector:
         roi2 = self.region_of_interest(edges, self.stopReg)
         roi3 = self.region_of_interest(edges, self.interStopReg)
 
-        lines2 = self.detect_lines(roi2, 10)
-        lines3 = self.detect_lines(roi3, 15)
+        lines2 = self.detect_lines(roi2, 5)
+        lines3 = self.detect_lines(roi3, 10)
 
         intersection, linesX, slope_degrees = self.detectIntersection(lines2)
         intersectionA, linesY, _ = self.detectIntersection(lines3)
