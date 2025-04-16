@@ -16,6 +16,7 @@ class IntersectionControl():
         self.navPoint = 0
         self.smer = "None"
         self.slope_degrees = 0
+        self.straighten_time = 0
     
     def calculate_distance_to_straighten(self, alpha_deg, wheelbase=26, max_steering_angle=25):
         """
@@ -96,14 +97,14 @@ class IntersectionControl():
                 else:
                     self.time0 = 0
 
-            straighten_distance = self.calculate_distance_to_straighten(self.slope_degrees)
-            # Assume speed is 168 cm/s — calculate duration
-            self.straighten_time = (straighten_distance / 30)
-            print(f'straighten_distance: {straighten_distance}, self.straighten_time: {self.straighten_time}')
-
         if self.status == -1: # CEKANJE PRIJE KRETANJA U SLUCAJU CRVENO ILI STOP
             if ((time.time() - self.lastPoint) >= self.time0) or trafficLightFlag:
+                straighten_distance = self.calculate_distance_to_straighten(self.slope_degrees)
+                # Assume speed is 300 cm/s — calculate duration
+                self.straighten_time = (straighten_distance / 30)
                 print("krecem sa ispravljanjem")
+                print(f'straighten_distance: {straighten_distance}, self.straighten_time: {self.straighten_time}')
+
                 if self.slope_degrees < 0:
                     self.angle = -250
                 elif self.slope_degrees > 0:
