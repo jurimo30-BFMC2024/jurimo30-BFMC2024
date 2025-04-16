@@ -32,17 +32,17 @@ class RoundaboutControl():
                 self.speed = 150  # Fixed forward speed
 
         elif self.status == 0:  # Moving forward
-            if (time.time() - self.lastPoint) >= 1.6:  # Fixed forward duration
+            if (time.time() - self.lastPoint) >= 1.2:  # Fixed forward duration
                 if self.debugging:
                     print("Switching to right turn")
                 self.lastPoint = time.time()
                 self.status = 1
-                self.angle = 240
+                self.angle = 250
                 self.speed = 150  # Fixed right turn speed
                 self.exitFlag = False  # Update instance attribute instead of local variable
 
         elif self.status == 1:  # Turning right
-            if (time.time() - self.lastPoint) >= 3:  # Fixed right turn duration
+            if (time.time() - self.lastPoint) >= 3.4:  # Fixed right turn duration
                 if self.debugging:
                     print("Adjusting angle for roundabout")
                 self.status = 2
