@@ -6,6 +6,7 @@ from src.core.Auto.SpeedControl import SpeedControl
 from src.core.Auto.IntersectionControl import IntersectionControl as InterCont
 from src.core.Auto.RoundaboutControl import RoundaboutControl
 from src.utils.messages.allMessages import (
+    LaneDetect,
     CoreSteerMotor,
     CoreSpeedMotor,
     IntersectionDetect,
@@ -27,22 +28,31 @@ class autoFSM(ControlModeThread):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.laneFollowData = LaneFollow(self.queuesList, self.logging, False)
-        self.speedControler = SpeedControl(self.logging, False)
-        self.interCont = InterCont(queueList, logging, debugging)
-        self.parkingController = Parking(queueList, logging, debugging)
-        self.overtakeController = Overtake(queueList, logging, debugging)
-        self.roundaboutController = RoundaboutControl(logging, debugging)
-
+        
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
-
-        self.planer = pp(43, 10, "pacman")
 
         self.subscribe()
         super().__init__()
 
     def start(self):
+        self.planer = pp(43, 10, "pacman")
+        self.laneFollowData = LaneFollow(self.logging, False)
+        self.speedControler = SpeedControl(self.logging, False)
+        self.interCont = InterCont(self.logging, self.debugging)
+        self.parkingController = Parking(self.logging, self.debugging)
+        self.overtakeController = Overtake(self.logging, self.debugging)
+        self.roundaboutController = RoundaboutControl(self.logging, self.debugging)
+
+        self.laneDetectSubscriber.empty()
+        self.intersectionDetectSubscriber.empty()
+        self.intersectionDetectSubscriber2.empty()
+        self.signDetectionSubscriber.empty()
+        self.sideSensorSubscriber.empty()
+        self.frontSensorSubscriber.empty()
+        self.parkingSpotDetectionSubscriber.empty()
+        self.roundaboutAngleSubscriber.empty()
+
         self.oldAngle = 0
         self.oldSpeed = 0
         self.steerMotorSender.send("0")
@@ -92,7 +102,7 @@ class autoFSM(ControlModeThread):
         super().stop()
 
     def loop(self):
-        angle = self.laneFollowData.getControlData(self.highway, self.lowDistance)
+        error_angle = self.laneDetectSubscriber.receiveWithBlock()
         stopLine = self.intersectionDetectSubscriber.receiveWithBlock()
         # stopLine je sad tuple (intersection(bool), slope_degrees (float))
 
@@ -190,6 +200,9 @@ class autoFSM(ControlModeThread):
 
         if not self._running.is_set():
             return
+        
+        # calculate steering angle from lane follow data
+        angle = self.laneFollowData.getControlData(self.highway, self.lowDistance, error_angle)
 
         if not self.roundabout and not self.parking and not self.overtake and not self.intersection:
             if self.traffic_signs["round_about"] or self.traffic_signs["round_about2"]:
@@ -250,6 +263,7 @@ class autoFSM(ControlModeThread):
 
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
+        self.laneDetectSubscriber = messageHandlerSubscriber(self.queuesList, LaneDetect, "LastOnly", True)
         self.intersectionDetectSubscriber = messageHandlerSubscriber(self.queuesList, IntersectionDetect, "LastOnly", True)
         self.intersectionDetectSubscriber2 = messageHandlerSubscriber(self.queuesList, IntersectionDetect2, "LastOnly", True)
         self.signDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ObjectDetection, "FIFO", True)

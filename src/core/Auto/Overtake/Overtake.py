@@ -4,13 +4,11 @@ import time
 class Overtake():
     """This class handles overtaking.
     Args:
-        queueList (dictionary of multiprocessing.queues.Queue): Dictionary of queues where the ID is the type of messages.
         logging (logging object): Made for debugging.
         debugging (bool, optional): A flag for debugging. Defaults to False.
     """
 
-    def __init__(self, queueList, logging, debugging=False, normal_speed=200, highway_speed=500):
-        self.queuesList = queueList
+    def __init__(self, logging, debugging=False, normal_speed=200, highway_speed=500):
         self.logging = logging
         self.debugging = debugging
         self.normal_speed = normal_speed
