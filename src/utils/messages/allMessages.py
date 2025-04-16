@@ -96,7 +96,7 @@ class IntersectionDetect(Enum):
     Queue = "General"
     Owner = "threadLaneDetect"
     msgID = 7
-    msgType = "bool"
+    msgType = "tuple"
 
 class IntersectionDetect2(Enum):
     Queue = "General"

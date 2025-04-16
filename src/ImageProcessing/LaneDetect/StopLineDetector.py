@@ -27,22 +27,31 @@ class StopLineDetector:
                 (self.width*0.75, self.height*0.68)
             ]], np.int32)
 
-    def detectIntersection(self, lines) -> bool:
+    def detectIntersection(self, lines):
         if lines is None:
             return False, []
         
         lines2 = []
+        slope_degrees = None
+
         for line in lines:
             for x1, y1, x2, y2 in line:
-                slope = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
-                distance = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+                dx = x2 - x1
+                dy = y2 - y1
+                distance = np.sqrt(dx**2 + dy**2)
 
-                if slope < 0.2 and slope > -0.2:
-                    if distance > 50:
-                        lines2.append([(x1, y1), (x2, y2)])
-        if(len(lines2) >= 2):
-            return True, lines2
-        
+                if dx != 0:
+                    slope = dy / dx
+                else:
+                    slope = 0  # Used only for filtering, real angle from atan2
+
+                if -0.2 < slope < 0.2 and distance > 50:
+                    lines2.append([(x1, y1), (x2, y2)])
+                    slope_degrees = math.degrees(math.atan2(dy, dx))
+
+        if len(lines2) >= 2:
+            return True, lines2, slope_degrees
+
         return False, []
 
     def region_of_interest(self, img, Reg):
@@ -61,8 +70,8 @@ class StopLineDetector:
         lines2 = self.detect_lines(roi2, 10)
         lines3 = self.detect_lines(roi3, 15)
 
-        intersection, linesX = self.detectIntersection(lines2)
-        intersectionA, linesY = self.detectIntersection(lines3)
+        intersection, linesX, slope_degrees = self.detectIntersection(lines2)
+        intersectionA, linesY, _ = self.detectIntersection(lines3)
 
         if self.debugging:
             points = self.stopReg.reshape((-1, 1, 2))
@@ -70,11 +79,33 @@ class StopLineDetector:
             points = self.interStopReg.reshape((-1, 1, 2))
             cv2.polylines(frame, [points], isClosed=True, color=(150, 255, 50), thickness=2)
 
+
+            # Pretpostavka da se linesX odnosi na linije detektovane na zaustavnoj liniji
             if len(linesX) > 0:
-                for line in linesX:
-                    (x1, y1), (x2, y2) = line
-                    cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 3)
-            
+                points = []
+
+                for (x1, y1), (x2, y2) in linesX:
+                    points.append((x1, y1))
+                    points.append((x2, y2))
+
+                points = np.array(points)
+                x = points[:, 0]
+                y = points[:, 1]
+
+                # Fit a line: y = m*x + b
+                m, b = np.polyfit(x, y, 1)
+
+                # Define two x points to draw the fitted line
+                x_start = int(np.min(x))
+                x_end = int(np.max(x))
+                y_start = int(m * x_start + b)
+                y_end = int(m * x_end + b)
+
+                # Kombinuje sve detektovane linije u jednu veliku prosecnu
+                cv2.line(frame, (x_start, y_start), (x_end, y_end), (255, 0, 0), 3)
+
+            # Ovo me ne interesuje jer pretpostavljam da su linesY za ono dalje detektovanje raskrsnice
+            # pa cu ostaviti zasad samo ovako
             if len(linesY) > 0:
                 for line in linesY:
                     (x1, y1), (x2, y2) = line
@@ -83,4 +114,4 @@ class StopLineDetector:
         if intersectionA:
             intersection = False
 
-        return frame, intersection, intersectionA
+        return frame, (intersection, slope_degrees), intersectionA
