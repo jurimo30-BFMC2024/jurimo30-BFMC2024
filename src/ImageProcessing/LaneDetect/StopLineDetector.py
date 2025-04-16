@@ -29,7 +29,7 @@ class StopLineDetector:
 
     def detectIntersection(self, lines):
         if lines is None:
-            return False, []
+            return False, [], None
         
         lines2 = []
         slope_degrees = None
@@ -52,7 +52,7 @@ class StopLineDetector:
         if len(lines2) >= 2:
             return True, lines2, slope_degrees
 
-        return False, []
+        return False, [], None
 
     def region_of_interest(self, img, Reg):
         mask = np.zeros_like(img, dtype=np.uint8)
