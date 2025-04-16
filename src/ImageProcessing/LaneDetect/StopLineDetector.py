@@ -27,15 +27,14 @@ class StopLineDetector:
                 (self.width*0.75, self.height*0.64)
             ]], np.int32)
 
-    def detectIntersection(self, lines):
+    def detectIntersection(self, lines) -> bool:
         if lines is None:
             return False, [], None
         
         lines2 = []
-        slope_degrees = None
-
         for line in lines:
             for x1, y1, x2, y2 in line:
+
                 dx = x2 - x1
                 dy = y2 - y1
                 distance = np.sqrt(dx**2 + dy**2)
@@ -70,8 +69,8 @@ class StopLineDetector:
         lines2 = self.detect_lines(roi2, 5)
         lines3 = self.detect_lines(roi3, 10)
 
-        intersection, linesX, slope_degrees = self.detectIntersection(lines2)
-        intersectionA, linesY, _ = self.detectIntersection(lines3)
+        intersection, linesX = self.detectIntersection(lines2)
+        intersectionA, linesY = self.detectIntersection(lines3)
 
         if self.debugging:
             points = self.stopReg.reshape((-1, 1, 2))
@@ -79,33 +78,11 @@ class StopLineDetector:
             points = self.interStopReg.reshape((-1, 1, 2))
             cv2.polylines(frame, [points], isClosed=True, color=(150, 255, 50), thickness=2)
 
-
-            # Pretpostavka da se linesX odnosi na linije detektovane na zaustavnoj liniji
             if len(linesX) > 0:
-                points = []
-
-                for (x1, y1), (x2, y2) in linesX:
-                    points.append((x1, y1))
-                    points.append((x2, y2))
-
-                points = np.array(points)
-                x = points[:, 0]
-                y = points[:, 1]
-
-                # Fit a line: y = m*x + b
-                m, b = np.polyfit(x, y, 1)
-
-                # Define two x points to draw the fitted line
-                x_start = int(np.min(x))
-                x_end = int(np.max(x))
-                y_start = int(m * x_start + b)
-                y_end = int(m * x_end + b)
-
-                # Kombinuje sve detektovane linije u jednu veliku prosecnu
-                cv2.line(frame, (x_start, y_start), (x_end, y_end), (255, 0, 0), 3)
-
-            # Ovo me ne interesuje jer pretpostavljam da su linesY za ono dalje detektovanje raskrsnice
-            # pa cu ostaviti zasad samo ovako
+                for line in linesX:
+                    (x1, y1), (x2, y2) = line
+                    cv2.line(frame, (x1, y1), (x2, y2), (255, 0, 0), 3)
+            
             if len(linesY) > 0:
                 for line in linesY:
                     (x1, y1), (x2, y2) = line
@@ -114,4 +91,4 @@ class StopLineDetector:
         if intersectionA:
             intersection = False
 
-        return frame, (intersection, slope_degrees), intersectionA
+        return frame, intersection, intersectionA

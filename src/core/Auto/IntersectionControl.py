@@ -3,7 +3,6 @@ from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.core.Auto.LaneFollow.MovingAverage import MovingAverage as ma
 from src.core.Auto.PID import PIDController as pid
 import time
-import math
 import socket
 
 class IntersectionControl():
@@ -11,7 +10,7 @@ class IntersectionControl():
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.status = -2 # 0-nije startovano, 1 - startovano ide napred, 2 - startovano mota
+        self.status = -1 # 0-nije startovano, 1 - startovano ide napred, 2 - startovano mota
         self.lastPoint = 0
         self.navPoint = 0
         self.smer = "None"
@@ -72,7 +71,7 @@ class IntersectionControl():
             time1 = 100
             time2 = 100
 
-        if self.status == -2:
+        if self.status == -1:
             if self.debugging:
                 print("Pokmrenut manevar raskrsnice")
             self.lastPoint = time.time()
@@ -81,13 +80,13 @@ class IntersectionControl():
 
             if trafficLightFlag:
                 if trafficLights["green"]:
-                    self.status = -1
+                    self.status = 0
                     trafficLights["green"] = False
                     self.time0 = 0
                 else:
-                    self.status = -2
+                    self.status = -1
             else:
-                self.status = -1
+                self.status = 0
                 if sign == "stop":
                     self.time0 = 3
                     if self.debugging:
@@ -96,7 +95,6 @@ class IntersectionControl():
                     self.time0 = 0
                 else:
                     self.time0 = 0
-
         if self.status == -1: # CEKANJE PRIJE KRETANJA U SLUCAJU CRVENO ILI STOP
             if ((time.time() - self.lastPoint) >= self.time0) or trafficLightFlag:
                 straighten_distance = self.calculate_distance_to_straighten(self.slope_degrees)
@@ -116,9 +114,8 @@ class IntersectionControl():
                 self.status = 0
                 print("angle, speed, slope", self.angle, self.speed, self.slope_degrees)
                 
-
         if self.status == 0:
-            if (time.time() - self.lastPoint) >= self.straighten_time:
+            if ((time.time() - self.lastPoint) >= self.time0) or trafficLightFlag:
                 if self.debugging:
                     print("Krecem sa algoritmom")
                 if navigate:  # Check if navigate is not empty
@@ -127,7 +124,7 @@ class IntersectionControl():
                     if self.debugging:
                         print(f"Smer je {self.smer}")
                 else:
-                    self.status = -2
+                    self.status = -1
                     self.speed = 0
                     self.angle = 0
                     if self.debugging:
@@ -137,7 +134,7 @@ class IntersectionControl():
                 self.angle = 0
                 self.speed = 168
         elif self.status == 1:
-            if (time.time() - self.lastPoint) >= time1 - self.straighten_time:
+            if (time.time() - self.lastPoint) >= time1:
                 if self.debugging:
                     print("Krecem da motam")
                 self.status = 2
@@ -148,7 +145,7 @@ class IntersectionControl():
             if (time.time() - self.lastPoint) >= time2:
                 if self.debugging:
                     print("kraj")
-                self.status = -2
+                self.status = -1
                 intersection = False
                 self.angle = 0
                 self.lastPoint = 0
