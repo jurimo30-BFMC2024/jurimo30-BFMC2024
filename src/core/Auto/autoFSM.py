@@ -48,7 +48,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
         #self.navigateCommand = self.planer.planPath()
-        self.navigateCommand = ["Straight", "Right", "Right", "Straight", "Right", "Straight", "Straight", "Straight", "Right"]
+        self.navigateCommand = ["Right", "Right", "Straight", "Right", "Straight", "Straight", "Straight", "Right"]
 
         print(self.navigateCommand)
         self.traffic_signs = {
@@ -226,7 +226,7 @@ class autoFSM(ControlModeThread):
                 self.stephanie = False
                 self.traffic_signs["crosswalk"] = False
         else:
-            speed = self.speedControler.getControlData(angle, stopLine[0], self.lowDistance, self.highway, front_sensors["distance"], (not(any(self.traffic_signs.values()) or any(self.trafficLightStates.values()))))
+            speed = self.speedControler.getControlData(angle, stopLine[0], self.lowDistance, self.highway, front_sensors["distance"], (not(any(self.traffic_signs.values()) or any(self.trafficLightStates.values()))), self.sign_car_detected, (self.stephanie and not self.traffic_signs["crosswalk"]))
 
         ############ Sending data ##############################
 
