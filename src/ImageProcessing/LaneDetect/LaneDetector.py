@@ -14,28 +14,17 @@ class LaneDetector:
         self.pc = pc
         self.currentAngle = 0
         
-        # self.roadReg = np.array([[
-        #         (int(self.width * 0.02), self.height - int(self.height * 0.15)),
-        #         (int(self.width * 0.98), self.height - int(self.height * 0.15)),
-        #         (int(self.width * 0.85), self.height // 2 + int(self.height * 0.2)),
-        #         (int(self.width * 0.15), self.height // 2 + int(self.height * 0.2))
-        #     ]], np.int32)
-
         self.roadReg = np.array([[
-                (int(self.width * 0.02), self.height - int(self.height * 0.05)),
-                (int(self.width * 0.25), self.height - int(self.height * 0.05)),
-                (int(self.width * 0.3), self.height - int(self.height * 0.2)),
-                (int(self.width * 0.7), self.height - int(self.height * 0.2)),
-                (int(self.width * 0.75), self.height - int(self.height * 0.05)),
-                (int(self.width * 0.98), self.height - int(self.height * 0.05)),
-                (int(self.width * 0.85), self.height // 2 + int(self.height * 0.2)),
-                (int(self.width * 0.15), self.height // 2 + int(self.height * 0.2))
+                (int(self.width * 0.02), self.height - int(self.height * 0.25)),
+                (int(self.width * 0.98), self.height - int(self.height * 0.25)),
+                (int(self.width * 0.85), self.height // 2 + int(self.height * 0.05)),
+                (int(self.width * 0.15), self.height // 2 + int(self.height * 0.05))
             ]], np.int32)
         
         self.squareLeft = (120, 180, 220, 220)
         self.squareRight = (290, 180, 390, 220)
 
-    def calculate_steering_angle(self, lines, img_width, img_height, frame):
+    def calculate_steering_angle(self, lines, img_width, img_height):
         if lines is None:
             return 0  # No lines detected, keep going straight
         left_slopes = []
@@ -61,7 +50,7 @@ class LaneDetector:
         right_avg_slope = np.mean(right_slopes) if right_slopes else 0
         right_avg_intercept = np.mean(right_intercepts) if right_intercepts else 0
 
-        y = int(img_height * 0.75)
+        y = img_height // 2 +40
 
         left_x = self.extrapolate_missing_lane(left_avg_slope, left_avg_intercept, y, img_width) if left_avg_slope != 0 else 0
         right_x = self.extrapolate_missing_lane(right_avg_slope, right_avg_intercept, y, img_width) if right_avg_slope != 0 else img_width
@@ -81,17 +70,13 @@ class LaneDetector:
 
 
         if left_x == 0 and right_x != img_width:
-            return -25
+            return -19
         elif right_x == img_width and left_x != 0:
-            return 25
+            return 21
         elif left_x == 0 and right_x == img_width:
             return 0
 
         center_x = (left_x + right_x) // 2
-        
-        cv2.circle(frame, (img_width // 2, y), 5, (0, 255, 0), -1)
-        cv2.circle(frame, (center_x, y), 5, (0, 0, 255), -1)
-
         angle = np.arctan2(center_x - (img_width // 2 - 20), img_width // 2 - 20)
         angle_degrees = np.degrees(angle) * 1.2
         max_angle = 25
@@ -134,7 +119,7 @@ class LaneDetector:
         roi = self.region_of_interest(edges)
         lines = self.detect_lines(roi, 5)
 
-        angle_degrees = float(self.calculate_steering_angle(lines, frame.shape[1], frame.shape[0], frame))
+        angle_degrees = float(self.calculate_steering_angle(lines, frame.shape[1], frame.shape[0]))
 
         if self.debugging:
             if lines is not None:

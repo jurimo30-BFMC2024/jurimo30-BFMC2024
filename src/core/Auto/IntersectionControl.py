@@ -52,9 +52,9 @@ class IntersectionControl():
         slope_degrees = stopLine[1]
 
         if(self.smer == "Right"):
-            tangle = 240
-            time1 = 2.0
-            time2 = 5.2
+            tangle = 190
+            time1 = 0.8
+            time2 = 6.4
         elif(self.smer == "Left"):
             tangle = -190
             time1 = 3.5

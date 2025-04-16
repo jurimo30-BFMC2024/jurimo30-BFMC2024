@@ -9,7 +9,7 @@ class RoundaboutNavigator:
         self.debugging = debugging
         self.target_distance_from_left = width * 0.45  # Podešavanje razmaka od leve linije
         self.exit_region = (int(width * 0.70), int(height * 0.2), int(width*0.95), int(height * 0.8))  # Gornji desni deo slike
-        self.left_search_region = (0, int(height * 0.7), int(width * 0.4), height)  # Donji levi deo slike
+        self.left_search_region = (0, int(height * 0.7), int(width * 0.3), height)  # Donji levi deo slike
         self.oldAngle = 0
     
     def detect_left_line(self, edges):

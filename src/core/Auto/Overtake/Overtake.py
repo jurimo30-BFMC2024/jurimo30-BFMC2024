@@ -44,7 +44,7 @@ class Overtake():
         }
 
     def run(self, highway, front_sensors, side_sensors):
-        # print(side_sensors["right"])
+        print(side_sensors["right"])
         if self.state == "finish":
             self.state = "close_distance"
 
