@@ -49,7 +49,7 @@ class IntersectionControl():
 
 
     def getControlData(self, navigate, signs, sign, trafficLights, trafficLightFlag, stopLine):
-        print(f'status raskrsnice: {self.status}')
+        # print(f'status raskrsnice: {self.status}')
         self.lastStatus = self.status
         intersection = True
         if stopLine[0]:
@@ -103,7 +103,7 @@ class IntersectionControl():
                 # Assume speed is 300 cm/s — calculate duration
                 self.straighten_time = (straighten_distance / 30)
                 print("krecem sa ispravljanjem")
-                print(f'straighten_distance: {straighten_distance}, self.straighten_time: {self.straighten_time}')
+                # print(f'straighten_distance: {straighten_distance}, self.straighten_time: {self.straighten_time}')
 
                 if self.slope_degrees < 0:
                     self.angle = -250
@@ -114,7 +114,7 @@ class IntersectionControl():
                 self.speed = 300
                 self.lastPoint = time.time()
                 self.status = 0
-                print("angle, speed, slope", self.angle, self.speed, self.slope_degrees)
+                # print("angle, speed, slope", self.angle, self.speed, self.slope_degrees)
                 
 
         if self.status == 0:

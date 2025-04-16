@@ -63,7 +63,7 @@ class RoundaboutControl():
                 # Assume speed is 300 cm/s — calculate duration
                 self.straighten_time = (straighten_distance / 30)
                 print("krecem sa ispravljanjem")
-                print(f'straighten_distance: {straighten_distance}, self.straighten_time: {self.straighten_time}')
+                # print(f'straighten_distance: {straighten_distance}, self.straighten_time: {self.straighten_time}')
 
                 if self.slope_degrees < 0:
                     self.angle = -250
@@ -74,7 +74,7 @@ class RoundaboutControl():
                 self.speed = 300
                 self.lastPoint = time.time()
                 self.status = -1
-                print("angle, speed, slope", self.angle, self.speed, self.slope_degrees)
+                # print("angle, speed, slope", self.angle, self.speed, self.slope_degrees)
 
         elif self.status == -1: # fix the car angle
             if (time.time() - self.lastPoint) >= self.straighten_time:
