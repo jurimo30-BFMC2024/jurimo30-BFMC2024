@@ -69,9 +69,10 @@ class threadObjectDetection(ThreadWithStop):
         """Process frame and return annotated frame with best detection."""
         # Get YOLO results
         results = self.model(frame, verbose=self.debugging)[0]
-        
+        cv2.rectangle(frame, (200, 200), (255, 255), (150, 255, 150), 3)
+
         h, w = frame.shape[:2]
-        center_box = (w // 2 - 60, 0, w // 2 + 60, h)  # 60x60 center region
+        center_box = (w // 2 - 30, 0, w // 2 + 30, h)  # 30x30 center region
 
         best_sign = None
         detections = []
@@ -80,29 +81,37 @@ class threadObjectDetection(ThreadWithStop):
             x1, y1, x2, y2, conf, cls = box.tolist()
             label = self.model.model.names[int(cls)]
 
-            # Compute center of the bounding box
+            # Precompute values
             box_cx = (x1 + x2) / 2
             box_cy = (y1 + y2) / 2
+            area = (x2 - x1) * (y2 - y1)
             in_center = (center_box[0] <= box_cx <= center_box[2]) and (center_box[1] <= box_cy <= center_box[3])
 
+# Filter detections based on label and conditions
             if label == "car":
                 if conf > 0.75 and in_center:
-                    area = (x2 - x1) * (y2 - y1)
-                    detections.append((conf, area, label))
-            elif label == "exit":
+                    detections.append((conf, area, label, (x1, y1, x2, y2)))
+                    color = (0, 0, 255)  # Red for cars
+            elif label == "exit": 
                 if conf > 0.15 and (y2 > 180 and x2 > 180):
-                    area = (x2 - x1) * (y2 - y1)
-                    detections.append((conf, area, label))
+                    detections.append((conf, area, label, (x1, y1, x2, y2)))
+                    color = (0, 255, 0)  # Green for exit
+            elif conf > 0.75:
+                detections.append((conf, area, label, (x1, y1, x2, y2)))
+                color = (0, 204, 255)  # Yellow for other objects
             else:
-                if conf > 0.75:
-                    area = (x2 - x1) * (y2 - y1)
-                    detections.append((conf, area, label))
+                continue
+
+            # Draw bounding box and label
+            cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
+            cv2.putText(frame, f"{label} {conf:.2f}", 
+                       (int(x1) + 5, int(y1) + 15), cv2.FONT_HERSHEY_SIMPLEX,  0.4, color, 2)
 
         if detections:
             detections.sort(key=lambda x: (-x[0], -x[1]))
             best_sign = detections[0][2]
 
-        return self.annotate_boxes(frame, results), best_sign
+        return frame, best_sign
 
 
     def update_state(self, new_sign):
@@ -160,27 +169,3 @@ class threadObjectDetection(ThreadWithStop):
         """Crop top-right quadrant of frame."""
         h, _ = frame.shape[:2]
         return frame[0:h-63, :]
-
-    def annotate_boxes(self, frame, results):
-        cv2.rectangle(frame, (200, 200), (255, 255), (150, 255, 150), 3)
-        """Draw detection boxes on frame."""
-        for box in results.boxes:
-            x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
-            label = self.model.model.names[int(box.cls[0])]
-            conf = box.conf[0].item()
-
-            if label != "exit":
-                if conf > 0.75:
-                    cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    cv2.putText(frame, f"{label} {conf:.2f}", 
-                            (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, 
-                            0.4, (0, 255, 0), 2)
-            elif conf > 0.15 and (y2 > 180 and x2 > 180):
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 150), 2)
-                cv2.putText(frame, f"{label} {conf:.2f}", 
-                       (x1+5, y1+15), cv2.FONT_HERSHEY_SIMPLEX, 
-                        0.4, (0, 255, 0), 2)
-            else:
-                continue
-            
-        return frame
