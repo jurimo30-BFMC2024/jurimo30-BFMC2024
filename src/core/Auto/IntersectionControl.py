@@ -6,8 +6,7 @@ import time
 import socket
 
 class IntersectionControl():
-    def __init__(self, queueList, logging, debugging=False):
-        self.queuesList = queueList
+    def __init__(self, logging, debugging=False):
         self.logging = logging
         self.debugging = debugging
         self.status = -1 # 0-nije startovano, 1 - startovano ide napred, 2 - startovano mota
