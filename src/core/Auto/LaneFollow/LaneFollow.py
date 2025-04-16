@@ -1,5 +1,4 @@
-from src.core.Auto.LaneFollow.MovingAverage import MovingAverage as ma
-from src.core.Auto.PID import PIDController as pid
+from src.core.Auto.LaneFollow.MovingAverage import MovingAverage
 
 class LaneFollow():
     """This thread handles LaneFollow.
@@ -9,12 +8,9 @@ class LaneFollow():
     """
 
     def __init__(self, logging, debugging=False):
-        self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.avgAngle = ma(2)
-        self.subscribe()
-        self.pid = pid(0.5, 0.3, 0)
+        self.avgAngle = MovingAverage(2)
         self.oldAngle = 0
         self.finalAngle = 0
 
