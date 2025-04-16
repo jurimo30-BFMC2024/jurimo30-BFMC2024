@@ -15,6 +15,7 @@ class IntersectionControl():
         self.lastPoint = 0
         self.navPoint = 0
         self.smer = "None"
+        self.slope_degrees = 0
     
     def calculate_distance_to_straighten(self, alpha_deg, wheelbase=26, max_steering_angle=25):
         """
@@ -47,9 +48,11 @@ class IntersectionControl():
 
 
     def getControlData(self, navigate, signs, sign, trafficLights, trafficLightFlag, stopLine):
+        print(f'status raskrsnice: {self.status}')
         self.lastStatus = self.status
         intersection = True
-        slope_degrees = stopLine[1]
+        if stopLine[0]:
+            self.slope_degrees = stopLine[1]
 
         if(self.smer == "Right"):
             tangle = 240
@@ -93,22 +96,24 @@ class IntersectionControl():
                 else:
                     self.time0 = 0
 
-            straighten_distance = self.calculate_distance_to_straighten(slope_degrees)
+            straighten_distance = self.calculate_distance_to_straighten(self.slope_degrees)
             # Assume speed is 168 cm/s — calculate duration
-            self.straighten_time = straighten_distance / 168.0
+            self.straighten_time = (straighten_distance / 30)
+            print(f'straighten_distance: {straighten_distance}, self.straighten_time: {self.straighten_time}')
 
-        if self.status == -1:
+        if self.status == -1: # CEKANJE PRIJE KRETANJA U SLUCAJU CRVENO ILI STOP
             if ((time.time() - self.lastPoint) >= self.time0) or trafficLightFlag:
-                
-                if slope_degrees < 90:
-                    self.angle = 250
-                elif slope_degrees > 90:
+                print("krecem sa ispravljanjem")
+                if self.slope_degrees < 0:
                     self.angle = -250
+                elif self.slope_degrees > 0:
+                    self.angle = 250
                 else:
                     self.angle = 0
-                self.speed = 168
+                self.speed = 300
                 self.lastPoint = time.time()
                 self.status = 0
+                print("angle, speed, slope", self.angle, self.speed, self.slope_degrees)
                 
 
         if self.status == 0:
