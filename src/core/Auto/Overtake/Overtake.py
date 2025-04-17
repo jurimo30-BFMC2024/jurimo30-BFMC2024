@@ -19,6 +19,7 @@ class Overtake():
         self.state = "finish"
         self.caught_up_at_time = 0
         self.passed_at_time = 0
+        self.right_sensor_counter = 0
         
         self.motionScheduler = MotionScheduler()
 
@@ -62,22 +63,40 @@ class Overtake():
                 self.angle, self.speed = None, self.highway_speed if highway else self.normal_speed
         
         elif self.state == "catch_up":
-            if side_sensors["right"] < 50 and time.time() - self.caught_up_at_time > 2:  # Ignore sensors for some period
+            if side_sensors["right"] < 50:
+                self.right_sensor_counter += 1
+            else:
+                self.right_sensor_counter = 0
+
+            if self.right_sensor_counter >= 3 and time.time() - self.caught_up_at_time > 2:
                 self.caught_up_at_time = time.time()
                 self.state = "pass"
+                self.right_sensor_counter = 0
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
 
         elif self.state == "pass":
             if side_sensors["right"] > 50:
+                self.right_sensor_counter += 1
+            else:
+                self.right_sensor_counter = 0
+
+            if self.right_sensor_counter >= 3:
                 self.passed_at_time = time.time()
                 self.state = "get_distance"
+                self.right_sensor_counter = 0
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
 
         elif self.state == "get_distance":
             if side_sensors["right"] < 50:
+                self.right_sensor_counter += 1
+            else:
+                self.right_sensor_counter = 0
+
+            if self.right_sensor_counter >= 3:
                 self.state = "pass"
+                self.right_sensor_counter = 0
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
-            elif time.time() - self.passed_at_time > (self.passed_at_time - self.caught_up_at_time) // 2: # drive the same amount of time after passing the car to ensure that the we can merge back
+            elif time.time() - self.passed_at_time > (self.passed_at_time - self.caught_up_at_time) // 2:
                 self.state = "change_lane_right"
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
                 self.motionScheduler.set_schedule(self.motions["overtake" if highway else "pass_obstacle"]["move_right"])

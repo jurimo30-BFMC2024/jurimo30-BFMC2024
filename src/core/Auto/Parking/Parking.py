@@ -24,6 +24,9 @@ class Parking():
         self.last_detection_time = 0
         self.start_evaluate = 0
 
+        self.left_spot_counter = 0
+        self.right_spot_counter = 0
+
         self.motions = {
             "park": {
                 "left": [
@@ -65,7 +68,7 @@ class Parking():
             return True
 
         if not parking_spot_detected:
-            if current_time - self.last_detection_time >= 0.5:
+            if current_time - self.last_detection_time >= 0.3:
                 self.last_parking_spot_detected = False
 
         return False
@@ -85,7 +88,7 @@ class Parking():
                 self.start_evaluate = time.time()
 
         elif self.state == "search_and_evaluate":
-            if time.time() - self.start_evaluate > 1:
+            if time.time() - self.start_evaluate > 2:
                 if self.evaluate_side_sensors(side_sensors):
                     self.state = "search_parking_spot"
                 elif parking_spot_detected:
@@ -122,12 +125,18 @@ class Parking():
         return self.angle, self.speed, self.state != "finish"
 
     def evaluate_side_sensors(self, side_sensors):
-        # Implement logic to evaluate side sensors
         left_spot = side_sensors["left"] < 40.0
         right_spot = side_sensors["right"] < 40.0
 
-        self.left_spot_taken = self.left_spot_taken or left_spot
-        self.right_spot_taken = self.right_spot_taken or right_spot
+        # Increment counters
+        self.left_spot_counter = min(self.left_spot_counter + 1, 5) if left_spot else 0
+        self.right_spot_counter = min(self.right_spot_counter + 1, 5) if right_spot else 0
+
+        # Mark spot taken if 3 consecutive detections
+        if self.left_spot_counter >= 5:
+            self.left_spot_taken = True
+        if self.right_spot_counter >= 5:
+            self.right_spot_taken = True
 
         return self.left_spot_taken and self.right_spot_taken
 
