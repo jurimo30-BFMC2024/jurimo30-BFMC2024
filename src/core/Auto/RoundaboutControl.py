@@ -86,7 +86,7 @@ class RoundaboutControl():
                 self.speed = 150  # Fixed forward speed
 
         elif self.status == 0:  # Moving forward
-            if (time.time() - self.lastPoint) >= 1.2 - self.straighten_time:  # Fixed forward duration
+            if (time.time() - self.lastPoint) >= 1.35 - self.straighten_time:  # Fixed forward duration
                 if self.debugging:
                     print("Switching to right turn")
                 self.lastPoint = time.time()
@@ -111,7 +111,7 @@ class RoundaboutControl():
                 print("Modul detektovao izlaz")
                 if navigate.pop(0) == "Right":
                     print("Izlazim iz kruznog toka")
-                    self.angle = 245
+                    self.angle = 230
                     self.speed = 150
                     self.status = 3
                     self.lastPoint = time.time()

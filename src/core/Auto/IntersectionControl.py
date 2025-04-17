@@ -57,7 +57,7 @@ class IntersectionControl():
         if(self.smer == "Right"):
             tangle = 240
             time1 = 1.7
-            time2 = 5.2
+            time2 = 5.3
         elif(self.smer == "Left"):
             tangle = -190
             time1 = 3.7
@@ -96,7 +96,7 @@ class IntersectionControl():
                 else:
                     self.time0 = 0
 
-        if self.status == -1: # CEKANJE PRIJE KRETANJA U SLUCAJU CRVENO ILI STOP
+        elif self.status == -1: # CEKANJE PRIJE KRETANJA U SLUCAJU CRVENO ILI STOP
             if ((time.time() - self.lastPoint) >= self.time0) or trafficLightFlag:
                 straighten_distance = self.calculate_distance_to_straighten(self.slope_degrees)
                 # Assume speed is 300 cm/s — calculate duration
@@ -116,7 +116,7 @@ class IntersectionControl():
                 # print("angle, speed, slope", self.angle, self.speed, self.slope_degrees)
                 
 
-        if self.status == 0:
+        elif self.status == 0:
             if (time.time() - self.lastPoint) >= self.straighten_time:
                 if self.debugging:
                     print("Krecem sa algoritmom")

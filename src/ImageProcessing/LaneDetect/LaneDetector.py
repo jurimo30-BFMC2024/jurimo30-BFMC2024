@@ -23,10 +23,10 @@ class LaneDetector:
 
         self.roadReg = np.array([[
                 (int(self.width * 0.02), self.height - int(self.height * 0.05)),
-                (int(self.width * 0.25), self.height - int(self.height * 0.05)),
-                (int(self.width * 0.3), self.height - int(self.height * 0.2)),
-                (int(self.width * 0.7), self.height - int(self.height * 0.2)),
-                (int(self.width * 0.75), self.height - int(self.height * 0.05)),
+                (int(self.width * 0.30), self.height - int(self.height * 0.05)),
+                (int(self.width * 0.35), self.height - int(self.height * 0.2)),
+                (int(self.width * 0.65), self.height - int(self.height * 0.2)),
+                (int(self.width * 0.70), self.height - int(self.height * 0.05)),
                 (int(self.width * 0.98), self.height - int(self.height * 0.05)),
                 (int(self.width * 0.85), self.height // 2 + int(self.height * 0.2)),
                 (int(self.width * 0.15), self.height // 2 + int(self.height * 0.2))

@@ -95,7 +95,7 @@ class RoundaboutNavigator:
             self.draw_lines(frame, left_lines, (0, 0, 255))  # Red left line
             self.draw_rectangle(frame, self.left_search_region, (255, 0, 0))  # Blue search region
             self.draw_center_and_target(frame, left_lines)  # Draw center and target point
-            self.overlay_info(frame, steering_angle, alignment_error)  # Overlay info
+            # self.overlay_info(frame, steering_angle, alignment_error)  # Overlay info
         
         return frame, -steering_angle
 

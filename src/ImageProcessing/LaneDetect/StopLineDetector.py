@@ -21,8 +21,8 @@ class StopLineDetector:
             ]], np.int32)
         
         self.interStopReg = np.array([[
-                (self.width*0.68, self.height*0.40),
-                (self.width*0.32, self.height*0.40),
+                (self.width*0.68, self.height*0.35),
+                (self.width*0.32, self.height*0.35),
                 (self.width*0.25, self.height*0.64),
                 (self.width*0.75, self.height*0.64)
             ]], np.int32)

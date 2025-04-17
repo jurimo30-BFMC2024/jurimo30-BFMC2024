@@ -40,7 +40,7 @@ class SpeedControl():
             elif abs(angle) > 170:
                 speed = 420
             else:
-                speed = self.map_value(angle, 70, 170, 420, 520)
+                speed = self.map_value(angle, 70, 170, 420, 500)
 
         # Low distance override
         if lowDistance:
@@ -85,7 +85,7 @@ class SpeedControl():
             self.pid.reset()
 
         follow_speed = speed - pid_adjustment
-        final_speed = max(0, min(min(speed, follow_speed), 600))
+        final_speed = max(0, min(min(speed, follow_speed), 500))
 
         if self.debugging:
             print(f"[{frontDistance}cm] PID: {int(pid_adjustment)}, Base: {int(speed)} Final: {int(final_speed)}")
