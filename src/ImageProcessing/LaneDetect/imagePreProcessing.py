@@ -1,59 +1,80 @@
 import cv2
 import numpy as np
 from skimage.morphology import skeletonize
+from numba import njit  # Dodato za ubrzanje
 
 class ImagePreProcessing:
-    def __init__(self, width: int, height: int,logging, debugging=False, pc = False, camera_fov_degrees: float = 79.3):
+    def __init__(self, width: int, height: int, logging, debugging=False, pc=False, camera_fov_degrees: float = 79.3):
         self.debugging = debugging
-        self.l245ogging = logging
+        self.logging = logging
         self.camera_fov_degrees = camera_fov_degrees    
         self.width = width
         self.height = height
         self.pc = pc
 
+        # self.roadReg = np.array([[
+        #     (int(self.width * 0.01), self.height * 0.45),
+        #     (int(self.width * 0.99), self.height * 0.45),
+        #     (int(self.width * 0.99), self.height * 0.85),
+        #     (int(self.width * 0.01), self.height * 0.85)
+        # ]], np.int32)
+
         self.roadReg = np.array([[
-            (int(self.width * 0.01), self.height * 0.45),
-            (int(self.width * 0.99), self.height * 0.45),
-            (int(self.width * 0.99), self.height * 0.85),
-            (int(self.width * 0.01), self.height * 0.85)
-        ]], np.int32)
-    
-    def gamma_correction(self, image: np.ndarray, gamma: float) -> np.ndarray:
-        image_normalized = image  / 255.0
-        corrected = np.power(image_normalized, gamma)
-        corrected = np.uint8(corrected * 255)
-        return corrected
-    
-    def normalize_histogram(self, image, lower_percentile=1, upper_percentile=99):
-        I_min = np.percentile(image, lower_percentile)
-        I_max = np.percentile(image, upper_percentile)
+                (int(self.width * 0.01), self.height - int(self.height * 0.05)),
+                (int(self.width * 0.25), self.height - int(self.height * 0.05)),
+                (int(self.width * 0.3), self.height - int(self.height * 0.2)),
+                (int(self.width * 0.7), self.height - int(self.height * 0.2)),
+                (int(self.width * 0.75), self.height - int(self.height * 0.05)),
+                (int(self.width * 0.99), self.height - int(self.height * 0.05)),
+                (int(self.width * 0.99), self.height * 0.45),
+                (int(self.width * 0.01), self.height * 0.45)
+            ]], np.int32)
+
+        self.gamma_lut = self._create_gamma_lut(13)  # Precompute LUT for gamma correction
+        self.mask = self._create_roi_mask()  # Precompute ROI mask
+
+    def _create_gamma_lut(self, gamma: float):
+        """Create a Look-Up Table for gamma correction."""
+        lut = np.array([((i / 255.0) ** gamma) * 255 for i in range(256)], dtype=np.uint8)
+        return lut
+
+    def _create_roi_mask(self):
+        """Precompute the region of interest mask."""
+        mask = np.zeros((self.height, self.width), dtype=np.uint8)
+        cv2.fillPoly(mask, self.roadReg, 255)
+        return mask
+
+    def gamma_correction(self, image: np.ndarray, gamma: float = None) -> np.ndarray:
+        # Use precomputed LUT for gamma correction
+        return cv2.LUT(image, self.gamma_lut)
+
+    @staticmethod
+    @njit
+    def normalize_histogram(image, lower_percentile=1, upper_percentile=99):
+        """Accelerated histogram normalization using Numba."""
+        percentiles = np.percentile(image, [lower_percentile, upper_percentile])
+        I_min, I_max = percentiles[0], percentiles[1]
 
         if I_min == I_max:
             return image
 
-        # Normalizacija
         image_normalized = np.clip((image - I_min) / (I_max - I_min), 0, 1) * 255
-        image_normalized = image_normalized.astype(np.uint8)  # Pretvori u 8-bitni format
+        return image_normalized.astype(np.uint8)
 
-        return image_normalized
-    
     def region_of_interest(self, img):
-        mask = np.zeros_like(img)
-        cv2.fillPoly(mask, self.roadReg, 255)
-        masked_image = cv2.bitwise_and(img, mask)
-        return masked_image
-    
-    
+        # Use precomputed mask
+        return cv2.bitwise_and(img, self.mask)
+
     def process_frame(self, frame: np.ndarray):
         gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
-        gama = self.gamma_correction(gray, 18)
-        blurred = cv2.medianBlur(gama, 5)
-        temp = self.region_of_interest(blurred)
+        temp = self.gamma_correction(gray)  # Use LUT-based gamma correction
+        temp = cv2.medianBlur(temp, 5)
+        temp = self.region_of_interest(temp)  # Use precomputed ROI mask
         temp = self.normalize_histogram(temp)
         _, bin = cv2.threshold(temp, 230, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        xbin = bin / 255 # skimage radi sa binarnim vrednostima (0 ili 1)
 
-        edges = skeletonize(xbin)
+        # Directly skeletonize binary image
+        edges = skeletonize(bin // 255)
         edges = (edges * 255).astype(np.uint8)
 
         return edges

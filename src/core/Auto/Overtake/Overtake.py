@@ -4,13 +4,11 @@ import time
 class Overtake():
     """This class handles overtaking.
     Args:
-        queueList (dictionary of multiprocessing.queues.Queue): Dictionary of queues where the ID is the type of messages.
         logging (logging object): Made for debugging.
         debugging (bool, optional): A flag for debugging. Defaults to False.
     """
 
-    def __init__(self, queueList, logging, debugging=False, normal_speed=200, highway_speed=500):
-        self.queuesList = queueList
+    def __init__(self, logging, debugging=False, normal_speed=200, highway_speed=500):
         self.logging = logging
         self.debugging = debugging
         self.normal_speed = normal_speed
@@ -21,30 +19,31 @@ class Overtake():
         self.state = "finish"
         self.caught_up_at_time = 0
         self.passed_at_time = 0
+        self.right_sensor_counter = 0
         
         self.motionScheduler = MotionScheduler()
 
         self.motions = {
             "overtake": {
                 "move_left": [
-                    (-250, self.highway_speed, .4),
+                    (-230, self.highway_speed, .4),
                 ],
                 "move_right": [
-                    (250, self.highway_speed, .3),
+                    (230, self.highway_speed, .3),
                 ],
             },
             "pass_obstacle": {
                 "move_left": [
-                    (-250, self.normal_speed, 2.5),
+                    (-230, self.normal_speed, 2.5),
                 ],
                 "move_right": [
-                    (250, self.normal_speed, 3),
+                    (230, self.normal_speed, 3),
                 ],
             }
         }
 
     def run(self, highway, front_sensors, side_sensors):
-        print(side_sensors["right"])
+        # print(side_sensors["right"])
         if self.state == "finish":
             self.state = "close_distance"
 
@@ -64,22 +63,40 @@ class Overtake():
                 self.angle, self.speed = None, self.highway_speed if highway else self.normal_speed
         
         elif self.state == "catch_up":
-            if side_sensors["right"] < 50 and time.time() - self.caught_up_at_time > 2:  # Ignore sensors for some period
+            if side_sensors["right"] < 50:
+                self.right_sensor_counter += 1
+            else:
+                self.right_sensor_counter = 0
+
+            if self.right_sensor_counter >= 3 and time.time() - self.caught_up_at_time > 2:
                 self.caught_up_at_time = time.time()
                 self.state = "pass"
+                self.right_sensor_counter = 0
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
 
         elif self.state == "pass":
             if side_sensors["right"] > 50:
+                self.right_sensor_counter += 1
+            else:
+                self.right_sensor_counter = 0
+
+            if self.right_sensor_counter >= 3:
                 self.passed_at_time = time.time()
                 self.state = "get_distance"
+                self.right_sensor_counter = 0
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
 
         elif self.state == "get_distance":
             if side_sensors["right"] < 50:
+                self.right_sensor_counter += 1
+            else:
+                self.right_sensor_counter = 0
+
+            if self.right_sensor_counter >= 3:
                 self.state = "pass"
+                self.right_sensor_counter = 0
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
-            elif time.time() - self.passed_at_time > (self.passed_at_time - self.caught_up_at_time) // 2: # drive the same amount of time after passing the car to ensure that the we can merge back
+            elif time.time() - self.passed_at_time > (self.passed_at_time - self.caught_up_at_time) // 2:
                 self.state = "change_lane_right"
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
                 self.motionScheduler.set_schedule(self.motions["overtake" if highway else "pass_obstacle"]["move_right"])

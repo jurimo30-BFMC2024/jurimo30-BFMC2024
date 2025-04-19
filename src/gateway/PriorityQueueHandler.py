@@ -19,7 +19,7 @@ class PriorityQueueHandler:
         """
         self.queue_list = queue_list
         self.logger = logger
-        self.debugging = True
+        self.debugging = debugging
         self.message_semaphore = Semaphore(0)
         self.priority_queue = queue.PriorityQueue()
         self._running = True
