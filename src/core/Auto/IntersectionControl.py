@@ -1,10 +1,7 @@
-from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
-from src.utils.messages.messageHandlerSender import messageHandlerSender
-from src.core.Auto.LaneFollow.MovingAverage import MovingAverage as ma
-from src.core.Auto.PID import PIDController as pid
+
+from src.core.Auto.TrafficSignController import TrafficSignController
 import time
 import math
-import socket
 
 class IntersectionControl():
     def __init__(self, logging, debugging=False):
@@ -47,7 +44,7 @@ class IntersectionControl():
         return distance
 
 
-    def getControlData(self, navigate, signs, sign, trafficLights, trafficLightFlag, stopLine):
+    def getControlData(self, navigate, sign: str, trafficLights: TrafficSignController, trafficLightFlag, stopLine):
         # print(f'status raskrsnice: {self.status}')
         self.lastStatus = self.status
         intersection = True
@@ -79,9 +76,9 @@ class IntersectionControl():
             self.speed = 0
 
             if trafficLightFlag:
-                if trafficLights["green"]:
+                if trafficLights.get_active() == "green":
+                    trafficLights.clear()
                     self.status = -1
-                    trafficLights["green"] = False
                     self.time0 = 0
                 else:
                     self.status = -2
@@ -94,7 +91,7 @@ class IntersectionControl():
                 elif sign == "priority":
                     self.time0 = 0
                 else:
-                    self.time0 = 0
+                    raise ValueError(f"Unknown sign received in IntersectionControl: {sign}")
 
         elif self.status == -1: # CEKANJE PRIJE KRETANJA U SLUCAJU CRVENO ILI STOP
             if ((time.time() - self.lastPoint) >= self.time0) or trafficLightFlag:
@@ -152,7 +149,6 @@ class IntersectionControl():
                 self.angle = 0
                 self.lastPoint = 0
                 self.speed = 168
-                signs[sign] = False
-                trafficLights = {key: False for key in trafficLights}
+                trafficLights.clear()
         
         return self.angle, self.speed, intersection

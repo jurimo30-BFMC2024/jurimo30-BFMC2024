@@ -1,9 +1,13 @@
+if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, "../../..")
+
 from src.core.Auto.Parking.Parking import Parking
 from src.core.Auto.Overtake.Overtake import Overtake
 from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.core.Auto.LaneFollow.LaneFollow import LaneFollow
 from src.core.Auto.SpeedControl import SpeedControl
-from src.core.Auto.IntersectionControl import IntersectionControl as InterCont
+from src.core.Auto.IntersectionControl import IntersectionControl
 from src.core.Auto.RoundaboutControl import RoundaboutControl
 from src.utils.messages.allMessages import (
     LaneDetect,
@@ -19,9 +23,23 @@ from src.utils.messages.allMessages import (
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
-from src.core.Auto.pathPlanning.pathPlanning import PathPlanner as pp
+from src.core.Auto.pathPlanning.pathPlanning import PathPlanner
+from src.core.Auto.TrafficSignController import TrafficSignController
 import time
-import enum
+from enum import Enum, auto
+
+"""
+    - stopline staviti u jedan stopline subscriber
+"""
+
+class autoFSMState(Enum):
+    DRIVE = auto()
+    OVERTAKE = auto()
+    PARKING = auto()
+    INTERSECTION = auto()
+    ROUNDABOUT = auto()
+    CROSSWALK = auto()
+    HIGHWAY = auto()
 
 class autoFSM(ControlModeThread):
     def __init__(self, queueList, logging, debugging=False):
@@ -36,10 +54,10 @@ class autoFSM(ControlModeThread):
         super().__init__()
 
     def start(self):
-        self.planer = pp(43, 10, "pacman")
+        self.planer = PathPlanner(start=43, goal=10, mode="pacman")
         self.laneFollowData = LaneFollow(self.logging, False)
         self.speedControler = SpeedControl(self.logging, False)
-        self.interCont = InterCont(self.logging, self.debugging)
+        self.intersectionController = IntersectionControl(self.logging, self.debugging)
         self.parkingController = Parking(self.logging, self.debugging)
         self.overtakeController = Overtake(self.logging, self.debugging)
         self.roundaboutController = RoundaboutControl(self.logging, self.debugging)
@@ -47,7 +65,7 @@ class autoFSM(ControlModeThread):
         self.laneDetectSubscriber.empty()
         self.intersectionDetectSubscriber.empty()
         self.intersectionDetectSubscriber2.empty()
-        self.signDetectionSubscriber.empty()
+        self.objectDetectionSubscriber.empty()
         self.sideSensorSubscriber.empty()
         self.frontSensorSubscriber.empty()
         self.parkingSpotDetectionSubscriber.empty()
@@ -61,40 +79,23 @@ class autoFSM(ControlModeThread):
         self.navigateCommand = ["Straight", "Straight", "Straight", "Right"]
 
         print(self.navigateCommand)
-        self.traffic_signs = {
-            "stop": False,
-            "crosswalk": False,
-            "highway_entrance": False,
-            "highway_exit": False,
-            "one_way": False,
-            "no_entry": False,
-            "parking": False,
-            "priority": False,
-            "round_about": False,
-            "round_about2": False
-        }
+        self.traffic_signs = TrafficSignController([
+            "stop", "crosswalk", "highway_entrance", "highway_exit",
+            "one_way", "no_entry", "parking", "priority",
+            "round_about", "round_about2"
+        ])
 
-        self.trafficLightStates = {
-            "red": False,
-            "green": False,
-            "yellow": False,
-            "red_yellow": False
-        }
+        self.traffic_light_states = TrafficSignController([
+            "red", "green", "yellow", "red_yellow"
+        ])
 
         self.sign_car_detected = False
-        self.obstacle = False
         self.obstacle_start_time = None
-        self.trafficLight = False
-        self.lowDistance = False
-
-        self.intersection = False
-        self.crosswalk = False
-        self.highway = False
-        self.parking = False
-        self.overtake = False
         self.stephanie = False
-        self.roundabout = False
         self.roundaboutExitFlag = False
+        self.intersectionSign = "None"
+
+        self.state = autoFSMState.DRIVE
 
         super().start()
     
@@ -103,30 +104,26 @@ class autoFSM(ControlModeThread):
 
     def loop(self):
         error_angle = self.laneDetectSubscriber.receiveWithBlock()
-        stopLine = self.intersectionDetectSubscriber.receiveWithBlock()
-        # stopLine je sad tuple (intersection(bool), slope_degrees (float))
+        stopLine = self.intersectionDetectSubscriber.receiveWithBlock() # stopLine je sad tuple (intersection(bool), slope_degrees (float))
+        lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
 
-        self.lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
+        while self.objectDetectionSubscriber.isDataInPipe():
+            object = self.objectDetectionSubscriber.receive()
 
-        while self.signDetectionSubscriber.isDataInPipe():
-            sign = self.signDetectionSubscriber.receive()
-            print("autofsm:", sign)
-            if sign == "stefanija":
+            if object == "stefanija":
                 self.stephanie = True
-            elif sign == "exit":
+            elif object == "exit":
                 self.roundaboutExitFlag = True
-                print("Exit from roundabout is received in AUTO FSM")
-            elif sign == "car":
+            elif object == "car":
                 self.sign_car_detected = True
-            elif sign in self.trafficLightStates:
-                for key in self.trafficLightStates:
-                    self.trafficLightStates[key] = False
-                self.trafficLightStates[sign] = True
+            elif object in self.traffic_light_states:
+                self.traffic_light_states.set_active(object)
+            elif object in self.traffic_signs:
+                self.traffic_signs.set_active(object)
             else:
-                self.traffic_signs[sign] = True
-
+                raise ValueError(f'Unknown object detected: {object}')
           
-            print(f"Preuzet je znak {sign}")
+            print(f"Preuzet je objekat {object}")
 
         parking_spot_detected = self.parkingSpotDetectionSubscriber.receive() != None
 
@@ -136,116 +133,133 @@ class autoFSM(ControlModeThread):
 
         # Receive roundabout-related messages
         roundabout_angle = self.roundaboutAngleSubscriber.receiveWithBlock()  # Corrected to RoundAboutAngle
+        traffic_light_present = self.traffic_light_states.get_active() != None
+        obstacle = front_sensors["distance"] <= 80 and self.sign_car_detected
+        angle = self.laneFollowData.getControlData(self.state == autoFSMState.HIGHWAY, lowDistance, error_angle) # calculate steering angle from lane follow data
 
-        if not self.parking and not self.overtake and not self.intersection and not self.roundabout:
-            if self.traffic_signs["parking"]:
-                self.traffic_signs["parking"] = False
-                self.parking = True
-            
-        self.trafficLight = any(self.trafficLightStates.values())
-
-        #flogovi za znakove znacajne situacije parking, raskrsnica, semafor ....
-        if not self.intersection and not self.parking and not self.overtake and not self.roundabout:
-            if self.traffic_signs["stop"] or self.traffic_signs["priority"] or self.trafficLight:
-
-                if stopLine[0]:
-                    if self.debugging:
-                        print("Krecemo sa raskrsnicom")
-                    self.intersection = True
-                    if self.traffic_signs["stop"]:
-                        self.intersectionSign = "stop"
-                    if self.traffic_signs["priority"]:
-                        self.intersectionSign = "priority"
-                    
-                    if self.trafficLight:
-                        self.intersectionSign = "None"
-                        
-
-        if not self.highway and self.traffic_signs["highway_entrance"] and not self.parking and not self.overtake and not self.intersection and not self.roundabout:
-            self.highway = True
-            self.traffic_signs["highway_entrance"] = False
-            if self.debugging:
-                print("Ulazak na autoput")
-        if self.highway and (self.traffic_signs["highway_exit"] or stopLine[0] or self.lowDistance) and not self.parking and not self.overtake and not self.intersection and not self.roundabout:
-            self.highway = False
-            self.traffic_signs["highway_entrance"] = False
-            self.traffic_signs["highway_exit"] = False
-            if self.debugging:
-                print("Izlazak sa auto puta")
-
-        # Latching obstacle if:
-        # - distance is low, and
-        # - either car or stefanija (when not at crosswalk) is detected
-        valid_sign_obstacle = self.sign_car_detected
-        self.obstacle = front_sensors["distance"] <= 80 and valid_sign_obstacle
-
-        #if self.highway and self.obstacle and not self.parking and not self.intersection:
-            #self.overtake = True
-            #print("Overtake on highway")
-        if self.obstacle and self.oldSpeed == 0 and not self.highway and not self.parking and not self.intersection and not self.roundabout:
-            if self.obstacle_start_time is None:
-                self.obstacle_start_time = time.time()
-            
-            if time.time() - self.obstacle_start_time >= 1:
-                print("Pass static obstacle start")
-                self.overtake = True
-                self.sign_car_detected = False
-        else:
+        if not obstacle:
             self.obstacle_start_time = None  # Reset if obstacle is not present
-
-        #temp solution
-        if self.traffic_signs["crosswalk"] and self.stephanie and stopLine[0] and not self.crosswalk:
-            self.crosswalk = True
-            self.crosswalkStart = time.time()
-            
 
         if not self._running.is_set():
             return
         
-        # calculate steering angle from lane follow data
-        angle = self.laneFollowData.getControlData(self.highway, self.lowDistance, error_angle)
+        ##############################         SET STATES            #############################
 
-        if not self.roundabout and not self.parking and not self.overtake and not self.intersection and not self.highway:
-            if self.traffic_signs["round_about"] or self.traffic_signs["round_about2"]:
-                if stopLine[0]:
-                    if self.debugging:
-                        print("Entering roundabout")
-                    self.roundabout = True
-                    self.traffic_signs["round_about"] = False
-                    self.traffic_signs["round_about2"] = False
+        
+        if self.state == autoFSMState.HIGHWAY:
+            if self.traffic_signs.get_active() == "highway_exit" or stopLine[0] or lowDistance:
+                if self.debugging:
+                    print("Izlazak sa auto puta")
+                self.traffic_signs.clear()
+                self.state = autoFSMState.DRIVE
+        
+        if self.state == autoFSMState.DRIVE:
+            if self.traffic_signs.get_active() == "parking":
+                self.traffic_signs.clear()
+                self.state = autoFSMState.PARKING
+            
+            elif stopLine[0] and (self.traffic_signs.get_active() in ["stop", "priority"] or traffic_light_present):
+                if self.debugging:
+                    print("Krecemo sa raskrsnicom")
+                if self.traffic_signs.get_active() == "stop":
+                    self.intersectionSign = "stop"
+                if self.traffic_signs.get_active() == "priority":
+                    self.intersectionSign = "priority"
+                if traffic_light_present:
+                    self.intersectionSign = "None"
+                self.traffic_signs.clear()
+                self.state = autoFSMState.INTERSECTION
 
-        #################         FSM            ############
-        # print("stanja:", self.parking, self.intersection, self.overtake, self.crosswalk, self.roundabout)
+            elif stopLine[0] and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
+                if self.debugging:
+                    print("Entering roundabout")
+                self.traffic_signs.clear()
+                self.state = autoFSMState.ROUNDABOUT
 
-        if self.parking:
-            park_angle, speed, self.parking = self.parkingController.run(parking_spot_detected, side_sensors)
+            elif stopLine[0] and self.traffic_signs.get_active() == "crosswalk" and self.stephanie:
+                self.crosswalkStart = time.time()
+                self.state = autoFSMState.CROSSWALK
+                        
+            elif self.traffic_signs.get_active() == "highway_entrance":
+                if self.debugging:
+                    print("Ulazak na autoput")
+                self.traffic_signs.clear()
+                self.state = autoFSMState.HIGHWAY
+            
+            elif obstacle and self.oldSpeed == 0:
+                if self.obstacle_start_time is None:
+                    self.obstacle_start_time = time.time()
+                
+                if time.time() - self.obstacle_start_time >= 1:
+                    print("Pass static obstacle start")
+                    self.sign_car_detected = False
+                    self.state = autoFSMState.OVERTAKE
+
+        ##############################         FSM            #############################
+
+        if self.state == autoFSMState.PARKING:
+            park_angle, speed, finished = self.parkingController.run(parking_spot_detected, side_sensors)
             if park_angle is not None:
                 angle = park_angle
-        elif self.intersection:
-            angle, speed, self.intersection = self.interCont.getControlData(self.navigateCommand, self.traffic_signs, self.intersectionSign, self.trafficLightStates, self.trafficLight, stopLine)
-            pass
-        elif self.overtake:
-            overtake_angle, speed, self.overtake = self.overtakeController.run(self.highway, front_sensors, side_sensors)
+
+            if finished:
+                self.state = autoFSMState.DRIVE
+            
+        elif self.state == autoFSMState.INTERSECTION:
+            angle, speed, finished = self.intersectionController.getControlData(
+                navigate=self.navigateCommand,
+                sign=self.intersectionSign,
+                trafficLights=self.traffic_light_states,
+                trafficLightFlag=traffic_light_present,
+                stopLine=stopLine
+            )
+            
+            if finished:
+                self.state = autoFSMState.DRIVE
+
+        elif self.state == autoFSMState.OVERTAKE:
+            overtake_angle, speed, finished = self.overtakeController.run(False, front_sensors, side_sensors)
             if overtake_angle is not None:
                 angle = overtake_angle
-        elif self.crosswalk:
+
+            if finished:
+                self.state = autoFSMState.DRIVE
+
+        elif self.state == autoFSMState.CROSSWALK:
             angle = 0
             speed = 0
             if time.time() - self.crosswalkStart >= 3:
-                self.crosswalk = False
                 self.stephanie = False
-                self.traffic_signs["crosswalk"] = False
-        elif self.roundabout:
-            angle, speed, self.roundabout, self.roundaboutExitFlag  = self.roundaboutController.getControlData(
+                self.traffic_signs.clear()
+                self.state = autoFSMState.DRIVE
+
+        elif self.state == autoFSMState.ROUNDABOUT:
+            angle, speed, finished, self.roundaboutExitFlag  = self.roundaboutController.getControlData(
                 angleForRoundabout=roundabout_angle,  # Use the received angle
                 navigate=self.navigateCommand,
                 exitFlag=self.roundaboutExitFlag,
                 stopLine=stopLine
             )
-        else:
-            speed = self.speedControler.getControlData(angle, stopLine[0], self.lowDistance, self.highway, front_sensors["distance"], (not(any(self.traffic_signs.values()) or any(self.trafficLightStates.values()))), self.sign_car_detected, (self.stephanie and not self.traffic_signs["crosswalk"]))
 
-        ############ Sending data ##############################
+            if finished:
+                self.state = autoFSMState.DRIVE
+
+        elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
+            no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
+            stephanie_crossing = self.stephanie and self.traffic_signs.get_active() != "crosswalk"
+
+            speed = self.speedControler.getControlData(
+                angle=angle,
+                stopLine=stopLine[0],
+                lowDistance=lowDistance,
+                highway=self.state == autoFSMState.HIGHWAY,
+                frontDistance=front_sensors["distance"],
+                enable_emergency_stop=no_active_sign,
+                car_in_front=self.sign_car_detected,
+                stephanie_in_front=stephanie_crossing
+            )
+
+        ############################ Sending data ##############################
 
         if angle != self.oldAngle:
             self.steerMotorSender.send(f"{angle}")
@@ -259,7 +273,7 @@ class autoFSM(ControlModeThread):
             # if self.debugging:
             #     self.logging.info(f"New speed: {speed}")
         
-        time.sleep(0.05)
+        # time.sleep(0.05)
 
     def getTime(self):
         return round(time.time()*1000)
@@ -269,7 +283,7 @@ class autoFSM(ControlModeThread):
         self.laneDetectSubscriber = messageHandlerSubscriber(self.queuesList, LaneDetect, "LastOnly", True)
         self.intersectionDetectSubscriber = messageHandlerSubscriber(self.queuesList, IntersectionDetect, "LastOnly", True)
         self.intersectionDetectSubscriber2 = messageHandlerSubscriber(self.queuesList, IntersectionDetect2, "LastOnly", True)
-        self.signDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ObjectDetection, "FIFO", True)
+        self.objectDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ObjectDetection, "FIFO", True)
         self.sideSensorSubscriber = messageHandlerSubscriber(self.queuesList, SideSensors, "LastOnly", True)
         self.frontSensorSubscriber = messageHandlerSubscriber(self.queuesList, FrontSensors, "LastOnly", True)
         self.parkingSpotDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ParkingSpotDetect, "LastOnly", True)
