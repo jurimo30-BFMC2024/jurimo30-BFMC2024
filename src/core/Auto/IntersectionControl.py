@@ -44,12 +44,12 @@ class IntersectionControl():
         return distance
 
 
-    def getControlData(self, navigate, sign: str, trafficLights: TrafficSignController, trafficLightFlag, stopLine):
+    def getControlData(self, navigate, sign: str, trafficLights: TrafficSignController, trafficLightFlag, stop_line_present, stop_line_slope):
         # print(f'status raskrsnice: {self.status}')
         self.lastStatus = self.status
         intersection = True
-        if stopLine[0]:
-            self.slope_degrees = stopLine[1]
+        if stop_line_present:
+            self.slope_degrees = stop_line_slope
 
         if(self.smer == "Right"):
             tangle = 240
