@@ -161,12 +161,12 @@ class autoFSM(ControlModeThread):
             elif stop_line_present and (self.traffic_signs.get_active() in ["stop", "priority"] or traffic_light_present):
                 if self.debugging:
                     print("Krecemo sa raskrsnicom")
-                if self.traffic_signs.get_active() == "stop":
-                    self.intersectionSign = "stop"
-                if self.traffic_signs.get_active() == "priority":
-                    self.intersectionSign = "priority"
-                if traffic_light_present:
-                    self.intersectionSign = "None"
+                
+                self.intersectionController.setCourse(
+                    sign=self.traffic_signs.get_active(), 
+                    direction=self.navigateCommand.pop(0),
+                    traffic_light_present=traffic_light_present
+                )
                 self.traffic_signs.clear()
                 self.state = autoFSMState.INTERSECTION
 
