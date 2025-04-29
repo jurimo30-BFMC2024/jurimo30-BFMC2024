@@ -1,5 +1,5 @@
 import time
-from src.core.Auto.Parking.MotionScheduler import MotionScheduler
+from src.core.Auto.MotionScheduler import MotionScheduler
 
 class Parking():
     """This thread handles Parking.
