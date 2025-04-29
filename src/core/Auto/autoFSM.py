@@ -198,15 +198,15 @@ class autoFSM(ControlModeThread):
         ##############################         FSM            #############################
 
         if self.state == autoFSMState.PARKING:
-            park_angle, speed, finished = self.parkingController.run(parking_spot_detected, side_sensors)
+            park_angle, speed, module_running = self.parkingController.run(parking_spot_detected, side_sensors)
             if park_angle is not None:
                 angle = park_angle
 
-            if finished:
+            if not module_running:
                 self.state = autoFSMState.DRIVE
             
         elif self.state == autoFSMState.INTERSECTION:
-            angle, speed, finished = self.intersectionController.getControlData(
+            angle, speed, module_running = self.intersectionController.getControlData(
                 navigate=self.navigateCommand,
                 sign=self.intersectionSign,
                 trafficLights=self.traffic_light_states,
@@ -215,15 +215,15 @@ class autoFSM(ControlModeThread):
                 stop_line_slope=stop_line_slope
             )
             
-            if finished:
+            if not module_running:
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.OVERTAKE:
-            overtake_angle, speed, finished = self.overtakeController.run(False, front_sensors, side_sensors)
+            overtake_angle, speed, module_running = self.overtakeController.run(False, front_sensors, side_sensors)
             if overtake_angle is not None:
                 angle = overtake_angle
 
-            if finished:
+            if not module_running:
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.CROSSWALK:
@@ -235,7 +235,7 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.ROUNDABOUT:
-            angle, speed, finished, self.roundaboutExitFlag  = self.roundaboutController.getControlData(
+            angle, speed, module_running, self.roundaboutExitFlag  = self.roundaboutController.getControlData(
                 angleForRoundabout=roundabout_angle,  # Use the received angle
                 navigate=self.navigateCommand,
                 exitFlag=self.roundaboutExitFlag,
@@ -243,7 +243,7 @@ class autoFSM(ControlModeThread):
                 stop_line_slope=stop_line_slope
             )
 
-            if finished:
+            if not module_running:
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
