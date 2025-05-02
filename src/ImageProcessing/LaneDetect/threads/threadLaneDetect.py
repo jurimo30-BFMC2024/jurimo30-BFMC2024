@@ -55,7 +55,6 @@ class threadLaneDetect(ThreadWithStop):
         self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
 
     def run(self):
-        frame_count = 0
         start_time_second = time.time()
 
         while self._running:
@@ -72,15 +71,6 @@ class threadLaneDetect(ThreadWithStop):
                 frame, angle = self.laneDetector.process_frame(frame, edges)
                 frame, parking_line = self.parkingSpotDetector.process_frame(frame, edges)
                 frame, roundaboutAngle = self.roundAboutDetector.process_frame(frame, edges)
-                roundaboutExitDetected = False
-
-                # Increment frame count
-                frame_count += 1
-
-                # Check if one second has passed
-                if time.time() - start_time_second >= 1:
-                    frame_count = 0
-                    start_time_second = time.time()
 
                 # Slanje rezultate
                 self.laneDetectionSender.send(angle)
