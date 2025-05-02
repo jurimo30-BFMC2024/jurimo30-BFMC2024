@@ -120,6 +120,12 @@ class ObjectDetection(Enum):
     Queue = "General"
     Owner = "threadObjectDetection"
     msgID = 8
+    msgType = "list"
+
+class TrafficSignsDetection(Enum):
+    Queue = "General"
+    Owner = "threadObjectDetection"
+    msgID = 9
     msgType = "str"
 
 ################################# processCarsAndSemaphores ##################################
