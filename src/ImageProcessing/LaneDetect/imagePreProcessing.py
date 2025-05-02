@@ -66,37 +66,52 @@ class ImagePreProcessing:
         
         for y in range(image.shape[0]):
             for x in range(image.shape[1]):
-                if image[y, x] > 0:  # ROI check
-                    roi_pixels[count] = image[y, x]
+                val = image[y, x]
+                if val > 15:  # ignore ultra dark pixels
+                    roi_pixels[count] = val
                     count += 1
                     
         if count == 0:
-            return image  # Return original if no ROI pixels
+            return image  # Return original if no ROI pixels stronger than 15
     
         roi_pixels = roi_pixels[:count]  # Trim to actual size
         
+        # dynamically find upper and lower percentile for each frame
+        median_val = np.median(roi_pixels)
+        if median_val < 60:  # low light condition
+            lower_pct, upper_pct = 10, 98
+        elif median_val > 180:  # bright light condition
+            lower_pct, upper_pct = 2, 90
+        else:  # normal conditions
+            lower_pct, upper_pct = lower_percentile, upper_percentile
+
         # Calculate percentiles
-        I_min = np.percentile(roi_pixels, lower_percentile)
-        I_max = np.percentile(roi_pixels, upper_percentile)
+        I_min = np.percentile(roi_pixels, lower_pct)
+        I_max = np.percentile(roi_pixels, upper_pct)
         
-        if I_min == I_max:
-            return image
+        # Prevent over-amplification of noise
+        min_range = 25  # Minimum required contrast
+        if I_max - I_min < min_range:
+            center = (I_max + I_min) / 2
+            I_min = max(0, center - min_range/2)
+            I_max = min(255, center + min_range/2)
 
         # Normalize image
         # prethodno image_normalized = np.clip((image - I_min) / (I_max - I_min), 0, 1) * 255
-        image_normalized = np.empty_like(image, dtype=np.float64)
-        range_val = I_max - I_min
+        result = np.empty_like(image, dtype=np.float32)
+        range_val = max(1, I_max - I_min)
         
         for y in range(image.shape[0]):
             for x in range(image.shape[1]):
                 val = image[y, x]
-                if val > 0:  # Only process ROI pixels
-                    normalized = (val - I_min) / range_val
-                    image_normalized[y, x] = max(0.0, min(255.0, normalized * 255.0))
+                if val > 15:  # Same noise threshold
+                    # Enhanced contrast curve (adjust 0.7 for more/less aggressive)
+                    normalized = ((val - I_min) / range_val) ** 0.7
+                    result[y,x] = max(0, min(255, normalized * 255))
                 else:
-                    image_normalized[y, x] = 0.0
-        
-        return image_normalized.astype(np.uint8)
+                    result[y,x] = 0
+                    
+        return result.astype(np.uint8)
 
     def process_frame(self, frame: np.ndarray):
         
