@@ -60,7 +60,7 @@ class threadCamera(ThreadWithStop):
         self.queuesList = queuesList
         self.logger = logger
         self.debugger = debugger
-        self.frame_rate = 5
+        self.frame_rate = 20
         self.recording = False
 
         self.video_writer = ""
@@ -123,35 +123,41 @@ class threadCamera(ThreadWithStop):
 
     # ================================ RUN ================================================
     def run(self):
-        """This function will run while the running flag is True. It captures the image from camera and make the required modifies and then it send the data to process gateway."""
+        """This function will run while the running flag is True. It captures the image from camera and makes the required modifications and then sends the data to the process gateway."""
+        frame_interval = 1.0 / self.frame_rate  # seconds per frame
+
         while self._running:
+            loop_start_time = time.time()
+
             try:
                 recordRecv = self.recordSubscriber.receive()
-                if recordRecv is not None: 
+                if recordRecv is not None:
                     self.recording = bool(recordRecv)
-                    if recordRecv == False:
+                    if not self.recording:
                         self.video_writer.release()
                     else:
-                        fourcc = cv2.VideoWriter_fourcc(
-                            *"XVID"
-                        )  # You can choose different codecs, e.g., 'MJPG', 'XVID', 'H264', etc.
+                        fourcc = cv2.VideoWriter_fourcc(*"XVID")
                         self.video_writer = cv2.VideoWriter(
                             "output_video" + str(time.time()) + ".avi",
                             fourcc,
                             self.frame_rate,
                             (512, 270),
                         )
-
             except Exception as e:
                 print(e)
 
-            serialRequest = self.camera.capture_array("lores")  # Will capture an array that can be used by OpenCV library
-            
-            if self.recording == True:
+            serialRequest = self.camera.capture_array("lores")
+
+            if self.recording:
                 self.video_writer.write(serialRequest)
 
             serialEncodedImageData = encode_frame(serialRequest)
             self.serialCameraSender.send(serialEncodedImageData)
+
+            elapsed_time = time.time() - loop_start_time
+            sleep_time = frame_interval - elapsed_time
+            if sleep_time > 0:
+                time.sleep(sleep_time)
 
     # =============================== START ===============================================
     def start(self):
