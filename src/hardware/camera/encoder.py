@@ -12,6 +12,7 @@ def encode_frame(yuv_frame: np.ndarray) -> bytes:
 
     # JPEG encode the BGR frame
     success, encoded = cv2.imencode(".jpg", bgr_frame)
+    # success, encoded = cv2.imencode(".jpg", bgr_frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
     if not success:
         raise RuntimeError("Failed to encode image")
 
