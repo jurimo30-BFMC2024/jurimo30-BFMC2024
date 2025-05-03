@@ -43,6 +43,7 @@ from src.utils.messages.allMessages import (
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.templates.threadwithstop import ThreadWithStop
+from src.hardware.camera.encoder import encode_frame
 
 
 class threadCamera(ThreadWithStop):
@@ -144,21 +145,12 @@ class threadCamera(ThreadWithStop):
             except Exception as e:
                 print(e)
 
-            # mainRequest = self.camera.capture_array("main")
             serialRequest = self.camera.capture_array("lores")  # Will capture an array that can be used by OpenCV library
-
-            #serialRequest = cv2.cvtColor(serialRequest, cv2.COLOR_YUV2BGR_I420)
             
             if self.recording == True:
                 self.video_writer.write(serialRequest)
 
-            #_, mainEncodedImg = cv2.imencode(".jpg", mainRequest)                   
-            _, serialEncodedImg = cv2.imencode(".jpg", serialRequest)
-
-            # mainEncodedImageData = base64.b64encode(mainEncodedImg).decode("utf-8")
-            serialEncodedImageData = base64.b64encode(serialEncodedImg).decode("utf-8")
-
-            # self.mainCameraSender.send(mainEncodedImageData)
+            serialEncodedImageData = encode_frame(serialRequest)
             self.serialCameraSender.send(serialEncodedImageData)
 
     # =============================== START ===============================================
@@ -173,8 +165,8 @@ class threadCamera(ThreadWithStop):
         config = self.camera.create_preview_configuration(
             buffer_count=1,
             queue=False,
-            main={"format": "RGB888", "size": (2048, 1080)},
-            lores={"format": "RGB888", "size": (512, 270)},
+            main={"format": "YUV420", "size": (2048, 1080)},
+            lores={"format": "YUV420", "size": (512, 270)},
             encode="lores",
         )
         self.camera.configure(config)

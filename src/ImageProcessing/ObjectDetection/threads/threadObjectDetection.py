@@ -16,6 +16,7 @@ from src.utils.messages.allMessages import (
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream
+from src.hardware.camera.encoder import decode_frame
 
 class threadObjectDetection(ThreadWithStop):
     """This thread handles ObjectDetection."""
@@ -55,7 +56,7 @@ class threadObjectDetection(ThreadWithStop):
         while self._running:
             try:
                 videoData = self.videoSubscriber.receiveWithBlock()
-                frame = self.decode_frame(videoData)
+                frame = decode_frame(videoData)
                 frame_cropped = self.crop_frame(frame)
                 frame_cropped = cv2.resize(frame_cropped, (256,256), interpolation=cv2.INTER_AREA)
                 processed_frame, best_sign, relevant_objects = self.process_frame(frame_cropped)
@@ -225,13 +226,6 @@ class threadObjectDetection(ThreadWithStop):
                 active_objects.append(obj)
         
         return active_objects
-
-    @staticmethod
-    def decode_frame(encoded_data):
-        """Decode base64 encoded frame to OpenCV image."""
-        frame_data = base64.b64decode(encoded_data)
-        np_array = np.frombuffer(frame_data, np.uint8)
-        return cv2.imdecode(np_array, cv2.IMREAD_COLOR)
 
     @staticmethod
     def crop_frame(frame):
