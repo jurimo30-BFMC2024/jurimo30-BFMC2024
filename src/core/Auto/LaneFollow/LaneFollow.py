@@ -26,33 +26,7 @@ class LaneFollow():
     def getControlData(self, highway, stop_line, input_angle):
         angle = int(input_angle * 10)
 
-        if not highway:
-            if abs(self.finalAngle) > 225 and abs(self.finalAngle - angle) > 5:
-                if self.finalAngle < 0:
-                    self.finalAngle = angle - 5
-                else:
-                    self.finalAngle = angle + 5
-            else:
-                self.finalAngle = angle
-            if stop_line:
-                self.finalAngle = self.finalAngle*2.5
-            self.finalAngle = int(self.avgAngle.filter(self.finalAngle) * 1.1) 
-        else:
-            if abs(self.finalAngle - angle) > 40:
-                if angle > self.finalAngle:
-                    self.finalAngle += 40
-                else:
-                    self.finalAngle -= 40
-            else:
-                self.finalAngle = int(angle*0.65)
-
-
-        if self.finalAngle > 250:
-            self.finalAngle = 240
-        if self.finalAngle < -250:
-            self.finalAngle = -240
-        if self.debugging:
-            self.logging.info(f"Lane detect out: {self.finalAngle}")
+        self.finalAngle = angle
 
 
         return self.finalAngle
