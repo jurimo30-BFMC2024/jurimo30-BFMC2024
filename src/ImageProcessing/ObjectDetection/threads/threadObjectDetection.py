@@ -25,7 +25,14 @@ class threadObjectDetection(ThreadWithStop):
         logging (logging object): For debugging.
         debugging (bool, optional): Debugging flag. Defaults to False.
     """
-
+    """
+    - Razdvojiti objekte(auto, exit, stefanija) od znakova
+    - Poslati kada se objekat pojavi i kada nestane iz frejma
+    - Slati koordinate box-a oko objekta na slici dok je u frejmu
+    - Logika stanja znakova je bila dobra (trazio si sa najvecom povrsinom) i
+      slao samo taj jedan znak po frejmu, ali ostale objekte moras poslati sve koje vidis
+      
+    """
     def __init__(self, queueList, logging, debugging=False):
         self.queuesList = queueList
         self.logging = logging
@@ -70,11 +77,11 @@ class threadObjectDetection(ThreadWithStop):
                 frame_cropped = self.crop_frame(frame)
                 frame_cropped = cv2.resize(frame_cropped, (256,256), interpolation=cv2.INTER_AREA)
                 
-                # Process frame and get best detection
-                processed_frame, best_sign = self.process_frame(frame_cropped)
+                # Process frame and get detections
+                processed_frame, best_sign, detected_objects = self.process_frame(frame_cropped)
                 
                 # Update state and send messages
-                self.update_state(best_sign)
+                self.update_state(best_sign, detected_objects)
                 
                 # Display frame on server
                 self.streamer.display(processed_frame)
@@ -83,7 +90,7 @@ class threadObjectDetection(ThreadWithStop):
                 print(e)
 
     def process_frame(self, frame):
-        """Process frame and return annotated frame with best detection."""
+        """Process frame and return annotated frame, best detection, and detected objects."""
         # Get YOLO results
         results = self.model(frame, verbose=self.debugging)[0]
 
@@ -98,6 +105,10 @@ class threadObjectDetection(ThreadWithStop):
 
         h, w = frame.shape[:2]
         center_box = (w // 2 - 20, int(h * 0.2), w // 2 + 20, h)
+
+        # # Reset relevant_objects presence
+        # for obj in self.relevant_objects:
+        #     self.relevant_objects[obj]["present"] = False
 
         for box in results.boxes.data:
             x1, y1, x2, y2, conf, cls = box.tolist()
@@ -157,18 +168,15 @@ class threadObjectDetection(ThreadWithStop):
                 "present": data["present"]
             })
 
-        # Send detected_objects list to ObjectDetection topic
-        self.objectDetectionSender.send(detected_objects)
-
         if traffic_signs:
             # Sort by confidence (desc), then area (desc)
             traffic_signs.sort(key=lambda x: (-x[0], -x[1]))
             best_sign = traffic_signs[0][2]
 
-        return frame, best_sign
+        return frame, best_sign, detected_objects
 
-    def update_state(self, new_sign):
-        """Update detection state and handle messaging."""
+    def update_state(self, new_sign, detected_objects):
+        """Update detection state and handle messaging for traffic signs and detected objects."""
         # Reset counters if no sign detected
         if new_sign is None:
             self.lost_sign_count += 1
@@ -176,36 +184,61 @@ class threadObjectDetection(ThreadWithStop):
             if self.lost_sign_count >= self.lost_sign_threshold:
                 self.current_sign = None
                 self.lost_sign_count = 0
-            return
-
-        # Case 1: New potential sign while we have current sign
-        if self.current_sign is not None:
-            if new_sign == self.current_sign:
-                # Reset counters for current sign
-                self.lost_sign_count = 0
-                self.confirmation_counter = 0
-            else:
-                # Track confirmation for new candidate
-                self.confirmation_counter += 1
-                
-                # If new candidate confirmed before losing current
-                if self.confirmation_counter >= self.confirmation_threshold:
-                    # Send both lost and new sign
-                    self.trafficSignsDetectionSender.send(new_sign)  # Send new sign
-                    self.current_sign = new_sign
-                    self.confirmation_counter = 0
-                    self.lost_sign_count = 0
-
-        # Case 2: No current sign, new detection
         else:
-            if new_sign:
+            # Case 1: New potential sign while we have current sign
+            if self.current_sign is not None:
+                if new_sign == self.current_sign:
+                    # Reset counters for current sign
+                    self.lost_sign_count = 0
+                    self.confirmation_counter = 0
+                else:
+                    # Track confirmation for new candidate
+                    self.confirmation_counter += 1
+                    
+                    # If new candidate confirmed before losing current
+                    if self.confirmation_counter >= self.confirmation_threshold:
+                        self.trafficSignsDetectionSender.send(new_sign)  # Send new sign
+                        self.current_sign = new_sign
+                        self.confirmation_counter = 0
+                        self.lost_sign_count = 0
+            # Case 2: No current sign, new detection
+            else:
                 self.confirmation_counter += 1
-                # Confirm new sign
                 if self.confirmation_counter >= self.confirmation_threshold:
                     self.trafficSignsDetectionSender.send(new_sign)
                     self.current_sign = new_sign
                     self.confirmation_counter = 0
                     self.lost_sign_count = 0
+
+        for obj in detected_objects:
+            name = obj["name"]
+            current_position = obj["position"]
+            was_present = self.relevant_objects[name]["present"]
+            last_position = self.relevant_objects[name]["position"]
+
+            if obj["present"]:
+                if not was_present or current_position != last_position:
+                    # Novi objekat ili pomeraj postojećeg
+                    self.relevant_objects[name]["present"] = True
+                    self.relevant_objects[name]["position"] = current_position
+                    self.objectDetectionSender.send([{
+                        "name": name,
+                        "position": current_position,
+                        "present": True
+                    }])
+                else:
+                    # Objekat je prisutan i pozicija ista – ne šalji ništa
+                    continue
+            else:
+                if was_present:
+                    # Objekat više nije u kadru
+                    self.relevant_objects[name]["present"] = False
+                    self.relevant_objects[name]["position"] = None
+                    self.objectDetectionSender.send([{
+                        "name": name,
+                        "position": None,
+                        "present": False
+                    }])
 
     @staticmethod
     def decode_frame(encoded_data):
