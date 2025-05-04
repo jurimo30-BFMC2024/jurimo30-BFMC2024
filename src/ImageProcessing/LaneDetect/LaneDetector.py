@@ -3,7 +3,7 @@ import numpy as np
 import math
 import time
 from collections import deque
-from pid_controller import PIDController  # use external PID implementation
+from src.ImageProcessing.LaneDetect.pid_controller import PIDController  # use external PID implementation
 
 class LaneDetector:
     def __init__(self, width: int, height: int, logging, debugging=False, pc=False, camera_fov_degrees: float = 79.3):
@@ -50,7 +50,7 @@ class LaneDetector:
         self.measure_height = int(self.height * 0.8)  # 80% down the image
         
         # PID controller for steering
-        self.pid = PIDController(kp=0.8, ki=0.1, kd=0, output_limits=(-25, 25))
+        self.pid = PIDController(kp=0.5, ki=0.05, kd=0, output_limits=(-25, 25))
         
         # Image center reference point
         self.center_x = self.width // 2

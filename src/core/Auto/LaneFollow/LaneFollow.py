@@ -26,7 +26,7 @@ class LaneFollow():
     def getControlData(self, highway, stop_line, input_angle):
         angle = int(input_angle * 10)
 
-        self.finalAngle = angle
+        self.finalAngle = -angle
 
 
         return self.finalAngle

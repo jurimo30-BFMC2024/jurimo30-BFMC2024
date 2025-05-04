@@ -37,10 +37,10 @@ class threadLaneDetect(ThreadWithStop):
         self.debugging = debugging
         self.laneDetector = LaneDetector(512, 270, logging, debugging, False)
         self.imgProcessor = ImgProcessor(512, 270, logging, debugging, False)
-        self.stopLineDetector = StopDetect(512, 270, logging, debugging, False)
+        self.stopLineDetector = StopDetect(512, 270, logging, False, False)
         self.parkingSpotDetector = ParkingSpotDetector()
         self.strm = vs(1, 0)
-        self.roundAboutDetector = RoundaboutNavigator(512, 270, logging, debugging)  # Initialize RoundAboutDetector
+        self.roundAboutDetector = RoundaboutNavigator(512, 270, logging, False)  # Initialize RoundAboutDetector
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
