@@ -102,7 +102,7 @@ class ImagePreProcessing:
         
         processed = np.empty((self.height, self.width), dtype=np.uint8) # empty is faster than zeros and the array values are changed anyways
         # use functions explicitly without making new variables
-        cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY, dst=processed)
+        cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY, dst=processed)
         cv2.bitwise_and(processed, self.mask, dst=processed) # roi cutoff first, then image processing
         cv2.LUT(processed, self.gamma_lut, dst=processed)
         cv2.medianBlur(processed, 5, dst=processed)
