@@ -5,7 +5,7 @@ if __name__ == "__main__":
 from src.core.Auto.Parking.Parking import Parking
 from src.core.Auto.Overtake.Overtake import Overtake
 from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
-from src.core.Auto.LaneFollow.LaneFollow import LaneFollow
+from src.core.Auto.LaneFollow.LaneFollow import LaneFollow as LaneFollowController
 from src.core.Auto.SpeedControl import SpeedControl
 from src.core.Auto.IntersectionControl import IntersectionControl
 from src.core.Auto.RoundaboutControl import RoundaboutControl
@@ -55,7 +55,7 @@ class autoFSM(ControlModeThread):
 
     def start(self):
         self.planer = PathPlanner(start=43, goal=10, mode="pacman")
-        self.laneFollowData = LaneFollow(self.logging, False)
+        self.laneFollowContrler = LaneFollowController(512, 270, self.logging, self.debugging)
         self.speedControler = SpeedControl(self.logging, False)
         self.intersectionController = IntersectionControl(self.logging, self.debugging)
         self.parkingController = Parking(self.logging, self.debugging)
@@ -103,7 +103,7 @@ class autoFSM(ControlModeThread):
         super().stop()
 
     def loop(self):
-        error_angle = self.laneDetectSubscriber.receiveWithBlock()
+        self.leftX, self.rightX = self.laneDetectSubscriber.receiveWithBlock()
         stop_line_present, stop_line_slope = self.intersectionDetectSubscriber.receiveWithBlock() # stopLine je sad tuple (intersection(bool), slope_degrees (float))
         lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
 
@@ -135,7 +135,7 @@ class autoFSM(ControlModeThread):
         roundabout_angle = self.roundaboutAngleSubscriber.receiveWithBlock()  # Corrected to RoundAboutAngle
         traffic_light_present = self.traffic_light_states.get_active() != None
         obstacle = front_sensors["distance"] <= 80 and self.sign_car_detected
-        angle = self.laneFollowData.getControlData(self.state == autoFSMState.HIGHWAY, lowDistance, error_angle) # calculate steering angle from lane follow data
+        angle = self.laneFollowContrler.process_following(self.leftX, self.rightX) # calculate steering angle from lane follow data
 
         if not obstacle:
             self.obstacle_start_time = None  # Reset if obstacle is not present
@@ -152,6 +152,8 @@ class autoFSM(ControlModeThread):
                     print("Izlazak sa auto puta")
                 self.traffic_signs.clear()
                 self.state = autoFSMState.DRIVE
+                self.laneFollowContrler.restartPid()
+
         
         if self.state == autoFSMState.DRIVE:
             if self.traffic_signs.get_active() == "parking":
@@ -185,6 +187,7 @@ class autoFSM(ControlModeThread):
                     print("Ulazak na autoput")
                 self.traffic_signs.clear()
                 self.state = autoFSMState.HIGHWAY
+                self.laneFollowContrler.restartPid()
             
             elif obstacle and self.oldSpeed == 0:
                 if self.obstacle_start_time is None:
