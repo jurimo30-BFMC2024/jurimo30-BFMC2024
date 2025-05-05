@@ -5,7 +5,7 @@ if __name__ == "__main__":
 from src.core.Auto.Parking.Parking import Parking
 from src.core.Auto.Overtake.Overtake import Overtake
 from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
-from src.core.Auto.LaneFollow.LaneFollow import LaneFollow as LaneFollowController
+from src.core.Auto.LaneFollow.LaneFollow import LaneFollower as LaneFollowController
 from src.core.Auto.SpeedControl import SpeedControl
 from src.core.Auto.IntersectionControl import IntersectionControl
 from src.core.Auto.RoundaboutControl import RoundaboutControl

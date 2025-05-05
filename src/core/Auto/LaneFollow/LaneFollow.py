@@ -17,7 +17,7 @@ class LaneFollower:
         self.measure_height = int(self.height * 0.8)  # 80% down the image
 
         # PID controller for steering
-        self.pid = PIDController(kp=0.8, ki=0.1, kd=0, output_limits=(-25, 25))
+        self.pid = PIDController(kp=0.5, ki=0.01, kd=0, output_limits=(-25, 25))
 
         # Image center reference point
         self.center_x = self.width // 2
@@ -32,6 +32,8 @@ class LaneFollower:
         current_time = time.time()
         dt = current_time - self.last_frame_time
         self.last_frame_time = current_time
+
+        print(f" LAst frame time: {dt}")
 
         # Calculate lane center
         if left_x is not None and right_x is not None:
@@ -71,5 +73,7 @@ class LaneFollower:
             "lane_width_estimate": lane_width_estimate
         }
 
-        return angle_degrees
+        self.finalAngle = -int(angle_degrees*10)
+        print (f"Ugao je {self.finalAngle}")
+        return self.finalAngle
 

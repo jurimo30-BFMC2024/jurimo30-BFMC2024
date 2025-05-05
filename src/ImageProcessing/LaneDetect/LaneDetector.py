@@ -17,12 +17,12 @@ class LaneDetector:
         self.roadReg = np.array([[
             (int(self.width * 0.02), self.height - int(self.height * 0.02)),   # donji lijevi ugao
             (int(self.width * 0.22), self.height - int(self.height * 0.02)),  # donji lijevi prije ulegnuća
-            (int(self.width * 0.30), self.height - int(self.height * 0.35)), # donji lijevi ulegnuće
-            (int(self.width * 0.7), self.height - int(self.height * 0.35)), # donji desni ulegnuće
+            (int(self.width * 0.30), self.height - int(self.height * 0.39)), # donji lijevi ulegnuće
+            (int(self.width * 0.7), self.height - int(self.height * 0.39)), # donji desni ulegnuće
             (int(self.width * 0.78), self.height - int(self.height * 0.02)),  # donji desni prije ulegnuća
             (int(self.width * 0.98), self.height - int(self.height * 0.02)),  # donji desni ugao
-            (int(self.width * 0.8), self.height // 2 - int(self.height * 0.05)), # gornji desni ugao
-            (int(self.width * 0.2), self.height // 2 - int(self.height * 0.05))  # gornji lijevi ugao
+            (int(self.width * 0.8), self.height // 2 - int(self.height * 0.15)), # gornji desni ugao
+            (int(self.width * 0.2), self.height // 2 - int(self.height * 0.15))  # gornji lijevi ugao
         ]], np.int32)
 
         # Line history for smoothing
@@ -208,6 +208,13 @@ class LaneDetector:
             for line in right_lines_stable:
                 for x1, y1, x2, y2 in line:
                     cv2.line(frame_to_draw_on, (x1, y1), (x2, y2), self.color_right_lane, 2)
+
+        # Draw measurement points
+        if left_x is not None:
+            cv2.circle(frame_to_draw_on, (left_x, self.measure_height), radius=7, color=(255, 255, 0), thickness=-1)
+        if right_x is not None:
+            cv2.circle(frame_to_draw_on, (right_x, self.measure_height), radius=7, color=(255, 0, 255), thickness=-1)
+
         # --- End of Drawing Logic ---
 
         # Debug log for terminal (simplified)
