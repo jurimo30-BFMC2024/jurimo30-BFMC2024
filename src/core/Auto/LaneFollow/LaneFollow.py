@@ -12,6 +12,7 @@ class LaneFollower:
         self.height = height
         self.pc = pc
         self.last_frame_time = time.time()
+        self.lastStatus = 0
 
         # Measurement point - height in the image where we calculate lane center
         self.measure_height = int(self.height * 0.8)  # 80% down the image
@@ -54,6 +55,14 @@ class LaneFollower:
         # Calculate error (offset from center)
         error = self.center_x - lane_center
 
+        if abs(error) > 50:
+            if(self.lastStatus != 0):
+                self.pid.set_tunings(kp=0.5, ki=0.01, kd=0)
+                self.lastStatus = 0
+        else:   
+            if(self.lastStatus != 1):
+                self.pid.set_tunings(kp=0.05, ki=0.01, kd=0)
+                self.lastStatus = 1
         # Use PID to calculate steering angle
         angle_degrees = self.pid.compute(error, dt=dt)
 
