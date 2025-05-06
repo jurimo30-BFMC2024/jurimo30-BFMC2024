@@ -32,6 +32,8 @@ class ImagePreProcessing:
         self.gamma_lut = self._create_gamma_lut(13)  # Precompute LUT for gamma correction
         self.mask = self._create_roi_mask()  # Precompute ROI mask
 
+        self.clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+
     def _create_gamma_lut(self, gamma: float):
         """Create a Look-Up Table for gamma correction."""
         lut = np.array([((i / 255.0) ** gamma) * 255 for i in range(256)], dtype=np.uint8)
@@ -99,15 +101,29 @@ class ImagePreProcessing:
         return image_normalized.astype(np.uint8)
 
     def process_frame(self, frame: np.ndarray):
-        
-        processed = np.empty((self.height, self.width), dtype=np.uint8) # empty is faster than zeros and the array values are changed anyways
-        # use functions explicitly without making new variables
+        processed = np.empty((self.height, self.width), dtype=np.uint8)
         cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY, dst=processed)
-        cv2.bitwise_and(processed, self.mask, dst=processed) # roi cutoff first, then image processing
         cv2.LUT(processed, self.gamma_lut, dst=processed)
-        cv2.medianBlur(processed, 5, dst=processed)
-        processed = self.normalize_histogram(processed)
-        _, processed = cv2.threshold(processed, 230, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-        # quicker than scikit
-        edges = cv2.ximgproc.thinning(processed, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN)
+
+		# (jednostavniji; nije minimalan) bounding rect oko roi-a 
+        x, y, w, h = cv2.boundingRect(self.mask)
+
+		# crop both image and mask (mask is cropped to be applied to the cropped image)
+        crop_img = processed[y:y+h, x:x+w]
+        crop_mask = self.mask[y:y+h, x:x+w]
+
+		# CLAHE on cropped image (without mask applied)
+        clahe_applied = self.clahe.apply(crop_img)
+
+		# apply mask AFTER CLAHE to avoid useravanje
+        clahe_applied[crop_mask == 0] = 0
+
+		# put everything back into original frame size
+        full_processed = np.zeros_like(processed)
+        full_processed[y:y+h, x:x+w] = clahe_applied
+
+        cv2.medianBlur(full_processed, 5, dst=full_processed)
+		# full_processed = self.normalize_histogram(full_processed) (rip big boss)
+        _, full_processed = cv2.threshold(full_processed, 230, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        edges = cv2.ximgproc.thinning(full_processed, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN)
         return edges
