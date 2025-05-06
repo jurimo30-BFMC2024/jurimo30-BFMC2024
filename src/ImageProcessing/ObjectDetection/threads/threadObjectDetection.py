@@ -2,6 +2,7 @@ import cv2
 import base64
 import numpy as np
 import os
+import time
 
 os.environ['OMP_NUM_THREADS'] = "2"
 os.environ['MKL_NUM_THREADS'] = "2"
@@ -47,18 +48,20 @@ class threadObjectDetection(ThreadWithStop):
         self.lost_sign_count = 0          # Frames without current sign
         self.lost_sign_threshold = 17     # Frames to consider sign lost
         
+        self.lost_timeout = 0.2           # Timeout for lost objects
+   
         # Initialize relevant_objects structure
         self.relevant_objects = {
-            "car": {"position": None, "present": False},
-            "exit": {"position": None, "present": False},
-            "stefanija": {"position": None, "present": False}
+            "car": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False},
+            "exit": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False},
+            "stefanija": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False}
         }
         
         super(threadObjectDetection, self).__init__()
         self.subscribe() # Subscribe on serialCamera topic
         self.send()      #      Sending on topics:
                          #      ------------------
-                         ##     Object Detection    ##
+                         ##      ObjectDetection    ##
                          ##   TrafficSignsDetection    ##
 
     def send(self):
@@ -106,9 +109,9 @@ class threadObjectDetection(ThreadWithStop):
         h, w = frame.shape[:2]
         center_box = (w // 2 - 20, int(h * 0.2), w // 2 + 20, h)
 
-        # # Reset relevant_objects presence
-        # for obj in self.relevant_objects:
-        #     self.relevant_objects[obj]["present"] = False
+        # Reset relevant_objects presence
+        for obj_key in self.relevant_objects:
+            self.relevant_objects[obj_key]["present"] = False
 
         for box in results.boxes.data:
             x1, y1, x2, y2, conf, cls = box.tolist()
@@ -148,9 +151,6 @@ class threadObjectDetection(ThreadWithStop):
             if label in self.relevant_objects:
                 self.relevant_objects[label]["position"] = (x1, y1, x2, y2)
                 self.relevant_objects[label]["present"] = True
-            else:
-                self.relevant_objects[label]["position"] = None
-                self.relevant_objects[label]["present"] = False
 
             # Draw bounding box and label
             cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
@@ -197,6 +197,8 @@ class threadObjectDetection(ThreadWithStop):
                     
                     # If new candidate confirmed before losing current
                     if self.confirmation_counter >= self.confirmation_threshold:
+                        if self.debugging:
+                            print(f"[INFO]: Novi detektovani znak {new_sign}")
                         self.trafficSignsDetectionSender.send(new_sign)  # Send new sign
                         self.current_sign = new_sign
                         self.confirmation_counter = 0
@@ -205,36 +207,42 @@ class threadObjectDetection(ThreadWithStop):
             else:
                 self.confirmation_counter += 1
                 if self.confirmation_counter >= self.confirmation_threshold:
+                    if self.debugging:
+                        print(f"[INFO]: Novi detektovani znak {new_sign}")
                     self.trafficSignsDetectionSender.send(new_sign)
                     self.current_sign = new_sign
                     self.confirmation_counter = 0
                     self.lost_sign_count = 0
 
+        current_time = time.time()
         for obj in detected_objects:
             name = obj["name"]
             current_position = obj["position"]
-            was_present = self.relevant_objects[name]["present"]
-            last_position = self.relevant_objects[name]["position"]
 
             if obj["present"]:
-                if not was_present or current_position != last_position:
-                    # Novi objekat ili pomeraj postojećeg
-                    self.relevant_objects[name]["present"] = True
-                    self.relevant_objects[name]["position"] = current_position
-                    self.objectDetectionSender.send([{
+               # Ako je detektovan, ažuriraj vreme i pošalji poruku
+               self.relevant_objects[name]["last_seen_time"] = current_time
+               if not self.relevant_objects[name]["present"] or self.relevant_objects[name]["position"] != current_position:
+                   if self.debugging:
+                        print(f"[DETEKCIJA] Objekat '{name}' detektovan na {current_position}")
+                   self.relevant_objects[name]["present"] = True
+                   self.relevant_objects[name]["position"] = current_position
+                   self.relevant_objects[name]["sent_lost_message"] = False
+                   self.objectDetectionSender.send([{
                         "name": name,
                         "position": current_position,
                         "present": True
                     }])
-                else:
-                    # Objekat je prisutan i pozicija ista – ne šalji ništa
-                    continue
             else:
-                if was_present:
-                    # Objekat više nije u kadru
-                    self.relevant_objects[name]["present"] = False
-                    self.relevant_objects[name]["position"] = None
-                    self.objectDetectionSender.send([{
+                if self.relevant_objects[name]["last_seen_time"] is not None:
+                    time_since_seen = current_time - self.relevant_objects[name]["last_seen_time"]
+                    if time_since_seen >= self.lost_timeout and not self.relevant_objects[name]["sent_lost_message"]:
+                        if self.debugging:
+                            print(f"[GUBITAK] Objekat '{name}' nije detektovan {self.lost_timeout} sekunde – smatra se izgubljenim.")
+                        self.relevant_objects[name]["present"] = False
+                        self.relevant_objects[name]["position"] = None
+                        self.relevant_objects[name]["sent_lost_message"] = True
+                        self.objectDetectionSender.send([{
                         "name": name,
                         "position": None,
                         "present": False
