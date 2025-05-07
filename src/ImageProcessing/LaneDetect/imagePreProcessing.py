@@ -17,8 +17,8 @@ class ImagePreProcessing:
                 (int(self.width * 0.7), self.height - int(self.height * 0.2)),
                 (int(self.width * 0.75), self.height - int(self.height * 0.05)),
                 (int(self.width * 0.99), self.height - int(self.height * 0.05)),
-                (int(self.width * 0.99), self.height * 0.50),
-                (int(self.width * 0.01), self.height * 0.50)
+                (int(self.width * 0.99), self.height * 0.45),
+                (int(self.width * 0.01), self.height * 0.45)
             ]], np.int32)
 
         self.gamma_lut = self._create_gamma_lut(13)  # Precompute LUT for gamma correction
