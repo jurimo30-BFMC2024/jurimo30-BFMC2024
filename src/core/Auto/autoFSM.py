@@ -16,6 +16,7 @@ from src.utils.messages.allMessages import (
     IntersectionDetect,
     IntersectionDetect2,
     ObjectDetection,
+    TrafficSignsDetection,
     SideSensors,
     FrontSensors,
     ParkingSpotDetect,
