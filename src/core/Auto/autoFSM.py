@@ -67,6 +67,7 @@ class autoFSM(ControlModeThread):
         self.intersectionDetectSubscriber.empty()
         self.intersectionDetectSubscriber2.empty()
         self.objectDetectionSubscriber.empty()
+        self.trafficSignsSubscriber.empty()
         self.sideSensorSubscriber.empty()
         self.frontSensorSubscriber.empty()
         self.parkingSpotDetectionSubscriber.empty()
@@ -109,22 +110,40 @@ class autoFSM(ControlModeThread):
         lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
 
         while self.objectDetectionSubscriber.isDataInPipe():
-            object = self.objectDetectionSubscriber.receive()
+            detected_objects_list = self.objectDetectionSubscriber.receive() # This is now a list of dicts
+            for object_info in detected_objects_list:
+                object_name = object_info.get("name")
+                object_presence = object_info.get("present") # True/False
+                object_position = object_info.get("position") # Ceka se implementacija
 
-            if object == "stefanija":
-                self.stephanie = True
-            elif object == "exit":
-                self.roundaboutExitFlag = True
-            elif object == "car":
-                self.sign_car_detected = True
-            elif object in self.traffic_light_states:
-                self.traffic_light_states.set_active(object)
-            elif object in self.traffic_signs:
-                self.traffic_signs.set_active(object)
+                if object_name == "stefanija":
+                    self.stephanie = object_presence
+                    if self.debugging: print(f"Stephanie present: {self.stephanie}")
+                elif object_name == "exit":
+                    self.roundaboutExitFlag = object_presence
+                    if self.debugging: print(f"Roundabout Exit present: {self.roundaboutExitFlag}")
+                elif object_name == "car":
+                    self.sign_car_detected = object_presence
+                    if self.debugging: print(f"Car present: {self.sign_car_detected}")
+                else:
+                    raise ValueError(f'Unknown object detected: {detected_objects_list}')
+                
+                if self.debugging:
+                    print(f"Preuzet je objekat: {object_name}, Prisutan: {object_presence}")
+
+        while self.trafficSignsSubscriber.isDataInPipe():
+            sign = self.trafficSignsSubscriber.receive() # This is a string (sign name)
+            if sign in self.traffic_light_states:
+                self.traffic_light_states.set_active(sign)
+                if self.debugging: print(f"Traffic light detected: {sign}")
+            elif sign in self.traffic_signs:
+                self.traffic_signs.set_active(sign)
+                if self.debugging: print(f"Traffic sign detected: {sign}")
             else:
-                raise ValueError(f'Unknown object detected: {object}')
-          
-            print(f"Preuzet je objekat {object}")
+                 raise ValueError(f'Unknown sign detected: {sign}')
+            
+            if self.debugging:
+                print(f"Preuzet je saobracajni znak: {sign}")
 
         parking_spot_detected = self.parkingSpotDetectionSubscriber.receive() != None
 
