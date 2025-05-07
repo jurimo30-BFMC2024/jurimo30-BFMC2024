@@ -1,21 +1,37 @@
-from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
-from src.utils.messages.messageHandlerSender import messageHandlerSender
-from src.core.Auto.LaneFollow.MovingAverage import MovingAverage as ma
-from src.core.Auto.PID import PIDController as pid
+from src.core.Auto.MotionScheduler import MotionScheduler
+from src.core.Auto.TrafficSignController import TrafficSignController
 import time
 import math
-import socket
 
 class IntersectionControl():
     def __init__(self, logging, debugging=False):
         self.logging = logging
         self.debugging = debugging
-        self.status = -2 # 0-nije startovano, 1 - startovano ide napred, 2 - startovano mota
-        self.lastPoint = 0
-        self.navPoint = 0
-        self.smer = "None"
+
+        self.state = "finish"
+        self.direction = None
+        self.full_stop_required = True
         self.slope_degrees = 0
-        self.straighten_time = 0
+        self.traffic_light_present = False
+
+        self.motions = {
+            "Right": [
+                (0, 168, 1.7),
+                (240, 168, 5.3),
+            ],
+            "Left": [
+                (0, 168, 3.7),
+                (-190, 168, 6.0),
+            ],
+            "Straight": [
+                (0, 168, 9.0)
+            ],
+            "Wait": [
+                (0, 0, 3.0)
+            ]
+        }
+
+        self.motionScheduler = MotionScheduler()
     
     def calculate_distance_to_straighten(self, alpha_deg, wheelbase=26, max_steering_angle=25):
         """
@@ -43,116 +59,81 @@ class IntersectionControl():
         #po brzini 168, ovaj manevar ce trajati distance/168 sekundi
         #jbg izracunaj sam dole
 
-
         return distance
+    
+    def createCorrectedMotion(self):
+        straighten_distance = self.calculate_distance_to_straighten(self.slope_degrees)
+        straighten_time = (straighten_distance / 30)
 
-
-    def getControlData(self, navigate, signs, sign, trafficLights, trafficLightFlag, stopLine):
-        # print(f'status raskrsnice: {self.status}')
-        self.lastStatus = self.status
-        intersection = True
-        if stopLine[0]:
-            self.slope_degrees = stopLine[1]
-
-        if(self.smer == "Right"):
-            tangle = 240
-            time1 = 1.7
-            time2 = 5.3
-        elif(self.smer == "Left"):
-            tangle = -190
-            time1 = 3.7
-            time2 = 6.0
-        elif(self.smer == "Straight"):
-            tangle = 0
-            time1 = 5
-            time2 = 4
+        # Determine the angle to correct the direction based on slope sign
+        if self.slope_degrees < 0:
+            angle = -250
+        elif self.slope_degrees > 0:
+            angle = 250
         else:
-            tangle = 0
-            time1 = 100
-            time2 = 100
+            angle = 0
 
-        if self.status == -2:
-            if self.debugging:
-                print("Pokmrenut manevar raskrsnice")
-            self.lastPoint = time.time()
-            self.angle = 0
-            self.speed = 0
+        # Create the correction motion (angle, speed, duration)
+        correction_motion = (angle, 300, straighten_time)
 
-            if trafficLightFlag:
-                if trafficLights["green"]:
-                    self.status = -1
-                    trafficLights["green"] = False
-                    self.time0 = 0
-                else:
-                    self.status = -2
-            else:
-                self.status = -1
-                if sign == "stop":
-                    self.time0 = 3
-                    if self.debugging:
-                        print("Cekanje za znak stop")
-                elif sign == "priority":
-                    self.time0 = 0
-                else:
-                    self.time0 = 0
+        # Get a copy of the motion sequence for the current direction
+        motion = self.motions[self.direction].copy()
 
-        elif self.status == -1: # CEKANJE PRIJE KRETANJA U SLUCAJU CRVENO ILI STOP
-            if ((time.time() - self.lastPoint) >= self.time0) or trafficLightFlag:
-                straighten_distance = self.calculate_distance_to_straighten(self.slope_degrees)
-                # Assume speed is 300 cm/s — calculate duration
-                self.straighten_time = (straighten_distance / 30)
-                print("krecem sa ispravljanjem")
-                # print(f'straighten_distance: {straighten_distance}, self.straighten_time: {self.straighten_time}')
+        # Adjust the first motion's duration to account for the correction time
+        angle, speed, t = motion[0]
+        motion[0] = (angle, speed, t - straighten_time)
 
-                if self.slope_degrees < 0:
-                    self.angle = -250
-                elif self.slope_degrees > 0:
-                    self.angle = 250
-                else:
-                    self.angle = 0
-                self.speed = 300
-                self.lastPoint = time.time()
-                self.status = 0
-                # print("angle, speed, slope", self.angle, self.speed, self.slope_degrees)
-                
+        # Insert the correction motion at the beginning
+        motion.insert(0, correction_motion)
 
-        elif self.status == 0:
-            if (time.time() - self.lastPoint) >= self.straighten_time:
-                if self.debugging:
-                    print("Krecem sa algoritmom")
-                if navigate:  # Check if navigate is not empty
-                    # self.send_udp_packet(navigate[0])
-                    self.smer = navigate.pop(0)  # Use pop to get and remove the first element
-                    if self.debugging:
-                        print(f"Smer je {self.smer}")
-                else:
-                    self.status = -2
-                    self.speed = 0
-                    self.angle = 0
-                    if self.debugging:
-                        print("Izlazak iz opsega, staza je zavrsena")
-                self.lastPoint = time.time()
-                self.status = 1
-                self.angle = 0
-                self.speed = 168
-        elif self.status == 1:
-            if (time.time() - self.lastPoint) >= time1 - self.straighten_time:
-                if self.debugging:
-                    print("Krecem da motam")
-                self.status = 2
-                self.lastPoint = time.time()
-                self.angle = tangle
-                self.speed = 168
-        elif self.status == 2:
-            if (time.time() - self.lastPoint) >= time2:
-                if self.debugging:
-                    print("kraj")
-                self.status = -2
-                intersection = False
-                self.angle = 0
-                self.lastPoint = 0
-                self.speed = 168
-                signs[sign] = False
-                trafficLights = {key: False for key in trafficLights}
+        return motion
+    
+    def setCourse(self, sign: str, direction: str, traffic_light_present: bool):
+        if self.state != "finish":
+            raise RuntimeError(f"Previous intersection course not finished: {self.state}")
         
-        return self.angle, self.speed, intersection
+        if direction not in ["Right", "Left", "Straight"]:
+            raise ValueError(f"Unsuported direction requested: {direction}")
+        
+        if sign not in ["priority", "stop"]:
+            raise ValueError(f"Unknown sign received: {sign}")
+        
+        self.full_stop_required = (sign == "stop")
+        self.direction = direction
+        self.traffic_light_present = traffic_light_present
+        
+        if self.full_stop_required and self.traffic_light_present:
+            raise RuntimeError("Ambiguous state: both STOP and traffic light detected")
+
+    def getControlData(self, stop_line_present: bool, stop_line_slope: float, trafficLights: TrafficSignController):
+        if stop_line_present:
+            self.slope_degrees = stop_line_slope
+
+        if self.state == "finish":
+            if self.full_stop_required:
+                self.motionScheduler.set_schedule(self.motions["Wait"])
+                self.state = "stop"
+            elif self.traffic_light_present:
+                self.state = "traffic_light"
+            else:
+                self.motionScheduler.set_schedule(self.createCorrectedMotion())
+                self.state = "maneuver"
+
+        if self.state == "stop":
+            angle, speed, finished = self.motionScheduler.run()
+            if finished:
+                self.motionScheduler.set_schedule(self.createCorrectedMotion())
+                self.state = "maneuver"
+
+        elif self.state == "traffic_light":
+            angle, speed = 0, 0
+            if trafficLights.get_active() == "green":
+                self.motionScheduler.set_schedule(self.createCorrectedMotion())
+                self.state = "maneuver"
+
+        elif self.state == "maneuver":
+            angle, speed, finished = self.motionScheduler.run()
+            if finished:
+                self.state = "finish"
+
+        return angle, speed, self.state != "finish"

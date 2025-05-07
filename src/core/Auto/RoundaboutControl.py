@@ -43,11 +43,11 @@ class RoundaboutControl():
 
         return distance
 
-    def getControlData(self, angleForRoundabout, navigate, exitFlag, stopLine):
+    def getControlData(self, angleForRoundabout, navigate, exitFlag, stop_line_present, stop_line_slope):
         roundAbout = True
         self.exitFlag = exitFlag  # Update instance attribute instead of local variable
-        if stopLine[0]:
-            self.slope_degrees = stopLine[1]
+        if stop_line_present:
+            self.slope_degrees = stop_line_slope
 
         if self.status == -3:
             if self.debugging:
