@@ -18,15 +18,25 @@ class LaneFollower:
         self.measure_height = int(self.height * 0.8)  # 80% down the image
 
         # PID controller for steering
-        self.pid = PIDController(kp=0.5, ki=0.01, kd=0, output_limits=(-25, 25))
+        self.pid = PIDController(kp=0.35, ki=0.01, kd=0, output_limits=(-25, 25))
 
         # Image center reference point
-        self.center_x = self.width // 2
+        self.center_x = self.width * 0.47
+        
+        # Otvori fajl za upisivanje podataka o obradi
+        self.log_file = open("lane_follow_log.txt", "w")
+        self.log_file.write("dt greska izlaz_pid\n")
+
+    def __del__(self):
+        """Zatvori log fajl prilikom uništenja objekta"""
+        if hasattr(self, 'log_file'):
+            self.log_file.close()
 
     def restartPid(self):
         """Restart PID controller"""
         self.pid.reset()
         self.last_frame_time = time.time()
+        
     def process_following(self, left_x: int | None, right_x: int | None):
         """Calculates lane center, error, steering angle. Does NOT draw on the frame."""
         # Calculate time delta
@@ -54,17 +64,13 @@ class LaneFollower:
 
         # Calculate error (offset from center)
         error = self.center_x - lane_center
+        print(f"Error: {error}")
 
-        if abs(error) > 50:
-            if(self.lastStatus != 0):
-                self.pid.set_tunings(kp=0.5, ki=0.01, kd=0)
-                self.lastStatus = 0
-        else:   
-            if(self.lastStatus != 1):
-                self.pid.set_tunings(kp=0.05, ki=0.01, kd=0)
-                self.lastStatus = 1
-        # Use PID to calculate steering angle
         angle_degrees = self.pid.compute(error, dt=dt)
+        
+        # Upisivanje podataka u fajl
+        self.log_file.write(f"{dt:.6f} {error} {-angle_degrees}\n")
+        self.log_file.flush()  # Osigurava da se podaci odmah upišu
 
         # Debug log for terminal
         if self.logging:

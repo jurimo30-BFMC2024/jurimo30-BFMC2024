@@ -35,7 +35,7 @@ class threadLaneDetect(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.laneDetector = LaneDetector(512, 270, logging, debugging, False)
+        self.laneDetector = LaneDetector(512, 270, logging, False, False)
         self.imgProcessor = ImgProcessor(512, 270, logging, debugging, False)
         self.stopLineDetector = StopDetect(512, 270, logging, False, False)
         self.parkingSpotDetector = ParkingSpotDetector()

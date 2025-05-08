@@ -16,10 +16,10 @@ class LaneDetector:
         # Define road region for processing
         self.roadReg = np.array([[
             (int(self.width * 0.02), self.height - int(self.height * 0.02)),   # donji lijevi ugao
-            (int(self.width * 0.22), self.height - int(self.height * 0.02)),  # donji lijevi prije ulegnuća
-            (int(self.width * 0.30), self.height - int(self.height * 0.39)), # donji lijevi ulegnuće
-            (int(self.width * 0.7), self.height - int(self.height * 0.39)), # donji desni ulegnuće
-            (int(self.width * 0.78), self.height - int(self.height * 0.02)),  # donji desni prije ulegnuća
+            (int(self.width * 0.20), self.height - int(self.height * 0.02)),  # donji lijevi prije ulegnuća
+            (int(self.width * 0.28), self.height - int(self.height * 0.39)), # donji lijevi ulegnuće
+            (int(self.width * 0.68), self.height - int(self.height * 0.39)), # donji desni ulegnuće
+            (int(self.width * 0.76), self.height - int(self.height * 0.02)),  # donji desni prije ulegnuća
             (int(self.width * 0.98), self.height - int(self.height * 0.02)),  # donji desni ugao
             (int(self.width * 0.8), self.height // 2 - int(self.height * 0.15)), # gornji desni ugao
             (int(self.width * 0.2), self.height // 2 - int(self.height * 0.15))  # gornji lijevi ugao
@@ -42,7 +42,7 @@ class LaneDetector:
         self.min_lane_line_length = 15  # Minimum length for lane lines (pixels)
 
         # Measurement point - height in the image where we calculate lane center
-        self.measure_height = int(self.height * 0.8)  # 80% down the image
+        self.measure_height = int(self.height * 0.50)  # 80% down the image
 
         # Colors for visualization
         self.color_left_lane = (255, 100, 0)    # Blue-ish
@@ -218,7 +218,7 @@ class LaneDetector:
         # --- End of Drawing Logic ---
 
         # Debug log for terminal (simplified)
-        if self.logging:
+        if self.logging and self.debugging:
             print(f"Lane Detection: LeftX={left_x}, RightX={right_x}, "
                   f"LeftLines={len(left_lines_stable)}, RightLines={len(right_lines_stable)}")
 
