@@ -210,12 +210,9 @@ class autoFSM(ControlModeThread):
             
         elif self.state == autoFSMState.INTERSECTION:
             angle, speed, module_running = self.intersectionController.getControlData(
-                navigate=self.navigateCommand,
-                sign=self.intersectionSign,
-                trafficLights=self.traffic_light_states,
-                trafficLightFlag=traffic_light_present,
                 stop_line_present=stop_line_present,
-                stop_line_slope=stop_line_slope
+                stop_line_slope=stop_line_slope,
+                trafficLights=self.traffic_light_states
             )
             
             if not module_running:
