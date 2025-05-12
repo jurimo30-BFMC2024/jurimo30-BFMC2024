@@ -122,7 +122,7 @@ class threadObjectDetection(ThreadWithStop):
                     continue
                 color = (0, 0, 255)
             elif label == "exit":
-                if not (conf > 0.15 and y2 > 180 and x2 > 180):
+                if not (conf > 0.15):
                     continue
                 color = (0, 255, 0)
             elif label == "stefanija":
