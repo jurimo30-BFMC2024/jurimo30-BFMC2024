@@ -90,7 +90,7 @@ class LaneDetect(Enum):
     Queue = "General"
     Owner = "threadLaneDetect"
     msgID = 6
-    msgType = "float"
+    msgType = "tuple"
     
 class IntersectionDetect(Enum):
     Queue = "General"

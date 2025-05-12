@@ -35,12 +35,12 @@ class threadLaneDetect(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.laneDetector = LaneDetector(512, 270, logging, debugging, False)
+        self.laneDetector = LaneDetector(512, 270, logging, False, False)
         self.imgProcessor = ImgProcessor(512, 270, logging, debugging, False)
-        self.stopLineDetector = StopDetect(512, 270, logging, debugging, False)
+        self.stopLineDetector = StopDetect(512, 270, logging, False, False)
         self.parkingSpotDetector = ParkingSpotDetector()
         self.strm = vs(1, 0)
-        self.roundAboutDetector = RoundaboutNavigator(512, 270, logging, debugging)  # Initialize RoundAboutDetector
+        self.roundAboutDetector = RoundaboutNavigator(512, 270, logging, False)  # Initialize RoundAboutDetector
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
@@ -69,7 +69,7 @@ class threadLaneDetect(ThreadWithStop):
 
                 # obradi frejm
                 frame, (intersection, slope_degrees), intersectionA = self.stopLineDetector.process_frame(frame, edges)
-                frame, angle = self.laneDetector.process_frame(frame, edges)
+                frame, leftX, rightX = self.laneDetector.process_frame(edges, frame)
                 frame, parking_line = self.parkingSpotDetector.process_frame(frame, edges)
                 frame, roundaboutAngle = self.roundAboutDetector.process_frame(frame, edges)
                 roundaboutExitDetected = False
@@ -83,7 +83,7 @@ class threadLaneDetect(ThreadWithStop):
                     start_time_second = time.time()
 
                 # Slanje rezultate
-                self.laneDetectionSender.send(angle)
+                self.laneDetectionSender.send((leftX, rightX))
                 self.intersectionDetectionSender.send((intersection, slope_degrees))
                 self.intersectionDetectionSender2.send(bool(intersectionA))
                 if parking_line is not None:
