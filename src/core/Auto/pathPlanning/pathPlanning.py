@@ -74,7 +74,7 @@ class PathPlanner:
             target = edge.get("target")
             graph.add_edge(source, target)
         
-        # Improved intersection identification
+        # intersection identification
         for node in graph.nodes():
             graph.nodes[node]['intersection'] = graph.out_degree(node) > 1  # 3 or more connections
         
@@ -114,7 +114,7 @@ class PathPlanner:
             visited_collectibles.add(nearest)
             current_node = nearest
         
-        # Finally, go to the goal (this part is skipped if pacman)
+        # finally, go to the goal (this part is skipped if pacman)
         if self.mode == "p2p":
             final_segment = nx.shortest_path(graph, source=current_node, target=goal, method='dijkstra')
             path.extend(final_segment[1:])
@@ -136,19 +136,13 @@ class PathPlanner:
                         break
                     counter += 1
                 if counter == 2:
-                    directions.append((current_node, "Right"))
+                    directions.append((current_node, "Exit 1"))
                 elif counter == 4:
-                    directions.append((current_node, "Straight"))
-                    directions.append((current_node, "Right"))
+                    directions.append((current_node, "Exit 2"))
                 elif counter == 6:
-                    directions.append((current_node, "Straight"))
-                    directions.append((current_node, "Straight"))
-                    directions.append((current_node, "Right"))
+                    directions.append((current_node, "Exit 3"))
                 elif counter == 8:
-                    directions.append((current_node, "Straight"))
-                    directions.append((current_node, "Straight"))
-                    directions.append((current_node, "Straight"))
-                    directions.append((current_node, "Right"))
+                    directions.append((current_node, "Exit 4"))
                 else:
                     if i + counter + 1 > len(path) - 1:
                         print("W: Your end node is inside the roundabout (reconsider)")
@@ -159,43 +153,37 @@ class PathPlanner:
                 i += counter + 1
                 continue
 
-            # Skip if not an intersection
+            # skip if not an intersection
             if not graph.nodes[current_node].get('intersection', False):
                 i += 1
                 continue
             
-            # Get coordinates for vectors
+            # get coordinates for vectors
             x_prev, y_prev = graph.nodes[prev_node]['pos']
             x_curr, y_curr = graph.nodes[current_node]['pos']
             x_next, y_next = graph.nodes[next_node]['pos']
 
-            # Create direction vectors
+            # create direction vectors
             incoming_vec = np.array([x_curr - x_prev, y_curr - y_prev])
             outgoing_vec = np.array([x_next - x_curr, y_next - y_curr])
             
-            # Normalize vectors
+            # normalize vectors
             with np.errstate(divide='ignore', invalid='ignore'):
                 incoming_vec = incoming_vec / np.linalg.norm(incoming_vec)
                 outgoing_vec = outgoing_vec / np.linalg.norm(outgoing_vec)
             
-            # Handle potential zero vectors
+            # handle potential zero vectors
             if np.any(np.isnan(incoming_vec)) or np.any(np.isnan(outgoing_vec)):
                 i += 1
                 continue
             
-            # Calculate angle difference using arctan2
+            # calculate angle difference using arctan2
             angle_in = np.arctan2(incoming_vec[1], incoming_vec[0])
             angle_out = np.arctan2(outgoing_vec[1], outgoing_vec[0])
             angle_diff = np.degrees(angle_out - angle_in)
             
-            # Normalize angle to [-180, 180)
+            # normalize angle to [-180, 180)
             angle_diff = (angle_diff + 180) % 360 - 180
-            
-            # Debugging: Print intermediate values
-            # print(f"At node {current_node}:")
-            # print(f"  Incoming vector: {incoming_vec}")
-            # print(f"  Outgoing vector: {outgoing_vec}")
-            # print(f"  Angle difference: {angle_diff:.2f}°")
             
             if angle_diff > 45:
                 turn = "Left"
