@@ -218,11 +218,11 @@ class threadObjectDetection(ThreadWithStop):
                    self.relevant_objects[name]["present"] = True
                    self.relevant_objects[name]["position"] = current_position
                    self.relevant_objects[name]["sent_lost_message"] = False
-                   self.objectDetectionSender.send([{
+                   self.objectDetectionSender.send({
                         "name": name,
                         "position": current_position,
                         "present": True
-                    }])
+                    })
             else:
                 if self.relevant_objects[name]["last_seen_time"] is not None:
                     time_since_seen = current_time - self.relevant_objects[name]["last_seen_time"]
@@ -232,11 +232,11 @@ class threadObjectDetection(ThreadWithStop):
                         self.relevant_objects[name]["present"] = False
                         self.relevant_objects[name]["position"] = None
                         self.relevant_objects[name]["sent_lost_message"] = True
-                        self.objectDetectionSender.send([{
+                        self.objectDetectionSender.send({
                         "name": name,
                         "position": None,
                         "present": False
-                    }])
+                    })
 
     @staticmethod
     def decode_frame(encoded_data):

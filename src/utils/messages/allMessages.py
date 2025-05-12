@@ -120,7 +120,7 @@ class ObjectDetection(Enum):
     Queue = "General"
     Owner = "threadObjectDetection"
     msgID = 8
-    msgType = "list"
+    msgType = "dict"
 
 class TrafficSignsDetection(Enum):
     Queue = "General"

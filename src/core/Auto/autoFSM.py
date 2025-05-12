@@ -110,26 +110,25 @@ class autoFSM(ControlModeThread):
         lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
 
         while self.objectDetectionSubscriber.isDataInPipe():
-            detected_objects_list = self.objectDetectionSubscriber.receive() # This is now a list of dicts
-            for object_info in detected_objects_list:
-                object_name = object_info.get("name")
-                object_presence = object_info.get("present") # True/False
-                object_position = object_info.get("position") # Ceka se implementacija
+            detected_objects_dict = self.objectDetectionSubscriber.receive() # This is now a list of dicts
+            object_name = detected_objects_dict.get("name")
+            object_presence = detected_objects_dict.get("present") # True/False
+            object_position = detected_objects_dict.get("position") # Ceka se implementacija
 
-                if object_name == "stefanija":
-                    self.stephanie = object_presence
-                    if self.debugging: print(f"Stephanie present: {self.stephanie}")
-                elif object_name == "exit":
-                    self.roundaboutExitFlag = object_presence
-                    if self.debugging: print(f"Roundabout Exit present: {self.roundaboutExitFlag}")
-                elif object_name == "car":
-                    self.sign_car_detected = object_presence
-                    if self.debugging: print(f"Car present: {self.sign_car_detected}")
-                else:
-                    raise ValueError(f'Unknown object detected: {detected_objects_list}')
-                
-                if self.debugging:
-                    print(f"Preuzet je objekat: {object_name}, Prisutan: {object_presence}")
+            if object_name == "stefanija":
+                self.stephanie = object_presence
+                if self.debugging: print(f"Stephanie present: {self.stephanie}")
+            elif object_name == "exit":
+                self.roundaboutExitFlag = object_presence
+                if self.debugging: print(f"Roundabout Exit present: {self.roundaboutExitFlag}")
+            elif object_name == "car":
+                self.sign_car_detected = object_presence
+                if self.debugging: print(f"Car present: {self.sign_car_detected}")
+            else:
+                raise ValueError(f'Unknown object detected: {detected_objects_dict}')
+            
+            if self.debugging:
+                print(f"Preuzet je objekat: {object_name}, Prisutan: {object_presence}")
 
         while self.trafficSignsSubscriber.isDataInPipe():
             sign = self.trafficSignsSubscriber.receive() # This is a string (sign name)
