@@ -4,7 +4,7 @@ class PIDController:
         self.ki = ki  # Integralni faktor
         self.kd = kd  # Derivativni faktor
         # Anti-windup koeficijent; po defaultu jednak ki ako nije specificiran
-        self.kaw = 5
+        self.kaw = 8
 
         self.previous_error = 0.0      # Prethodna greška
         self.integral = 0.0            # Integralna akumulacija

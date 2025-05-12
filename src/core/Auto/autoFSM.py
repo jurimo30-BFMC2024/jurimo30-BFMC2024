@@ -152,7 +152,7 @@ class autoFSM(ControlModeThread):
                     print("Izlazak sa auto puta")
                 self.traffic_signs.clear()
                 self.state = autoFSMState.DRIVE
-                self.laneFollowContrler.restartPid()
+                self.laneFollowContrler.set_pid_highway(False)
 
         
         if self.state == autoFSMState.DRIVE:
@@ -187,7 +187,7 @@ class autoFSM(ControlModeThread):
                     print("Ulazak na autoput")
                 self.traffic_signs.clear()
                 self.state = autoFSMState.HIGHWAY
-                self.laneFollowContrler.restartPid()
+                self.laneFollowContrler.set_pid_highway(True)
             
             elif obstacle and self.oldSpeed == 0:
                 if self.obstacle_start_time is None:

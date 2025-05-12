@@ -18,7 +18,7 @@ class LaneFollower:
         self.measure_height = int(self.height * 0.8)  # 80% down the image
 
         # PID controller for steering
-        self.pid = PIDController(kp=0.35, ki=0.01, kd=0, output_limits=(-25, 25))
+        self.pid = PIDController(kp=0.35, ki=0.01, kd=0.01, output_limits=(-25, 25))
 
         # Image center reference point
         self.center_x = self.width * 0.47
@@ -36,7 +36,19 @@ class LaneFollower:
         """Restart PID controller"""
         self.pid.reset()
         self.last_frame_time = time.time()
-        
+
+    def set_pid_highway(self, highway: bool):
+       if highway:
+           kp = 0.25
+           ki = 0.0
+           kd = 0.1
+       else:
+           kp = 0.35
+           ki = 0.01
+           kd = 0.01
+       self.pid.set_tunings(kp=kp, ki=ki, kd=kd)
+       self.pid.reset()
+
     def process_following(self, left_x: int | None, right_x: int | None):
         """Calculates lane center, error, steering angle. Does NOT draw on the frame."""
         # Calculate time delta
