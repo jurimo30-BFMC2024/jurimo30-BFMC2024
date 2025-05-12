@@ -91,10 +91,10 @@ class autoFSM(ControlModeThread):
             "red", "green", "yellow", "red_yellow"
         ])
 
-        self.sign_car_detected = False
+        self.sign_car_position = False
         self.obstacle_start_time = None
-        self.stephanie = False
-        self.roundaboutExitFlag = False
+        self.stephanie_position = False
+        self.roundaboutExit_position = False
         self.intersectionSign = "None"
 
         self.state = autoFSMState.DRIVE
@@ -110,25 +110,24 @@ class autoFSM(ControlModeThread):
         lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
 
         while self.objectDetectionSubscriber.isDataInPipe():
-            detected_objects_dict = self.objectDetectionSubscriber.receive() # This is now a list of dicts
+            detected_objects_dict = self.objectDetectionSubscriber.receive() # This is now a dict
             object_name = detected_objects_dict.get("name")
-            object_presence = detected_objects_dict.get("present") # True/False
-            object_position = detected_objects_dict.get("position") # Ceka se implementacija
+            object_position = detected_objects_dict.get("position")
 
             if object_name == "stefanija":
-                self.stephanie = object_presence
-                if self.debugging: print(f"Stephanie present: {self.stephanie}")
+                self.stephanie_position = object_position
+                if self.debugging: print(f"Stephanie present: {self.stephanie_position}")
             elif object_name == "exit":
-                self.roundaboutExitFlag = object_presence
-                if self.debugging: print(f"Roundabout Exit present: {self.roundaboutExitFlag}")
+                self.roundaboutExit_position = object_position
+                if self.debugging: print(f"Roundabout Exit present: {self.roundaboutExit_position}")
             elif object_name == "car":
-                self.sign_car_detected = object_presence
-                if self.debugging: print(f"Car present: {self.sign_car_detected}")
+                self.sign_car_position = object_position
+                if self.debugging: print(f"Car present: {self.sign_car_position}")
             else:
                 raise ValueError(f'Unknown object detected: {detected_objects_dict}')
             
             if self.debugging:
-                print(f"Preuzet je objekat: {object_name}, Prisutan: {object_presence}")
+                print(f"Preuzet je objekat: {object_name}, Prisutan: {object_position}")
 
         while self.trafficSignsSubscriber.isDataInPipe():
             sign = self.trafficSignsSubscriber.receive() # This is a string (sign name)
@@ -153,7 +152,7 @@ class autoFSM(ControlModeThread):
         # Receive roundabout-related messages
         roundabout_angle = self.roundaboutAngleSubscriber.receiveWithBlock()  # Corrected to RoundAboutAngle
         traffic_light_present = self.traffic_light_states.get_active() != None
-        obstacle = front_sensors["distance"] <= 80 and self.sign_car_detected
+        obstacle = front_sensors["distance"] <= 80 and self.sign_car_position
         angle = self.laneFollowData.getControlData(self.state == autoFSMState.HIGHWAY, lowDistance, error_angle) # calculate steering angle from lane follow data
 
         if not obstacle:
@@ -195,7 +194,7 @@ class autoFSM(ControlModeThread):
                 self.traffic_signs.clear()
                 self.state = autoFSMState.ROUNDABOUT
 
-            elif stop_line_present and self.traffic_signs.get_active() == "crosswalk" and self.stephanie:
+            elif stop_line_present and self.traffic_signs.get_active() == "crosswalk" and self.stephanie_position:
                 self.crosswalkStart = time.time()
                 self.state = autoFSMState.CROSSWALK
                         
@@ -211,7 +210,7 @@ class autoFSM(ControlModeThread):
                 
                 if time.time() - self.obstacle_start_time >= 1:
                     print("Pass static obstacle start")
-                    self.sign_car_detected = False
+                    self.sign_car_position = False
                     self.state = autoFSMState.OVERTAKE
 
         ##############################         FSM            #############################
@@ -249,15 +248,15 @@ class autoFSM(ControlModeThread):
             angle = 0
             speed = 0
             if time.time() - self.crosswalkStart >= 3:
-                self.stephanie = False
+                self.stephanie_position = False
                 self.traffic_signs.clear()
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.ROUNDABOUT:
-            angle, speed, module_running, self.roundaboutExitFlag  = self.roundaboutController.getControlData(
+            angle, speed, module_running, self.roundaboutExit_position  = self.roundaboutController.getControlData(
                 angleForRoundabout=roundabout_angle,  # Use the received angle
                 navigate=self.navigateCommand,
-                exitFlag=self.roundaboutExitFlag,
+                exitFlag=self.roundaboutExit_position,
                 stop_line_present=stop_line_present,
                 stop_line_slope=stop_line_slope
             )
@@ -267,7 +266,7 @@ class autoFSM(ControlModeThread):
 
         elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
             no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
-            stephanie_crossing = self.stephanie and self.traffic_signs.get_active() != "crosswalk"
+            stephanie_crossing = self.stephanie_position and self.traffic_signs.get_active() != "crosswalk"
 
             speed = self.speedControler.getControlData(
                 angle=angle,
@@ -276,7 +275,7 @@ class autoFSM(ControlModeThread):
                 highway=self.state == autoFSMState.HIGHWAY,
                 frontDistance=front_sensors["distance"],
                 enable_emergency_stop=no_active_sign,
-                car_in_front=self.sign_car_detected,
+                car_in_front=self.sign_car_position,
                 stephanie_in_front=stephanie_crossing
             )
 

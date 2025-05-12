@@ -220,8 +220,7 @@ class threadObjectDetection(ThreadWithStop):
                    self.relevant_objects[name]["sent_lost_message"] = False
                    self.objectDetectionSender.send({
                         "name": name,
-                        "position": current_position,
-                        "present": True
+                        "position": current_position
                     })
             else:
                 if self.relevant_objects[name]["last_seen_time"] is not None:
@@ -234,8 +233,7 @@ class threadObjectDetection(ThreadWithStop):
                         self.relevant_objects[name]["sent_lost_message"] = True
                         self.objectDetectionSender.send({
                         "name": name,
-                        "position": None,
-                        "present": False
+                        "position": None
                     })
 
     @staticmethod
