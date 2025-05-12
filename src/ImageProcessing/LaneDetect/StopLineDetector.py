@@ -49,7 +49,7 @@ class StopLineDetector:
             masked_edges, 
             rho=1, 
             theta=np.pi/180, 
-            threshold=50, 
+            threshold=10, 
             minLineLength=self.min_line_length, 
             maxLineGap=self.max_line_gap
         )
@@ -65,7 +65,7 @@ class StopLineDetector:
                 if x2 - x1 == 0:  # Vertical line
                     line_angle = 90
                 else:
-                    line_angle = degrees(atan2((y2 - y1) / (x2 - x1)))
+                    line_angle = degrees(atan2((y2 - y1) , (x2 - x1)))
                 
                 # Check if the line is approximately horizontal (within threshold)
                 if line_angle <= self.horizontal_angle_threshold:
@@ -122,7 +122,7 @@ class StopLineDetector:
         cv2.polylines(frame, [self.roi_polygon], True, self.roi_color, self.roi_thickness)
         
         # Debug logging to console
-        if self.logging and detected:
-            print(f"Stop line detected: Distance={distance:.1f}px, Angle={angle:.1f}°")
+        #if self.logging and detected:
+        #    print(f"Stop line detected: Distance={distance:.1f}px, Angle={angle:.1f}°")
         
         return frame, (detected, distance, angle)

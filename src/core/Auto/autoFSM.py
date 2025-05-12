@@ -103,7 +103,7 @@ class autoFSM(ControlModeThread):
     def loop(self):
         self.leftX, self.rightX = self.laneDetectSubscriber.receiveWithBlock()
         stop_line_present, stop_line_distance, stop_line_angle = self.stopLineDetectionSubscriber.receiveWithBlock() # stopLine je sad tuple (intersection(bool), slope_degrees (float))
-        stop_line_present_close = stop_line_present and stop_line_distance < 50
+        stop_line_present_close = stop_line_present and stop_line_distance < 130
 
         while self.objectDetectionSubscriber.isDataInPipe():
             object = self.objectDetectionSubscriber.receive()
@@ -209,7 +209,7 @@ class autoFSM(ControlModeThread):
         elif self.state == autoFSMState.INTERSECTION:
             angle, speed, module_running = self.intersectionController.getControlData(
                 stop_line_present=stop_line_present_close,
-                stop_line_angle=stop_line_angle,
+                stop_line_slope=stop_line_angle,
                 trafficLights=self.traffic_light_states
             )
             
