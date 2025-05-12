@@ -106,9 +106,6 @@ class threadObjectDetection(ThreadWithStop):
         # Find best detection
         best_sign = None
 
-        h, w = frame.shape[:2]
-        center_box = (w // 2 - 20, int(h * 0.2), w // 2 + 20, h)
-
         # Reset relevant_objects presence
         for obj_key in self.relevant_objects:
             self.relevant_objects[obj_key]["present"] = False
@@ -117,18 +114,11 @@ class threadObjectDetection(ThreadWithStop):
             x1, y1, x2, y2, conf, cls = box.tolist()
             label = self.model.model.names[int(cls)]
             
-            box_cx = (x1 + x2) / 2
-            box_cy = (y1 + y2) / 2
             area = (x2 - x1) * (y2 - y1)
             
-            in_center = (
-                center_box[0] <= box_cx <= center_box[2] and
-                center_box[1] <= box_cy <= center_box[3]
-            )
-
             # Apply filtering logic
             if label == "car":
-                if not (conf > 0.75 and in_center):
+                if not (conf > 0.75):
                     continue
                 color = (0, 0, 255)
             elif label == "exit":
