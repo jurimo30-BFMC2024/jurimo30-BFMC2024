@@ -1,117 +1,128 @@
 import cv2
 import numpy as np
-import math
-from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream as vs
-from src.core.Auto.PID import PIDController as pid
+from math import atan2, degrees
+
 
 class StopLineDetector:
-    def __init__(self, width: int, height: int,logging, debugging=False, pc = False, camera_fov_degrees: float = 79.3):
-        self.debugging = debugging
-        self.logging = logging
-        self.camera_fov_degrees = camera_fov_degrees    
+    def __init__(self, width: int, height: int, logging, debugging=False, camera_fov_degrees: float = 79.3):
         self.width = width
         self.height = height
-        self.pc = pc
+        self.logging = logging
+        self.debugging = debugging
+        self.camera_fov_degrees = camera_fov_degrees
         
-        self.stopReg = np.array([[
-                (self.width*0.75, self.height*0.64),
-                (self.width*0.25, self.height*0.64),
-                (self.width*0.25, self.height*0.83),
-                (self.width*0.75, self.height*0.83)
-            ]], np.int32)
+        # Parameters for stop line detection
+        self.min_line_length = int(width * 0.3)  # Minimum length of line
+        self.max_line_gap = int(width * 0.05)    # Maximum allowed gap between line segments
+        self.horizontal_angle_threshold = 30     # Maximum angle from horizontal (in degrees)
+        self.previous_detections = []            # Store previous detections for smoothing
+        self.detection_history_size = 5          # Number of previous frames to consider
+        self.detection_threshold = 3             # Minimum detections to consider valid
+        self.last_detected = False               # Was a stop line detected in the previous frame
         
-        self.interStopReg = np.array([[
-                (self.width*0.68, self.height*0.35),
-                (self.width*0.32, self.height*0.35),
-                (self.width*0.25, self.height*0.64),
-                (self.width*0.75, self.height*0.64)
-            ]], np.int32)
-
-    def detectIntersection(self, lines):
-        if lines is None:
-            return False, [], None
+        # Define polygon ROI for stop line detection
+        self.roi_polygon = np.array([
+            [int(width * 0.1), int(height * 0.7)],    # Bottom left
+            [int(width * 0.1), int(height * 0.3)],    # Top left
+            [int(width * 0.9), int(height * 0.3)],    # Top right
+            [int(width * 0.9), int(height * 0.7)]     # Bottom right
+        ], np.int32)
         
-        lines2 = []
-        slope_degrees = None
+        # ROI polygon color and thickness for visualization
+        self.roi_color = (150, 50, 80)
+        self.roi_thickness = 2
 
-        for line in lines:
-            for x1, y1, x2, y2 in line:
-                dx = x2 - x1
-                dy = y2 - y1
-                distance = np.sqrt(dx**2 + dy**2)
 
-                if dx != 0:
-                    slope = dy / dx
+    def process_frame(self, frame: np.ndarray, edges: np.ndarray):
+        detected = False
+        distance = 0
+        angle = 0
+        best_line = None  # Store the best line data
+        
+        # Apply polygon ROI mask
+        mask = np.zeros_like(edges)
+        cv2.fillPoly(mask, [self.roi_polygon], 255)
+        masked_edges = cv2.bitwise_and(edges, mask)
+        
+        # Use Hough Line Transform to detect lines
+        lines = cv2.HoughLinesP(
+            masked_edges, 
+            rho=1, 
+            theta=np.pi/180, 
+            threshold=50, 
+            minLineLength=self.min_line_length, 
+            maxLineGap=self.max_line_gap
+        )
+        
+        potential_stop_lines = []
+        
+        # Process detected lines
+        if lines is not None:
+            for line in lines:
+                x1, y1, x2, y2 = line[0]
+                
+                # Calculate line angle
+                if x2 - x1 == 0:  # Vertical line
+                    line_angle = 90
                 else:
-                    slope = 0  # Used only for filtering, real angle from atan2
-
-                if -0.3 < slope < 0.3 and distance > 50:
-                    lines2.append([(x1, y1), (x2, y2)])
-                    slope_degrees = math.degrees(math.atan2(dy, dx))
-
-        if len(lines2) >= 2:
-            return True, lines2, slope_degrees
-
-        return False, [], None
-
-    def region_of_interest(self, img, Reg):
-        mask = np.zeros_like(img, dtype=np.uint8)
-        cv2.fillPoly(mask, Reg, (255, 255, 255)) # Mask now matches BGR format
-        masked_image = cv2.bitwise_and(img, mask)
-        return masked_image
-    
-    def detect_lines(self, img, tres = 30):
-        return cv2.HoughLinesP(img, rho=1, theta=np.pi / 180, threshold=tres, minLineLength=10, maxLineGap=30)
-    
-    def process_frame(self, frame: np.ndarray, edges):
-        roi2 = self.region_of_interest(edges, self.stopReg)
-        roi3 = self.region_of_interest(edges, self.interStopReg)
-
-        lines2 = self.detect_lines(roi2, 5)
-        lines3 = self.detect_lines(roi3, 10)
-
-        intersection, linesX, slope_degrees = self.detectIntersection(lines2)
-        intersectionA, linesY, _ = self.detectIntersection(lines3)
-
-        if self.debugging:
-            points = self.stopReg.reshape((-1, 1, 2))
-            cv2.polylines(frame, [points], isClosed=True, color=(255, 255, 0), thickness=2)
-            points = self.interStopReg.reshape((-1, 1, 2))
-            cv2.polylines(frame, [points], isClosed=True, color=(150, 255, 50), thickness=2)
-
-
-            # Pretpostavka da se linesX odnosi na linije detektovane na zaustavnoj liniji
-            if len(linesX) > 0:
-                points = []
-
-                for (x1, y1), (x2, y2) in linesX:
-                    points.append((x1, y1))
-                    points.append((x2, y2))
-
-                points = np.array(points)
-                x = points[:, 0]
-                y = points[:, 1]
-
-                # Fit a line: y = m*x + b
-                m, b = np.polyfit(x, y, 1)
-
-                # Define two x points to draw the fitted line
-                x_start = int(np.min(x))
-                x_end = int(np.max(x))
-                y_start = int(m * x_start + b)
-                y_end = int(m * x_end + b)
-
-                # Kombinuje sve detektovane linije u jednu veliku prosecnu
-                cv2.line(frame, (x_start, y_start), (x_end, y_end), (255, 0, 0), 3)
-
-            # Ovo me ne interesuje jer pretpostavljam da su linesY za ono dalje detektovanje raskrsnice
-            # pa cu ostaviti zasad samo ovako
-            if len(linesY) > 0:
-                for line in linesY:
-                    (x1, y1), (x2, y2) = line
-                    cv2.line(frame, (x1, y1), (x2, y2), (200, 50, 0), 3)
-
-        if intersectionA:
-            intersection = False
-
-        return frame, (intersection, slope_degrees), intersectionA
+                    line_angle = degrees(atan2((y2 - y1) / (x2 - x1)))
+                
+                # Check if the line is approximately horizontal (within threshold)
+                if line_angle <= self.horizontal_angle_threshold:
+                    # Calculate line width (horizontal span)
+                    line_width = abs(x2 - x1)
+                    
+                    # Check if line spans a significant portion of the image width
+                    if line_width > self.min_line_length:
+                        # Calculate line position (y-coordinate) - average of endpoints
+                        line_position = (y1 + y2) / 2
+                        
+                        # Calculate distance from bottom of the frame
+                        line_distance = self.height - line_position
+                        
+                        potential_stop_lines.append({
+                            'points': (x1, y1, x2, y2),
+                            'angle': line_angle,
+                            'distance': line_distance,
+                            'width': line_width
+                        })
+        
+        # Select the best stop line candidate
+        if potential_stop_lines:
+            # Sort by width (descending) and then by distance (ascending)
+            potential_stop_lines.sort(key=lambda x: (-x['width'], x['distance']))
+            best_line = potential_stop_lines[0]
+            
+            x1, y1, x2, y2 = best_line['points']
+            distance = best_line['distance']
+            angle = best_line['angle']
+            
+            # Update detection history
+            self.previous_detections.append(1)
+            if len(self.previous_detections) > self.detection_history_size:
+                self.previous_detections.pop(0)
+            
+            # Draw the detected stop line (only visual, no text)
+            cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
+            
+            detected = True
+        else:
+            # No potential stop lines found
+            self.previous_detections.append(0)
+            if len(self.previous_detections) > self.detection_history_size:
+                self.previous_detections.pop(0)
+        
+        # Check if we have consistent detections
+        if sum(self.previous_detections) >= self.detection_threshold:
+            detected = True
+        else:
+            detected = False
+        
+        # Always draw the ROI polygon on the frame
+        cv2.polylines(frame, [self.roi_polygon], True, self.roi_color, self.roi_thickness)
+        
+        # Debug logging to console
+        if self.logging and detected:
+            print(f"Stop line detected: Distance={distance:.1f}px, Angle={angle:.1f}°")
+        
+        return frame, (detected, distance, angle)
