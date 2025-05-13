@@ -32,12 +32,6 @@ class IntersectionControl():
         }
 
         self.motionScheduler = MotionScheduler()
-
-        self.status = -2
-        self.lastPoint = 0
-        self.navPoint = 0
-        self.smer = "None"
-        self.straighten_time = 0
     
     def calculate_distance_to_straighten(self, alpha_deg, wheelbase=26, max_steering_angle=25):
         """
@@ -109,8 +103,7 @@ class IntersectionControl():
         self.traffic_light_present = traffic_light_present
         
         if self.full_stop_required and self.traffic_light_present:
-            raise RuntimeError("Undefined state requested, both stop and traffic light detected")
-    
+            raise RuntimeError("Ambiguous state: both STOP and traffic light detected")
 
     def getControlData(self, stop_line_present: bool, stop_line_slope: float, trafficLights: TrafficSignController):
         if stop_line_present:
