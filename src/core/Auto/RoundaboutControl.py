@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import time
 from src.ImageProcessing.LaneDetect.pid_controller import PIDController
-
+from typing import Tuple
 
 
 class RoundaboutController:
@@ -50,19 +50,19 @@ class RoundaboutController:
     def start(self, command: str):
 
         if not command.startswith("Exit "):
-            if self.logging:
+            if self.debugging:
                 print("Greška: Komanda mora biti u formatu 'Exit X'")
             return False
 
         try:
             target_exit = int(command.split(" ")[1])
         except (IndexError, ValueError):
-            if self.logging:
+            if self.debugging:
                 print("Greška: Nije moguće parsirati broj izlaza iz komande")
             return False
 
         if target_exit < 1:
-            if self.logging:
+            if self.debugging:
                 print("Greška: Broj izlaza mora biti >= 1")
             return False
 
@@ -74,7 +74,7 @@ class RoundaboutController:
         self.right_pid.reset()
         self.left_pid.reset()
 
-        if self.logging:
+        if self.debugging:
             print(f"RoundaboutController: Započeta kontrola, cilj izlaz {target_exit}")
 
         return True
@@ -85,7 +85,7 @@ class RoundaboutController:
         self.active = False
         self.current_phase = None
         
-        if self.logging:
+        if self.debugging:
             print("RoundaboutController: Kontrola zaustavljena")
     
     def is_exit_in_region(self, exit_data):
@@ -99,9 +99,10 @@ class RoundaboutController:
         return (x2 >= reg['x_min'] and x2 <= reg['x_max'] and 
                 y2 >= reg['y_min'] and y2 <= reg['y_max'])
     
-    def process_frame(self, left_x, right_x, exit_data):
+    def process_frame(self, left_x, right_x, exit_data) -> Tuple[int, bool]:
         if not self.active:
-            return 0.0, False
+            return 0, False
+        
         
         # Izračun dt - vreme proteklo od poslednjeg poziva ove funkcije
         current_time = time.time()
@@ -121,10 +122,10 @@ class RoundaboutController:
                 # Prelazak na fazu praćenja lijeve linije
                 self.current_phase = "follow_left"
                 self.phase_start_time = current_time
-                if self.logging:
+                if self.debugging:
                     print("RoundaboutController: Prelazak na 'follow_left'")
             
-            return self._follow_right_line(right_x, dt), False
+            return int(self._follow_right_line(right_x, dt)*10), False
             
         elif self.current_phase == "follow_left":
             # Faza praćenja lijeve linije - sve dok ne dođemo do ciljanog izlaza
@@ -132,23 +133,23 @@ class RoundaboutController:
                 # Pronađen ciljani izlaz, prelazak na fazu izlaska
                 self.current_phase = "exit"
                 self.phase_start_time = current_time
-                if self.logging:
+                if self.debugging:
                     print(f"RoundaboutController: Dostignut ciljni izlaz ({self.exit_count}), prelazak na 'exit'")
             
-            return self._follow_left_line(left_x, dt), False
+            return int(self._follow_left_line(left_x, dt)*10), False
             
         elif self.current_phase == "exit":
             # Faza izlaska - pratimo desnu liniju određeno vrijeme
             if phase_elapsed >= self.exit_phase_time:
                 # Završetak kontrole kružnog toka
                 self.stop()
-                if self.logging:
+                if self.debugging:
                     print("RoundaboutController: Kontrola završena uspješno")
-                return 0.0, False
+                return 0.0, True
             
-            return self._follow_right_line(right_x, dt), True
+            return int(self._follow_right_line(right_x, dt)*10), False
             
-        return 0.0, False
+        return 0, False
     
     def _track_exit(self, exit_data):
         # Proveri da li je izlaz prisutan i u regionu
@@ -157,7 +158,7 @@ class RoundaboutController:
         # Brojanje kada izlaz nestane iz regiona (tranzicija sa detected na not detected)
         if self.last_exit_detected and not exit_detected:
             self.exit_count += 1
-            if self.logging:
+            if self.debugging:
                 print(f"RoundaboutController: Detektovan izlaz #{self.exit_count}")
         
         self.last_exit_data = exit_data  # čuvamo podatke o trenutnom izlazu

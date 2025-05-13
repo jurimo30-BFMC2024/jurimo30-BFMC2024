@@ -56,8 +56,6 @@ class LaneFollower:
         dt = current_time - self.last_frame_time
         self.last_frame_time = current_time
 
-        print(f" LAst frame time: {dt}")
-
         # Calculate lane center
         if left_x is not None and right_x is not None:
             lane_center = (left_x + right_x) // 2
@@ -76,7 +74,7 @@ class LaneFollower:
 
         # Calculate error (offset from center)
         error = self.center_x - lane_center
-        print(f"Error: {error}")
+
 
         angle_degrees = self.pid.compute(error, dt=dt)
         
@@ -85,7 +83,7 @@ class LaneFollower:
         self.log_file.flush()  # Osigurava da se podaci odmah upišu
 
         # Debug log for terminal
-        if self.logging:
+        if self.debugging:
             print(f"Lane Following: LeftX={left_x}, RightX={right_x}, "
                   f"Center={lane_center}, Error={error:.1f}px, Angle={angle_degrees:.1f}°")
 
@@ -101,6 +99,6 @@ class LaneFollower:
         }
 
         self.finalAngle = -int(angle_degrees*10)
-        print (f"Ugao je {self.finalAngle}")
+
         return self.finalAngle
 

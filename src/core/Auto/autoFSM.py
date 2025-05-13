@@ -55,12 +55,12 @@ class autoFSM(ControlModeThread):
 
     def start(self):
         self.planer = PathPlanner(start=43, goal=10, mode="pacman")
-        self.laneFollowContrler = LaneFollowController(512, 270, self.logging, self.debugging)
+        self.laneFollowContrler = LaneFollowController(512, 270, self.logging, False)
         self.speedControler = SpeedControl(self.logging, False)
         self.intersectionController = IntersectionControl(self.logging, self.debugging)
         self.parkingController = Parking(self.logging, self.debugging)
         self.overtakeController = Overtake(self.logging, self.debugging)
-        self.roundaboutController = RoundaboutController(512, 270, self.logging, self.debugging)
+        self.roundaboutController = RoundaboutController(512, 270, self.logging, True)
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -76,7 +76,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
         #self.navigateCommand = self.planer.planPath()
-        self.navigateCommand = ["Straight", "Straight", "Straight", "Right"]
+        self.navigateCommand = ["Exit 2", "Right", "Straight", "Right"]
 
         print(self.navigateCommand)
         self.traffic_signs = TrafficSignController([
@@ -151,7 +151,7 @@ class autoFSM(ControlModeThread):
         roundabout_angle = self.roundaboutAngleSubscriber.receiveWithBlock()  # Corrected to RoundAboutAngle
         traffic_light_present = self.traffic_light_states.get_active() != None
 
-        obstacle = front_sensors["distance"] <= 80 and self.sign_car_detected
+        obstacle = front_sensors["distance"] <= 80 and self.sign_car_position
         angle = self.laneFollowContrler.process_following(self.leftX, self.rightX) # calculate steering angle from lane follow data
 
         if not obstacle:
@@ -257,10 +257,10 @@ class autoFSM(ControlModeThread):
         elif self.state == autoFSMState.ROUNDABOUT:
             angle, module_stoping =self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position)
 
-            if not module_running:
+            if module_stoping:
                 self.state = autoFSMState.DRIVE
 
-        elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
+        elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY or self.state == autoFSMState.ROUNDABOUT:
             no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
             stephanie_crossing = self.stephanie_position and self.traffic_signs.get_active() != "crosswalk"
 
