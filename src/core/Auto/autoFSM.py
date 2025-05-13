@@ -8,7 +8,7 @@ from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.core.Auto.LaneFollow.LaneFollow import LaneFollower as LaneFollowController
 from src.core.Auto.SpeedControl import SpeedControl
 from src.core.Auto.IntersectionControl import IntersectionControl
-from src.core.Auto.RoundaboutControl import RoundaboutControl
+from src.core.Auto.RoundaboutControl import RoundaboutController 
 from src.utils.messages.allMessages import (
     LaneDetect,
     CoreSteerMotor,
@@ -60,7 +60,7 @@ class autoFSM(ControlModeThread):
         self.intersectionController = IntersectionControl(self.logging, self.debugging)
         self.parkingController = Parking(self.logging, self.debugging)
         self.overtakeController = Overtake(self.logging, self.debugging)
-        self.roundaboutController = RoundaboutControl(self.logging, self.debugging)
+        self.roundaboutController = RoundaboutController(512, 270, self.logging, self.debugging)
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -192,6 +192,7 @@ class autoFSM(ControlModeThread):
             elif stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
                 if self.debugging:
                     print("Entering roundabout")
+                self.roundaboutController.start(self.navigateCommand.pop(0))
                 self.traffic_signs.clear()
                 self.state = autoFSMState.ROUNDABOUT
 
@@ -254,14 +255,7 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.ROUNDABOUT:
-            angle, speed, module_running, self.roundaboutExit_position  = self.roundaboutController.getControlData(
-                angleForRoundabout=roundabout_angle,  # Use the received angle
-                navigate=self.navigateCommand,
-
-                exitFlag=self.roundaboutExit_position,
-                stop_line_present=stop_line_present,
-                stop_line_slope=stop_line_slope
-            )
+            angle, module_stoping =self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position)
 
             if not module_running:
                 self.state = autoFSMState.DRIVE
