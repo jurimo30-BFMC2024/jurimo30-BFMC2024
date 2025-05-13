@@ -13,8 +13,7 @@ from src.utils.messages.allMessages import (
     LaneDetect,
     CoreSteerMotor,
     CoreSpeedMotor,
-    IntersectionDetect,
-    IntersectionDetect2,
+    StopLineDetect,
     ObjectDetection,
     TrafficSignsDetection,
     SideSensors,
@@ -64,8 +63,7 @@ class autoFSM(ControlModeThread):
         self.roundaboutController = RoundaboutControl(self.logging, self.debugging)
 
         self.laneDetectSubscriber.empty()
-        self.intersectionDetectSubscriber.empty()
-        self.intersectionDetectSubscriber2.empty()
+        self.stopLineDetectionSubscriber.empty()
         self.objectDetectionSubscriber.empty()
         self.trafficSignsSubscriber.empty()
         self.sideSensorSubscriber.empty()
@@ -106,8 +104,8 @@ class autoFSM(ControlModeThread):
 
     def loop(self):
         self.leftX, self.rightX = self.laneDetectSubscriber.receiveWithBlock()
-        stop_line_present, stop_line_slope = self.intersectionDetectSubscriber.receiveWithBlock() # stopLine je sad tuple (intersection(bool), slope_degrees (float))
-        lowDistance = self.intersectionDetectSubscriber2.receiveWithBlock()
+        stop_line_present, stop_line_distance, stop_line_angle = self.stopLineDetectionSubscriber.receiveWithBlock() # stopLine je sad tuple (intersection(bool), slope_degrees (float))
+        stop_line_present_close = stop_line_present and stop_line_distance < 130
 
         while self.objectDetectionSubscriber.isDataInPipe():
             detected_objects_dict = self.objectDetectionSubscriber.receive() # This is now a dict
@@ -166,7 +164,7 @@ class autoFSM(ControlModeThread):
 
         
         if self.state == autoFSMState.HIGHWAY:
-            if self.traffic_signs.get_active() == "highway_exit" or stop_line_present or lowDistance:
+            if self.traffic_signs.get_active() == "highway_exit" or stop_line_present:
                 if self.debugging:
                     print("Izlazak sa auto puta")
                 self.traffic_signs.clear()
@@ -179,7 +177,7 @@ class autoFSM(ControlModeThread):
                 self.traffic_signs.clear()
                 self.state = autoFSMState.PARKING
             
-            elif stop_line_present and (self.traffic_signs.get_active() in ["stop", "priority"] or traffic_light_present):
+            elif stop_line_present_close and (self.traffic_signs.get_active() in ["stop", "priority"] or traffic_light_present):
                 if self.debugging:
                     print("Krecemo sa raskrsnicom")
                 
@@ -191,13 +189,15 @@ class autoFSM(ControlModeThread):
                 self.traffic_signs.clear()
                 self.state = autoFSMState.INTERSECTION
 
-            elif stop_line_present and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
+            elif stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
                 if self.debugging:
                     print("Entering roundabout")
                 self.traffic_signs.clear()
                 self.state = autoFSMState.ROUNDABOUT
 
+
             elif stop_line_present and self.traffic_signs.get_active() == "crosswalk" and self.stephanie_position:
+              
                 self.crosswalkStart = time.time()
                 self.state = autoFSMState.CROSSWALK
                         
@@ -229,8 +229,8 @@ class autoFSM(ControlModeThread):
             
         elif self.state == autoFSMState.INTERSECTION:
             angle, speed, module_running = self.intersectionController.getControlData(
-                stop_line_present=stop_line_present,
-                stop_line_slope=stop_line_slope,
+                stop_line_present=stop_line_present_close,
+                stop_line_slope=stop_line_angle,
                 trafficLights=self.traffic_light_states
             )
             
@@ -257,6 +257,7 @@ class autoFSM(ControlModeThread):
             angle, speed, module_running, self.roundaboutExit_position  = self.roundaboutController.getControlData(
                 angleForRoundabout=roundabout_angle,  # Use the received angle
                 navigate=self.navigateCommand,
+
                 exitFlag=self.roundaboutExit_position,
                 stop_line_present=stop_line_present,
                 stop_line_slope=stop_line_slope
@@ -271,8 +272,8 @@ class autoFSM(ControlModeThread):
 
             speed = self.speedControler.getControlData(
                 angle=angle,
-                stopLine=stop_line_present,
-                lowDistance=lowDistance,
+                stopLine=stop_line_present_close,
+                lowDistance=stop_line_present,
                 highway=self.state == autoFSMState.HIGHWAY,
                 frontDistance=front_sensors["distance"],
                 enable_emergency_stop=no_active_sign,
@@ -302,8 +303,7 @@ class autoFSM(ControlModeThread):
     def subscribe(self):
         """Subscribes to the messages you are interested in"""
         self.laneDetectSubscriber = messageHandlerSubscriber(self.queuesList, LaneDetect, "LastOnly", True)
-        self.intersectionDetectSubscriber = messageHandlerSubscriber(self.queuesList, IntersectionDetect, "LastOnly", True)
-        self.intersectionDetectSubscriber2 = messageHandlerSubscriber(self.queuesList, IntersectionDetect2, "LastOnly", True)
+        self.stopLineDetectionSubscriber = messageHandlerSubscriber(self.queuesList, StopLineDetect, "LastOnly", True)
         self.objectDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ObjectDetection, "FIFO", True)
         self.trafficSignsSubscriber = messageHandlerSubscriber(self.queuesList, TrafficSignsDetection, "FIFO", True)
         self.sideSensorSubscriber = messageHandlerSubscriber(self.queuesList, SideSensors, "LastOnly", True)
