@@ -41,8 +41,9 @@ class PathPlanner:
             turns = self.determine_turns(graph, best_path)
             for node, direction in turns:
                 instructionQueue.append(direction)
+            distances = self.determine_distances(graph, best_path)
 
-        return instructionQueue
+        return instructionQueue, distances
 
 
     def parse_graphml(self, file_path, mode):
@@ -120,6 +121,81 @@ class PathPlanner:
             path.extend(final_segment[1:])
         
         return path
+    
+    def determine_distances(self, graph, path):
+        distances = []
+        intersection_nodes = [node for node in path if graph.nodes[node].get('intersection', False)]
+        start_node = path[0]
+        end_node = path[-1]
+
+        # calculate distance from start node to first intersection
+        if intersection_nodes:
+            first_intersection = intersection_nodes[0]
+            if start_node != first_intersection:
+                # calculate distance from start to node before first intersection
+                first_inter_idx = path.index(first_intersection)
+                segment_distance = 0
+                
+                for j in range(0, first_inter_idx):
+                    node1 = path[j]
+                    node2 = path[j + 1]
+                    pos1 = graph.nodes[node1]['pos']
+                    pos2 = graph.nodes[node2]['pos']
+                    segment_distance += np.linalg.norm(np.array(pos2) - np.array(pos1))
+                
+                distances.append({
+                    'start_node': start_node,
+                    'end_node': path[first_inter_idx - 1] if first_inter_idx > 0 else start_node,
+                    'distance': segment_distance
+                })
+
+        # calculate distances between intersections
+        for i in range(len(intersection_nodes) - 1):
+            current_intersection = intersection_nodes[i]
+            next_intersection = intersection_nodes[i + 1]
+            
+            current_idx = path.index(current_intersection)
+            next_idx = path.index(next_intersection)
+            
+            road_start_node = path[current_idx + 1] if current_idx + 1 < len(path) else None
+            road_end_node = path[next_idx - 1] if next_idx - 1 >= 0 else None
+            
+            if road_start_node and road_end_node:
+                segment_distance = 0
+                for j in range(current_idx + 1, next_idx):
+                    node1 = path[j]
+                    node2 = path[j + 1]
+                    pos1 = graph.nodes[node1]['pos']
+                    pos2 = graph.nodes[node2]['pos']
+                    segment_distance += np.linalg.norm(np.array(pos2) - np.array(pos1))
+                
+                distances.append({
+                    'start_node': road_start_node,
+                    'end_node': road_end_node,
+                    'distance': segment_distance
+                })
+
+        # calculate distance from last intersection to end node
+        if intersection_nodes:
+            last_intersection = intersection_nodes[-1]
+            if last_intersection != end_node:
+                last_inter_idx = path.index(last_intersection)
+                segment_distance = 0
+                
+                for j in range(last_inter_idx, len(path) - 1):
+                    node1 = path[j]
+                    node2 = path[j + 1]
+                    pos1 = graph.nodes[node1]['pos']
+                    pos2 = graph.nodes[node2]['pos']
+                    segment_distance += np.linalg.norm(np.array(pos2) - np.array(pos1))
+                
+                distances.append({
+                    'start_node': path[last_inter_idx + 1] if last_inter_idx + 1 < len(path) else last_intersection,
+                    'end_node': end_node,
+                    'distance': segment_distance
+                })
+
+        return distances
 
     def determine_turns(self, graph, path):
         directions = []
