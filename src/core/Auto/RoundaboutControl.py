@@ -38,7 +38,7 @@ class RoundaboutController:
         
         # Potrebna udaljenost od linije
         self.right_line_target_offset = 80  # Željena udaljenost od desne linije (piksel)
-        self.left_line_target_offset = -55  # Željena udaljenost od lijeve linije (piksel)
+        self.left_line_target_offset = -135  # Željena udaljenost od lijeve linije (piksel)
         
         # Podatci o zadnjem detektovanom izlazu
         self.last_exit_data = None  # sada će ovo biti (x1, y1, x2, y2) ili None
@@ -173,10 +173,10 @@ class RoundaboutController:
         target_position = right_x - self.right_line_target_offset
         error = center_x - target_position
 
-        steering_angle = self.right_pid.compute(error, dt)
+        steering_angle = self.right_pid.compute(-error, dt)
 
-        if steering_angle < 12:
-            steering_angle = 12
+        if steering_angle < 8:
+            steering_angle = 8
 
         if self.debugging:
             print(f"Follow right: error={error:.1f}, angle={steering_angle:.1f}")
@@ -196,8 +196,6 @@ class RoundaboutController:
         # PID kontrola
         steering_angle = -self.left_pid.compute(error, dt)
 
-        if steering_angle > -12:
-            steering_angle = -12
         
         if self.debugging:
             print(f"Follow left: error={error:.1f}, angle={steering_angle:.1f}")
