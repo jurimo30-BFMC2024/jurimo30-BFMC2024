@@ -38,7 +38,7 @@ class threadObjectDetection(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_2.7/detect/train/weights/best.pt')
+        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_2.9/detect/train/weights/best.pt')
         self.streamer = VideoStream(0, 0)
         
         # State management variables
