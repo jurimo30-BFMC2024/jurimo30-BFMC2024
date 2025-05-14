@@ -89,10 +89,10 @@ class autoFSM(ControlModeThread):
             "red", "green", "yellow", "red_yellow"
         ])
 
-        self.sign_car_position = False
+        self.sign_car_position = None
         self.obstacle_start_time = None
-        self.stephanie_position = False
-        self.roundaboutExit_position = False
+        self.stephanie_position = None
+        self.roundaboutExit_position = None
         self.intersectionSign = "None"
 
         self.state = autoFSMState.DRIVE
@@ -192,7 +192,7 @@ class autoFSM(ControlModeThread):
             elif stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
                 if self.debugging:
                     print("Entering roundabout")
-                self.roundaboutController.start(self.navigateCommand.pop(0))
+                isStarted = self.roundaboutController.start(self.navigateCommand.pop(0))
                 self.traffic_signs.clear()
                 self.state = autoFSMState.ROUNDABOUT
 
@@ -256,11 +256,12 @@ class autoFSM(ControlModeThread):
 
         elif self.state == autoFSMState.ROUNDABOUT:
             angle, module_stoping =self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position)
-
+            speed = 250
             if module_stoping:
                 self.state = autoFSMState.DRIVE
 
-        elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY or self.state == autoFSMState.ROUNDABOUT:
+
+        elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
             no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
             stephanie_crossing = self.stephanie_position and self.traffic_signs.get_active() != "crosswalk"
 

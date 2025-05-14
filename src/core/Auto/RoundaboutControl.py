@@ -25,8 +25,8 @@ class RoundaboutController:
         self.left_pid = PIDController(kp=0.6, ki=0.1, kd=0.0, output_limits=(-25, 25))
         
         # Vremena trajanja faza (u sekundama)
-        self.entry_phase_time = 1         # Vrijeme za fazu ulaska
-        self.exit_phase_time = 1          # Vrijeme za fazu izlaska
+        self.entry_phase_time = 2.5         # Vrijeme za fazu ulaska
+        self.exit_phase_time = 3         # Vrijeme za fazu izlaska
         
         # Parametri za detekciju izlaza
         self.exit_detection_region = {      # Region u kojem se detektuje izlaz
@@ -37,8 +37,8 @@ class RoundaboutController:
         }
         
         # Potrebna udaljenost od linije
-        self.right_line_target_offset = 100  # Željena udaljenost od desne linije (piksel)
-        self.left_line_target_offset = -100  # Željena udaljenost od lijeve linije (piksel)
+        self.right_line_target_offset = 80  # Željena udaljenost od desne linije (piksel)
+        self.left_line_target_offset = -55  # Željena udaljenost od lijeve linije (piksel)
         
         # Podatci o zadnjem detektovanom izlazu
         self.last_exit_data = None  # sada će ovo biti (x1, y1, x2, y2) ili None
@@ -92,6 +92,7 @@ class RoundaboutController:
         if exit_data is None:
             return False
         
+
         x1, y1, x2, y2 = exit_data
         reg = self.exit_detection_region
         
@@ -153,8 +154,8 @@ class RoundaboutController:
     
     def _track_exit(self, exit_data):
         # Proveri da li je izlaz prisutan i u regionu
-        exit_detected = self.is_exit_in_region(exit_data) if exit_data is not None else False
-        
+        exit_detected = self.is_exit_in_region(exit_data)
+        print("print 3")
         # Brojanje kada izlaz nestane iz regiona (tranzicija sa detected na not detected)
         if self.last_exit_detected and not exit_detected:
             self.exit_count += 1
@@ -173,7 +174,10 @@ class RoundaboutController:
         error = center_x - target_position
 
         steering_angle = self.right_pid.compute(error, dt)
-        
+
+        if steering_angle < 12:
+            steering_angle = 12
+
         if self.debugging:
             print(f"Follow right: error={error:.1f}, angle={steering_angle:.1f}")
             
@@ -191,6 +195,9 @@ class RoundaboutController:
         
         # PID kontrola
         steering_angle = -self.left_pid.compute(error, dt)
+
+        if steering_angle > -12:
+            steering_angle = -12
         
         if self.debugging:
             print(f"Follow left: error={error:.1f}, angle={steering_angle:.1f}")
