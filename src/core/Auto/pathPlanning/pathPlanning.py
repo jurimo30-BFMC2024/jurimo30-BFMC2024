@@ -123,77 +123,57 @@ class PathPlanner:
         return path
     
     def determine_distances(self, graph, path):
+        def get_nodes_and_distances(start_idx, end_idx):
+            segment_nodes = []
+            segment_distances = []
+
+            for i in range(start_idx, end_idx + 1):
+                node_id = path[i]
+                segment_nodes.append({
+                    "idx": node_id,
+                    "pos": graph.nodes[node_id]['pos']
+                })
+                if i > start_idx:
+                    prev_pos = np.array(graph.nodes[path[i - 1]]['pos'])
+                    curr_pos = np.array(graph.nodes[node_id]['pos'])
+                    segment_distances.append(np.linalg.norm(curr_pos - prev_pos))
+
+            return {
+                "nodes": segment_nodes,
+                "distances": segment_distances,
+                "length": sum(segment_distances)
+            }
+
         distances = []
-        intersection_nodes = [node for node in path if graph.nodes[node].get('intersection', False)]
-        start_node = path[0]
-        end_node = path[-1]
+        intersections = [
+            (i, node) for i, node in enumerate(path)
+            if graph.nodes[node].get('intersection', False)
+        ]
 
-        # calculate distance from start node to first intersection
-        if intersection_nodes:
-            first_intersection = intersection_nodes[0]
-            if start_node != first_intersection:
-                # calculate distance from start to node before first intersection
-                first_inter_idx = path.index(first_intersection)
-                segment_distance = 0
-                
-                for j in range(0, first_inter_idx):
-                    node1 = path[j]
-                    node2 = path[j + 1]
-                    pos1 = graph.nodes[node1]['pos']
-                    pos2 = graph.nodes[node2]['pos']
-                    segment_distance += np.linalg.norm(np.array(pos2) - np.array(pos1))
-                
-                distances.append({
-                    'start_node': start_node,
-                    'end_node': path[first_inter_idx - 1] if first_inter_idx > 0 else start_node,
-                    'distance': segment_distance
-                })
+        # Start to first intersection
+        if intersections:
+            first_idx = intersections[0][0] - 1
+            if first_idx > 0 and path[first_idx - 1] in self.roundabout_entries:
+                first_idx -= 1
+            if first_idx > 0:
+                distances.append(get_nodes_and_distances(0, first_idx))
 
-        # calculate distances between intersections
-        for i in range(len(intersection_nodes) - 1):
-            current_intersection = intersection_nodes[i]
-            next_intersection = intersection_nodes[i + 1]
-            
-            current_idx = path.index(current_intersection)
-            next_idx = path.index(next_intersection)
-            
-            road_start_node = path[current_idx + 1] if current_idx + 1 < len(path) else None
-            road_end_node = path[next_idx - 1] if next_idx - 1 >= 0 else None
-            
-            if road_start_node and road_end_node:
-                segment_distance = 0
-                for j in range(current_idx + 1, next_idx):
-                    node1 = path[j]
-                    node2 = path[j + 1]
-                    pos1 = graph.nodes[node1]['pos']
-                    pos2 = graph.nodes[node2]['pos']
-                    segment_distance += np.linalg.norm(np.array(pos2) - np.array(pos1))
-                
-                distances.append({
-                    'start_node': road_start_node,
-                    'end_node': road_end_node,
-                    'distance': segment_distance
-                })
+        # Between intersections
+        for i in range(len(intersections) - 1):
+            start_idx = intersections[i][0] + 1
+            end_idx = intersections[i + 1][0] - 1
 
-        # calculate distance from last intersection to end node
-        if intersection_nodes:
-            last_intersection = intersection_nodes[-1]
-            if last_intersection != end_node:
-                last_inter_idx = path.index(last_intersection)
-                segment_distance = 0
-                
-                for j in range(last_inter_idx, len(path) - 1):
-                    node1 = path[j]
-                    node2 = path[j + 1]
-                    pos1 = graph.nodes[node1]['pos']
-                    pos2 = graph.nodes[node2]['pos']
-                    segment_distance += np.linalg.norm(np.array(pos2) - np.array(pos1))
-                
-                distances.append({
-                    'start_node': path[last_inter_idx + 1] if last_inter_idx + 1 < len(path) else last_intersection,
-                    'end_node': end_node,
-                    'distance': segment_distance
-                })
+            if end_idx > 0 and path[end_idx - 1] in self.roundabout_entries:
+                end_idx -= 1
+
+            if end_idx > start_idx:
+                distances.append(get_nodes_and_distances(start_idx, end_idx))
+
+        # Last intersection to end
+        if intersections:
+            last_idx = intersections[-1][0] + 1
+            if last_idx < len(path) - 1:
+                distances.append(get_nodes_and_distances(last_idx, len(path) - 1))
 
         return distances
 
@@ -271,3 +251,9 @@ class PathPlanner:
             directions.append((current_node, turn))
             i += 1
         return directions
+    
+if __name__ == "__main__":
+    pathPlanner = PathPlanner(52, 43, "pacman")
+    instructions, segments = pathPlanner.planPath()
+    for segment in segments:
+        print(segment)
