@@ -187,6 +187,21 @@ class LaneDetector:
         left_x = self.extrapolate_lane_line(self.left_lines_history, self.measure_height)
         right_x = self.extrapolate_lane_line(self.right_lines_history, self.measure_height)
 
+        # Safety checks for lane line positions
+        # Check if lines are valid
+        if left_x is not None and right_x is not None:
+            # Check if right lane is to the left of left lane (invalid)
+            if right_x < left_x:
+                if self.logging and self.debugging:
+                    print(f"Warning: Right lane ({right_x}) is to the left of left lane ({left_x}). Ignoring.")
+                right_x = None
+                
+            # Check if lines are too close to each other (less than 50 pixels apart)
+            elif right_x - left_x < 50:
+                if self.logging and self.debugging:
+                    print(f"Warning: Lane lines are too close: {right_x - left_x} px. Minimum is 50px. Ignoring right line.")
+                right_x = None
+
         # --- Drawing Logic ---
         # Draw region of interest with transparent overlay
         road_mask = np.zeros_like(frame_to_draw_on)

@@ -21,7 +21,7 @@ class RoundaboutController:
         self.phase_start_time = None        # Vrijeme početka trenutne faze
         
         # PID kontroleri za praćenje lijeve i desne linije
-        self.right_pid = PIDController(kp=0.6, ki=0.1, kd=0.0, output_limits=(-25, 25))
+        self.right_pid = PIDController(kp=0.6, ki=0.01, kd=0.0, output_limits=(-25, 25))
         self.left_pid = PIDController(kp=0.6, ki=0.1, kd=0.0, output_limits=(-25, 25))
         
         # Vremena trajanja faza (u sekundama)
@@ -38,7 +38,7 @@ class RoundaboutController:
         
         # Potrebna udaljenost od linije
         self.right_line_target_offset = 80  # Željena udaljenost od desne linije (piksel)
-        self.left_line_target_offset = -135  # Željena udaljenost od lijeve linije (piksel)
+        self.left_line_target_offset = 120 # Željena udaljenost od lijeve linije (piksel)
         
         # Podatci o zadnjem detektovanom izlazu
         self.last_exit_data = None  # sada će ovo biti (x1, y1, x2, y2) ili None
@@ -190,13 +190,12 @@ class RoundaboutController:
         
         # Računanje greške (odstupanje od željene udaljenosti)
         center_x = self.width // 2
-        target_position = left_x - self.left_line_target_offset
+        target_position = left_x + self.left_line_target_offset
         error = center_x - target_position
         
         # PID kontrola
-        steering_angle = -self.left_pid.compute(error, dt)
+        steering_angle = self.left_pid.compute(-error, dt)
 
-        
         if self.debugging:
             print(f"Follow left: error={error:.1f}, angle={steering_angle:.1f}")
             
