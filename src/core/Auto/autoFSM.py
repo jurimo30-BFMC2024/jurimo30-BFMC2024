@@ -25,6 +25,7 @@ from src.utils.messages.allMessages import (
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.core.Auto.pathPlanning.pathPlanning import PathPlanner
+from src.core.Auto.Localization.Localization import Localization
 from src.core.Auto.TrafficSignController import TrafficSignController
 import time
 from enum import Enum, auto
@@ -77,7 +78,9 @@ class autoFSM(ControlModeThread):
         self.oldSpeed = 0
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
-        self.navigateCommand, self.nodeDistances = self.planer.planPath()
+        self.navigateCommand, segmentsData = self.planer.planPath()
+        self.localization = Localization(segmentsData)
+        self.localization.start_new_segment()
 
         print(self.navigateCommand)
         self.traffic_signs = TrafficSignController([
@@ -169,8 +172,8 @@ class autoFSM(ControlModeThread):
                 if self.debugging:
                     print("Izlazak sa auto puta")
                 self.traffic_signs.clear()
-                self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.set_pid_highway(False)
+                self.state = autoFSMState.DRIVE
 
         
         if self.state == autoFSMState.DRIVE:
@@ -188,12 +191,16 @@ class autoFSM(ControlModeThread):
                     traffic_light_present=traffic_light_present
                 )
                 self.traffic_signs.clear()
+                self.localization.update_speed_error()
+                print("Speed error:", self.localization.speed_error)
                 self.state = autoFSMState.INTERSECTION
 
             elif stop_line_present and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
                 if self.debugging:
                     print("Entering roundabout")
                 self.traffic_signs.clear()
+                self.localization.update_speed_error()
+                print("Speed error:", self.localization.speed_error)
                 self.state = autoFSMState.ROUNDABOUT
 
             elif stop_line_present and self.traffic_signs.get_active() == "crosswalk" and self.stephanie_position:
@@ -204,8 +211,8 @@ class autoFSM(ControlModeThread):
                 if self.debugging:
                     print("Ulazak na autoput")
                 self.traffic_signs.clear()
-                self.state = autoFSMState.HIGHWAY
                 self.laneFollowContrler.set_pid_highway(True)
+                self.state = autoFSMState.HIGHWAY
             
             elif obstacle and self.oldSpeed == 0:
                 if self.obstacle_start_time is None:
@@ -234,6 +241,7 @@ class autoFSM(ControlModeThread):
             )
             
             if not module_running:
+                self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.OVERTAKE:
@@ -262,6 +270,7 @@ class autoFSM(ControlModeThread):
             )
 
             if not module_running:
+                self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
@@ -278,6 +287,10 @@ class autoFSM(ControlModeThread):
                 car_in_front=self.sign_car_position,
                 stephanie_in_front=stephanie_crossing
             )
+
+            self.localization.update_position(speed)
+            print(f"Distance[est]: {self.localization.total_distance:.2f}, Speed[avg]: {self.localization.average_target_speed}, Position: {self.localization.get_location()}")
+            
 
         ############################ Sending data ##############################
 
