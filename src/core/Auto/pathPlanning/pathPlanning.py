@@ -250,6 +250,7 @@ class PathPlanner:
             
             directions.append((current_node, turn))
             i += 1
+            
         return directions
     
 if __name__ == "__main__":
