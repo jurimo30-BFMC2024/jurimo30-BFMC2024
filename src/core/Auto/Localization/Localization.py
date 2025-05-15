@@ -15,6 +15,21 @@ class Localization:
         self.segments_data = segments_data
         self.current_segment = None
 
+        scale_factor = 13  # e.g., each unit in graph
+
+        for segment in segments_data:
+            for node in segment['nodes']:
+                x, y = node['pos']
+                node['pos'] = (x * scale_factor, y * scale_factor)
+
+            # Modify list in place
+            segment['distances'] = [d * scale_factor for d in segment['distances']]
+
+            segment['length'] *= scale_factor
+
+            print(segment)
+
+
         # fields for position tracking
         self.location: Tuple[float, float] = (0.0, 0.0)
         self._cum_dists: List[float] = []  # cumulative distances along nodes
@@ -35,6 +50,8 @@ class Localization:
         self._cum_dists = [0.0]
         for d in dists:
             self._cum_dists.append(self._cum_dists[-1] + d)
+
+        print(f"_cum_dists: {self._cum_dists}")
 
         # reset timers & distance
         self.start_time = time.time()
@@ -85,6 +102,7 @@ class Localization:
 
         # clamp to [0, total_len]
         d = min(max(self.total_distance, 0.0), total_len)
+        print(f"d: {d}")
 
         # find index i so that cum[i] <= d < cum[i+1]
         # if at very end, snap to last node
@@ -121,6 +139,7 @@ class Localization:
         if passed_time > 0 and self.current_segment:
             actual_speed = self.current_segment["length"] / passed_time
             self.speed_error = self.average_target_speed - actual_speed
+            print(f"average_target_speed: {self.average_target_speed}, actual_speed: {actual_speed}, segment_length: {self.current_segment['length']}, passed_t: {passed_time}, speed_error: {self.speed_error}")
 
     def get_location(self, noise_stddev=0.05):
         """

@@ -55,8 +55,8 @@ class autoFSM(ControlModeThread):
         super().__init__()
 
     def start(self):
-        self.planer = PathPlanner(start=43, goal=10, mode="pacman")
-        self.laneFollowContrler = LaneFollowController(512, 270, self.logging, self.debugging)
+        self.planer = PathPlanner(start=10, goal=43, mode="pacman")
+        self.laneFollowContrler = LaneFollowController(512, 270, self.logging, False)
         self.speedControler = SpeedControl(self.logging, False)
         self.intersectionController = IntersectionControl(self.logging, self.debugging)
         self.parkingController = Parking(self.logging, self.debugging)
@@ -190,7 +190,7 @@ class autoFSM(ControlModeThread):
                 )
                 self.traffic_signs.clear()
                 self.localization.update_speed_error()
-                print("Speed error:", self.localization.speed_error)
+                # print("Speed error:", self.localization.speed_error)
                 self.state = autoFSMState.INTERSECTION
 
             elif stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
@@ -198,7 +198,7 @@ class autoFSM(ControlModeThread):
                     print("Entering roundabout")
                 self.traffic_signs.clear()
                 self.localization.update_speed_error()
-                print("Speed error:", self.localization.speed_error)
+                # print("Speed error:", self.localization.speed_error)
                 self.state = autoFSMState.ROUNDABOUT
 
 
@@ -265,7 +265,7 @@ class autoFSM(ControlModeThread):
                 navigate=self.navigateCommand,
                 exitFlag=self.roundaboutExit_position,
                 stop_line_present=stop_line_present,
-                stop_line_slope=stop_line_slope
+                stop_line_slope=stop_line_angle
             )
 
             if not module_running:
@@ -287,8 +287,8 @@ class autoFSM(ControlModeThread):
                 stephanie_in_front=stephanie_crossing
             )
 
-            self.localization.update_position(speed)
-            print(f"Distance[est]: {self.localization.total_distance:.2f}, Speed[avg]: {self.localization.average_target_speed}, Position: {self.localization.get_location()}")
+            self.localization.update_position(speed / 10)
+            print(f"Distance[est]: {self.localization.total_distance:.2f}, Speed[avg]: {self.localization.average_target_speed:.2f}, Position: {self.localization.get_location()}")
             
 
         ############################ Sending data ##############################
