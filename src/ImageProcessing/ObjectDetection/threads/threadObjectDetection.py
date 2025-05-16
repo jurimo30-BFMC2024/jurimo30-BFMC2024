@@ -48,7 +48,7 @@ class threadObjectDetection(ThreadWithStop):
         self.lost_sign_count = 0          # Frames without current sign
         self.lost_sign_threshold = 17     # Frames to consider sign lost
         
-        self.lost_timeout = 0.2           # Timeout for lost objects
+        self.lost_timeout = 1             # Timeout for lost objects
    
         # Initialize relevant_objects structure
         self.relevant_objects = {
@@ -95,7 +95,7 @@ class threadObjectDetection(ThreadWithStop):
     def process_frame(self, frame):
         """Process frame and return annotated frame, best detection, and detected objects."""
         # Get YOLO results
-        results = self.model(frame, verbose=self.debugging)[0]
+        results = self.model(frame, verbose=False)[0]
 
         # List to store relevant objects
         detected_objects = []
@@ -212,10 +212,9 @@ class threadObjectDetection(ThreadWithStop):
             if obj["present"]:
                # Ako je detektovan, ažuriraj vreme i pošalji poruku
                self.relevant_objects[name]["last_seen_time"] = current_time
-               if not self.relevant_objects[name]["present"] or self.relevant_objects[name]["position"] != current_position:
+               if self.relevant_objects[name]["present"]:
                    if self.debugging:
                         print(f"[DETEKCIJA] Objekat '{name}' detektovan na {current_position}")
-                   self.relevant_objects[name]["present"] = True
                    self.relevant_objects[name]["position"] = current_position
                    self.relevant_objects[name]["sent_lost_message"] = False
                    self.objectDetectionSender.send({
