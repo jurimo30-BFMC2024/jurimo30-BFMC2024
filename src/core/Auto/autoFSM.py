@@ -91,10 +91,10 @@ class autoFSM(ControlModeThread):
             "red", "green", "yellow", "red_yellow"
         ])
 
-        self.sign_car_position = False
+        self.sign_car_position = None
         self.obstacle_start_time = None
-        self.stephanie_position = False
-        self.roundaboutExit_position = False
+        self.stephanie_position = None
+        self.roundaboutExit_position = None
         self.intersectionSign = "None"
 
         self.state = autoFSMState.DRIVE
@@ -153,7 +153,7 @@ class autoFSM(ControlModeThread):
         roundabout_angle = self.roundaboutAngleSubscriber.receiveWithBlock()  # Corrected to RoundAboutAngle
         traffic_light_present = self.traffic_light_states.get_active() != None
 
-        obstacle = front_sensors["distance"] <= 80 and self.sign_car_detected
+        obstacle = front_sensors["distance"] <= 80 and self.sign_car_position
         angle = self.laneFollowContrler.process_following(self.leftX, self.rightX) # calculate steering angle from lane follow data
 
         if not obstacle:
