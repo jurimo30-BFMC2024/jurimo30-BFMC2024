@@ -1,6 +1,7 @@
 import time
 from typing import List, Tuple
 import random
+import math
 
 class Localization:
     def __init__(self, segments_data):
@@ -154,6 +155,49 @@ class Localization:
         # noisy_y = y + random.gauss(0, noise_stddev)
         # return (noisy_x, noisy_y)
 
+    def start_relative_localization(self):
+        """
+        Save the last known position of the car for relative localization.
+        """
+        self.saved_position = self.location
+        print(f"Relative localization started. Saved position: {self.saved_position}")
+
+    def update_position_with_steering(self, speed: float, steering_angle_deg: float):
+        """
+        Update the car's position based on speed and steering angle.
+        :param speed: Speed of the car (units per second).
+        :param steering_angle_deg: Steering angle in degrees.
+        """
+        if self.location is None:
+            print("Error: Current location is not set.")
+            return
+
+        # Measure time since the last update
+        current_time = time.time()
+        dt = current_time - self.last_update_time
+        self.last_update_time = current_time
+
+        # Convert steering angle to radians
+        steering_angle_rad = math.radians(steering_angle_deg)
+
+        # Calculate the change in position
+        dx = speed * math.cos(steering_angle_rad) * dt
+        dy = speed * math.sin(steering_angle_rad) * dt
+
+        # Update the current location
+        x, y = self.location
+        self.location = (x + dx, y + dy)
+        print(f"Updated position with speed {speed} and steering angle {steering_angle_deg}: {self.location}")
+
+    def stop_relative_localization(self):
+        """
+        Reset the car's position to the last saved position.
+        """
+        if hasattr(self, 'saved_position'):
+            self.location = self.saved_position
+            print(f"Relative localization stopped. Reset position to: {self.location}")
+        else:
+            print("Error: No saved position to reset to.")
 
 if __name__ == "__main__":
     segments_data = [
@@ -176,7 +220,7 @@ if __name__ == "__main__":
 
     # Simulate moving along the first segment at 2 units/sec
     for i in range(6):
-        loc.update_position(2.0)
+        loc.update_position(25.0)
         print(f"Distance[est]: {loc.total_distance:.2f}, Distance[ctrl]: {loc.average_target_speed * (0.5 * i)}, Position: {loc.get_location()}")
         time.sleep(0.5)
 
@@ -190,7 +234,7 @@ if __name__ == "__main__":
 
     # Simulate moving along second segment with same speed
     for i in range(10):
-        loc.update_position(3.0)
+        loc.update_position(40.0)
         print(f"Distance[est]: {loc.total_distance:.2f}, Distance[ctrl]: {loc.average_target_speed * (0.5 * i)}, Position: {loc.get_location()}")
         # print(f"Distance: {loc.total_distance:.2f}, Position: {loc.get_location()}")
         time.sleep(0.5)
@@ -198,5 +242,14 @@ if __name__ == "__main__":
     print("\nReached end of second segment.")
     loc.update_speed_error()
     print("Speed error:", loc.speed_error)
+
+    # Test relative localization
+    loc.start_relative_localization()
+    loc.update_position_with_steering(speed=50.0, steering_angle_deg=20)
+    time.sleep(0.5)
+    loc.update_position_with_steering(speed=50.0, steering_angle_deg=-20)
+    time.sleep(0.5)
+    loc.stop_relative_localization()
+    print(f"Final position after stopping relative localization: {loc.get_location()}")
 
     print("\nDone.")
