@@ -6,8 +6,7 @@ import time
 from src.utils.messages.allMessages import (
     serialCamera,
     LaneDetect,
-    IntersectionDetect,
-    IntersectionDetect2,
+    StopLineDetect,
     ParkingSpotDetect,
     RoundAboutAngle
 )
@@ -44,8 +43,7 @@ class threadLaneDetect(ThreadWithStop):
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
-        self.intersectionDetectionSender = messageHandlerSender(self.queuesList, IntersectionDetect)
-        self.intersectionDetectionSender2 = messageHandlerSender(self.queuesList, IntersectionDetect2)
+        self.stopLineDetectionSender = messageHandlerSender(self.queuesList, StopLineDetect)
         self.parkingSpotDetectionSender = messageHandlerSender(self.queuesList, ParkingSpotDetect)
         self.roundAboutAngleSender = messageHandlerSender(self.queuesList, RoundAboutAngle)
         self.subscribe()
@@ -68,11 +66,10 @@ class threadLaneDetect(ThreadWithStop):
                 edges = self.imgProcessor.process_frame(frame)
 
                 # obradi frejm
-                frame, (intersection, slope_degrees), intersectionA = self.stopLineDetector.process_frame(frame, edges)
-                frame, leftX, rightX = self.laneDetector.process_frame(edges, frame)
+                frame, stop_line_data = self.stopLineDetector.process_frame(frame, edges)
+                frame, leftX, rightX, leftVisible, rightVisible = self.laneDetector.process_frame(edges, frame)
                 frame, parking_line = self.parkingSpotDetector.process_frame(frame, edges)
                 frame, roundaboutAngle = self.roundAboutDetector.process_frame(frame, edges)
-                roundaboutExitDetected = False
 
                 # Increment frame count
                 frame_count += 1
@@ -83,9 +80,8 @@ class threadLaneDetect(ThreadWithStop):
                     start_time_second = time.time()
 
                 # Slanje rezultate
-                self.laneDetectionSender.send((leftX, rightX))
-                self.intersectionDetectionSender.send((intersection, slope_degrees))
-                self.intersectionDetectionSender2.send(bool(intersectionA))
+                self.stopLineDetectionSender.send(stop_line_data)
+                self.laneDetectionSender.send((leftX, rightX, leftVisible, rightVisible))
                 if parking_line is not None:
                     self.parkingSpotDetectionSender.send(True)
                 self.roundAboutAngleSender.send(float(roundaboutAngle))

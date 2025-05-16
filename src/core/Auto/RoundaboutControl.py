@@ -1,132 +1,195 @@
+import cv2
+import numpy as np
 import time
-import math
+from src.ImageProcessing.LaneDetect.pid_controller import PIDController
+from typing import Tuple
 
-class RoundaboutControl():
-    def __init__(self, logging, debugging=False):
+
+class RoundaboutController:
+    def __init__(self, width: int, height: int, logging: bool = False, debugging: bool = False):
+
+        self.width = width
+        self.height = height
         self.logging = logging
         self.debugging = debugging
-        self.status = -3  # -2: not started, -1: fix the car angle, 0: moving forward, 1: turning right, 2: adjusting angle, 3: exiting
-        self.lastPoint = 0
-        self.angle = 0
-        self.speed = 0
-        self.exiting = False
-        self.exitFlag = False  # Initialize exitFlag
-        self.slope_degrees = 0
-        self.straighten_time = 0
-
-    def calculate_distance_to_straighten(self, alpha_deg, wheelbase=26, max_steering_angle=25):
-        """
-        Izračunava dužinu puta (u cm) koju model auta treba da pređe dok se ne ispravi.
+        
+        # Stanje kontrolera
+        self.active = False                 # Da li je kontroler aktivan
+        self.target_exit = None             # Broj izlaza na koji treba izaći
+        self.current_phase = None           # Trenutna faza (entry, follow_right, follow_left, exit)
+        self.exit_count = 0                 # Broj izlaza koje smo prošli
+        self.phase_start_time = None        # Vrijeme početka trenutne faze
+        
+        # PID kontroleri za praćenje lijeve i desne linije
+        self.right_pid = PIDController(kp=0.6, ki=0.01, kd=0.0, output_limits=(-25, 25))
+        self.left_pid = PIDController(kp=0.6, ki=0.1, kd=0.0, output_limits=(-25, 25))
+        
+        # Vremena trajanja faza (u sekundama)
+        self.entry_phase_time = 2.5         # Vrijeme za fazu ulaska
+        self.exit_phase_time = 3         # Vrijeme za fazu izlaska
+        
+        # Parametri za detekciju izlaza
+        self.exit_detection_region = {      # Region u kojem se detektuje izlaz
+            'x_min': int(width * 0.6),      # 60% širine slike (desno)
+            'y_min': int(height * 0.5),     # 50% visine (sredina)
+            'x_max': width,                 # Desna ivica slike
+            'y_max': height                 # Donja ivica slike
+        }
+        
+        # Potrebna udaljenost od linije
+        self.right_line_target_offset = 80  # Željena udaljenost od desne linije (piksel)
+        self.left_line_target_offset = 120 # Željena udaljenost od lijeve linije (piksel)
+        
+        # Podatci o zadnjem detektovanom izlazu
+        self.last_exit_data = None  # sada će ovo biti (x1, y1, x2, y2) ili None
+        self.last_exit_detected = False
+        
+        # Dodavanje varijable za praćenje vremena za izračun dt
+        self.last_process_time = time.time()
     
-        Parametri:
-        alpha_deg (float): Ugao između auta i zaustavne linije u stepenima (-90 do 90).
-        speed_cm_s (float): Brzina kretanja auta napred u cm/s.
-        wheelbase (float): Međuosovinsko rastojanje u cm (default 26 cm).
-        max_steering_angle (float): Maksimalni ugao skretanja točkova u stepenima (default 25°).
-    
-        Returns:
-        float: Dužina puta u cm koja je potrebna da se auto ispravi.
-        """
-        # Konvertujemo uglove u radijane
-        alpha_rad = math.radians(alpha_deg)
-        steering_angle_rad = math.radians(max_steering_angle)
-    
-        # Poluprečnik kružne putanje (aproksimacija)
-        R = wheelbase / math.tan(steering_angle_rad)
-    
-        # Dužina luka potrebna da se auto ispravi
-        distance = R * abs(alpha_rad)
+    def start(self, command: str):
 
-        #po brzini 168, ovaj manevar ce trajati distance/168 sekundi
-        #jbg izracunaj sam dole
-
-
-        return distance
-
-    def getControlData(self, angleForRoundabout, navigate, exitFlag, stop_line_present, stop_line_slope):
-        roundAbout = True
-        self.exitFlag = exitFlag  # Update instance attribute instead of local variable
-        if stop_line_present:
-            self.slope_degrees = stop_line_slope
-
-        if self.status == -3:
+        if not command.startswith("Exit "):
             if self.debugging:
-                print("Starting roundabout maneuver")
-            self.speed = 0
-            self.status = -2
-            self.angle = 0
-            self.lastPoint = time.time()
+                print("Greška: Komanda mora biti u formatu 'Exit X'")
+            return False
+
+        try:
+            target_exit = int(command.split(" ")[1])
+        except (IndexError, ValueError):
+            if self.debugging:
+                print("Greška: Nije moguće parsirati broj izlaza iz komande")
+            return False
+
+        if target_exit < 1:
+            if self.debugging:
+                print("Greška: Broj izlaza mora biti >= 1")
+            return False
+
+        self.target_exit = target_exit
+        self.active = True
+        self.current_phase = "entry"
+        self.exit_count = 0
+        self.phase_start_time = time.time()
+        self.right_pid.reset()
+        self.left_pid.reset()
+
+        if self.debugging:
+            print(f"RoundaboutController: Započeta kontrola, cilj izlaz {target_exit}")
+
+        return True
+
+    
+    def stop(self):
+        """Zaustavlja kontrolu vožnje kroz kružni tok."""
+        self.active = False
+        self.current_phase = None
+        
+        if self.debugging:
+            print("RoundaboutController: Kontrola zaustavljena")
+    
+    def is_exit_in_region(self, exit_data):
+        if exit_data is None:
+            return False
+        return True
+    
+    def process_frame(self, left_x, right_x, exit_data, leftVisible, rightVisible) -> Tuple[int, bool]:
+        if not self.active:
+            return 0, False
+        
+        
+        # Izračun dt - vreme proteklo od poslednjeg poziva ove funkcije
+        current_time = time.time()
+        dt = current_time - self.last_process_time
+        self.last_process_time = current_time
+        
+        # Trenutno vrijeme
+        phase_elapsed = current_time - self.phase_start_time
+        
+        # Praćenje izlaza
+        self._track_exit(exit_data)
+        
+        # Upravljanje fazama
+        if self.current_phase == "entry":
+            # Faza ulaska - pratimo desnu liniju određeno vrijeme
+            if phase_elapsed >= self.entry_phase_time:
+                # Prelazak na fazu praćenja lijeve linije
+                self.current_phase = "follow_left"
+                self.phase_start_time = current_time
+                if self.debugging:
+                    print("RoundaboutController: Prelazak na 'follow_left'")
             
-        elif self.status == -2:  # Initial state
-            if (time.time() - self.lastPoint) >= 0.2:
-                straighten_distance = self.calculate_distance_to_straighten(self.slope_degrees)
-                # Assume speed is 300 cm/s — calculate duration
-                self.straighten_time = (straighten_distance / 30)
-                print("krecem sa ispravljanjem")
-                # print(f'straighten_distance: {straighten_distance}, self.straighten_time: {self.straighten_time}')
-
-                if self.slope_degrees < 0:
-                    self.angle = -250
-                elif self.slope_degrees > 0:
-                    self.angle = 250
-                else:
-                    self.angle = 0
-                self.speed = 300
-                self.lastPoint = time.time()
-                self.status = -1
-                # print("angle, speed, slope", self.angle, self.speed, self.slope_degrees)
-
-        elif self.status == -1: # fix the car angle
-            if (time.time() - self.lastPoint) >= self.straighten_time:
+            return int(self._follow_right_line(right_x, rightVisible, dt)*10), False
+            
+        elif self.current_phase == "follow_left":
+            # Faza praćenja lijeve linije - sve dok ne dođemo do ciljanog izlaza
+            if self.exit_count >= self.target_exit:
+                # Pronađen ciljani izlaz, prelazak na fazu izlaska
+                self.current_phase = "exit"
+                self.phase_start_time = current_time
                 if self.debugging:
-                    print("Starting roundabout maneuver speed")
-                self.lastPoint = time.time()
-                self.status = 0
-                self.angle = 0
-                self.speed = 150  # Fixed forward speed
-
-        elif self.status == 0:  # Moving forward
-            if (time.time() - self.lastPoint) >= 1.35 - self.straighten_time:  # Fixed forward duration
+                    print(f"RoundaboutController: Dostignut ciljni izlaz ({self.exit_count}), prelazak na 'exit'")
+            
+            return int(self._follow_left_line(left_x,leftVisible, dt)*10), False
+            
+        elif self.current_phase == "exit":
+            # Faza izlaska - pratimo desnu liniju određeno vrijeme
+            if phase_elapsed >= self.exit_phase_time:
+                # Završetak kontrole kružnog toka
+                self.stop()
                 if self.debugging:
-                    print("Switching to right turn")
-                self.lastPoint = time.time()
-                self.status = 1
-                self.angle = 250
-                self.speed = 150  # Fixed right turn speed
-                self.exitFlag = False  # Update instance attribute instead of local variable
+                    print("RoundaboutController: Kontrola završena uspješno")
+                return 0.0, True
+            
+            return int(self._follow_right_line(right_x,rightVisible, dt)*10), False
+            
+        return 0, False
+    
+    def _track_exit(self, exit_data):
+        # Proveri da li je izlaz prisutan i u regionu
+        exit_detected = self.is_exit_in_region(exit_data)
+        print("print 3")
+        # Brojanje kada izlaz nestane iz regiona (tranzicija sa detected na not detected)
+        if self.last_exit_detected and not exit_detected:
+            self.exit_count += 1
+            if self.debugging:
+                print(f"RoundaboutController: Detektovan izlaz #{self.exit_count}")
+        
+        self.last_exit_data = exit_data  # čuvamo podatke o trenutnom izlazu
+        self.last_exit_detected = exit_detected
+    
+    def _follow_right_line(self, right_x,rightVisible, dt):
+        if not rightVisible:
+            return 18
+        
+        center_x = self.width // 2
+        target_position = right_x - self.right_line_target_offset
+        error = center_x - target_position
 
-        elif self.status == 1:  # Turning right
-            if (time.time() - self.lastPoint) >= 3.4:  # Fixed right turn duration
-                if self.debugging:
-                    print("Adjusting angle for roundabout")
-                self.status = 2
-                self.lastPoint = time.time()
-                self.angle = int(angleForRoundabout*10) 
-                self.speed = 200
+        steering_angle = self.right_pid.compute(-error, dt)
 
-        elif self.status == 2:  # Adjusting 
-            self.angle = int(angleForRoundabout*10) 
-            self.speed = 200
-            if self.exitFlag:  # Use instance attribute
-                print("Modul detektovao izlaz")
-                if navigate.pop(0) == "Right":
-                    print("Izlazim iz kruznog toka")
-                    self.angle = 230
-                    self.speed = 150
-                    self.status = 3
-                    self.lastPoint = time.time()
-                else:
-                    self.status = 2
-                    print("Ostajem u kruznom toku")
-                self.exitFlag = False  # Reset instance attribute
+        if steering_angle < 8:
+            steering_angle = 8
 
-        elif self.status == 3:  # Exiting roundabout
-            if (time.time() - self.lastPoint) >= 3:  # Fixed right turn duration for exit
-                if self.debugging:
-                    print("Exiting roundabout completely")
-                roundAbout = False  # Exit roundabout
-                self.status = -3  # Reset to initial state
-                self.angle = 0
-                self.speed = 0
+        if self.debugging:
+            print(f"Follow right: error={error:.1f}, angle={steering_angle:.1f}")
+            
+        return steering_angle
+    
+    def _follow_left_line(self, left_x,leftVisible, dt):
+        if not leftVisible:
+            # Nema lijeve linije, nastaviti ravno
+            return -25
+        
+        # Računanje greške (odstupanje od željene udaljenosti)
+        center_x = self.width // 2
+        target_position = left_x + self.left_line_target_offset
+        error = center_x - target_position
+        
+        # PID kontrola
+        steering_angle = self.left_pid.compute(-error, dt)
 
-        return self.angle, self.speed, roundAbout, self.exitFlag  # Return instance attribute
+        if self.debugging:
+            print(f"Follow left: error={error:.1f}, angle={steering_angle:.1f}")
+            
+        return steering_angle
