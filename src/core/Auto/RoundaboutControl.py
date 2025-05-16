@@ -91,16 +91,9 @@ class RoundaboutController:
     def is_exit_in_region(self, exit_data):
         if exit_data is None:
             return False
-        
-
-        x1, y1, x2, y2 = exit_data
-        reg = self.exit_detection_region
-        
-        # Izlaz je u regionu ako je donji desni ugao (x2, y2) unutar regiona
-        return (x2 >= reg['x_min'] and x2 <= reg['x_max'] and 
-                y2 >= reg['y_min'] and y2 <= reg['y_max'])
+        return True
     
-    def process_frame(self, left_x, right_x, exit_data) -> Tuple[int, bool]:
+    def process_frame(self, left_x, right_x, exit_data, leftVisible, rightVisible) -> Tuple[int, bool]:
         if not self.active:
             return 0, False
         
@@ -126,7 +119,7 @@ class RoundaboutController:
                 if self.debugging:
                     print("RoundaboutController: Prelazak na 'follow_left'")
             
-            return int(self._follow_right_line(right_x, dt)*10), False
+            return int(self._follow_right_line(right_x, rightVisible, dt)*10), False
             
         elif self.current_phase == "follow_left":
             # Faza praćenja lijeve linije - sve dok ne dođemo do ciljanog izlaza
@@ -137,7 +130,7 @@ class RoundaboutController:
                 if self.debugging:
                     print(f"RoundaboutController: Dostignut ciljni izlaz ({self.exit_count}), prelazak na 'exit'")
             
-            return int(self._follow_left_line(left_x, dt)*10), False
+            return int(self._follow_left_line(left_x,leftVisible, dt)*10), False
             
         elif self.current_phase == "exit":
             # Faza izlaska - pratimo desnu liniju određeno vrijeme
@@ -148,7 +141,7 @@ class RoundaboutController:
                     print("RoundaboutController: Kontrola završena uspješno")
                 return 0.0, True
             
-            return int(self._follow_right_line(right_x, dt)*10), False
+            return int(self._follow_right_line(right_x,rightVisible, dt)*10), False
             
         return 0, False
     
@@ -165,8 +158,8 @@ class RoundaboutController:
         self.last_exit_data = exit_data  # čuvamo podatke o trenutnom izlazu
         self.last_exit_detected = exit_detected
     
-    def _follow_right_line(self, right_x, dt):
-        if right_x is None:
+    def _follow_right_line(self, right_x,rightVisible, dt):
+        if not rightVisible:
             return 18
         
         center_x = self.width // 2
@@ -183,8 +176,8 @@ class RoundaboutController:
             
         return steering_angle
     
-    def _follow_left_line(self, left_x, dt):
-        if left_x is None:
+    def _follow_left_line(self, left_x,leftVisible, dt):
+        if not leftVisible:
             # Nema lijeve linije, nastaviti ravno
             return -25
         

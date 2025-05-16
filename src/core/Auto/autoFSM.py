@@ -103,7 +103,7 @@ class autoFSM(ControlModeThread):
         super().stop()
 
     def loop(self):
-        self.leftX, self.rightX = self.laneDetectSubscriber.receiveWithBlock()
+        self.leftX, self.rightX, self.leftVisible, self.rightVisible = self.laneDetectSubscriber.receiveWithBlock()
         stop_line_present, stop_line_distance, stop_line_angle = self.stopLineDetectionSubscriber.receiveWithBlock() # stopLine je sad tuple (intersection(bool), slope_degrees (float))
         stop_line_present_close = stop_line_present and stop_line_distance < 130
         while self.objectDetectionSubscriber.isDataInPipe():
@@ -254,7 +254,7 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.ROUNDABOUT:
-            angle, module_stoping =self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position)
+            angle, module_stoping =self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position, self.leftVisible, self.rightVisible)
             speed = 250
             if module_stoping:
                 self.state = autoFSMState.DRIVE
