@@ -21,12 +21,12 @@ class RoundaboutController:
         self.phase_start_time = None        # Vrijeme početka trenutne faze
         
         # PID kontroleri za praćenje lijeve i desne linije
-        self.right_pid = PIDController(kp=0.8, ki=0.01, kd=0.0, output_limits=(-25, 25))
-        self.left_pid = PIDController(kp=0.4, ki=0.01, kd=0.0, output_limits=(-25, 25))
+        self.right_pid = PIDController(kp=0.4, ki=0.01, kd=0.0, kaw = 0, output_limits=(-25, 25))
+        self.left_pid = PIDController(kp=0.4, ki=0.01, kd=0.0, kaw = 0, output_limits=(-25, 25))
         
         # Vremena trajanja faza (u sekundama)
-        self.entry_phase_time = 7         # Vrijeme za fazu ulaska
-        self.exit_phase_time = 7        # Vrijeme za fazu izlaska
+        self.entry_phase_time = 5        # Vrijeme za fazu ulaska
+        self.exit_phase_time = 8.5       # Vrijeme za fazu izlaska
         
         # Parametri za detekciju izlaza
         self.exit_detection_region = {      # Region u kojem se detektuje izlaz
@@ -37,8 +37,8 @@ class RoundaboutController:
         }
         
         # Potrebna udaljenost od linije
-        self.right_line_target_offset = 90  # Željena udaljenost od desne linije (piksel)
-        self.left_line_target_offset = 150 # Željena udaljenost od lijeve linije (piksel)
+        self.right_line_target_offset = 130  # Željena udaljenost od desne linije (piksel)
+        self.left_line_target_offset = 210 # Željena udaljenost od lijeve linije (piksel)
         
         # Podatci o zadnjem detektovanom izlazu
         self.last_exit_data = None  # sada će ovo biti (x1, y1, x2, y2) ili None
@@ -143,7 +143,7 @@ class RoundaboutController:
                 if self.debugging:
                     print("RoundaboutController: Kontrola završena uspješno")
                 return 0.0, True
-            
+
             return int(self._follow_right_line(right_x,rightVisible, dt)*10), False
             
         return 0, False
@@ -161,8 +161,6 @@ class RoundaboutController:
         self.last_exit_detected = exit_detected
     
     def _follow_right_line(self, right_x,rightVisible, dt):
-        if not rightVisible:
-            return 18
         
         center_x = self.width *0.47
         target_position = right_x - self.right_line_target_offset

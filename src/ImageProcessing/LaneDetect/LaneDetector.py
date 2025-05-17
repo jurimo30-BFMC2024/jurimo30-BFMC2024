@@ -333,8 +333,8 @@ class LaneDetector:
                 frame_to_draw_on, 
                 left_x, 
                 right_x, 
-                150, 
-                90
+                210, 
+                130
             )
 
         # Return the frame with drawings, detection results and visibility flags

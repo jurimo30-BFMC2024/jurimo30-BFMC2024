@@ -76,7 +76,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
         #self.navigateCommand = self.planer.planPath()
-        self.navigateCommand = ["Exit 2", "Right", "Straight", "Right"]
+        self.navigateCommand = ["Exit 3", "Right", "Straight", "Right"]
 
         print(self.navigateCommand)
         self.traffic_signs = TrafficSignController([
