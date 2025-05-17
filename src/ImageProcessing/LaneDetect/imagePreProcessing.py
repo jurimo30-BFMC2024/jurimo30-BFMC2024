@@ -29,7 +29,7 @@ class ImagePreProcessing:
                 (int(self.width * 0.01), self.height * 0.45)
             ]], np.int32)
 
-        self.gamma_lut = self._create_gamma_lut(13)  # Precompute LUT for gamma correction
+        self.gamma_lut = self._create_gamma_lut(9)  # Precompute LUT for gamma correction
         self.mask = self._create_roi_mask()  # Precompute ROI mask
 
     def _create_gamma_lut(self, gamma: float):
