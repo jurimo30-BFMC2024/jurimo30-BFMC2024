@@ -28,7 +28,7 @@ class Localization:
 
             segment['length'] *= scale_factor
 
-            print(segment)
+            # print(segment)
 
 
         # fields for position tracking
@@ -103,7 +103,7 @@ class Localization:
 
         # clamp to [0, total_len]
         d = min(max(self.total_distance, 0.0), total_len)
-        print(f"d: {d}")
+        # print(f"d: {d}")
 
         # find index i so that cum[i] <= d < cum[i+1]
         # if at very end, snap to last node
@@ -140,7 +140,7 @@ class Localization:
         if passed_time > 0 and self.current_segment:
             actual_speed = self.current_segment["length"] / passed_time
             self.speed_error = self.average_target_speed - actual_speed
-            print(f"average_target_speed: {self.average_target_speed}, actual_speed: {actual_speed}, segment_length: {self.current_segment['length']}, passed_t: {passed_time}, speed_error: {self.speed_error}")
+            # print(f"average_target_speed: {self.average_target_speed}, actual_speed: {actual_speed}, segment_length: {self.current_segment['length']}, passed_t: {passed_time}, speed_error: {self.speed_error}")
 
     def get_location(self, noise_stddev=0.05):
         """
@@ -154,13 +154,6 @@ class Localization:
         # noisy_x = x + random.gauss(0, noise_stddev)
         # noisy_y = y + random.gauss(0, noise_stddev)
         # return (noisy_x, noisy_y)
-
-    def start_relative_localization(self):
-        """
-        Save the last known position of the car for relative localization.
-        """
-        self.saved_position = self.location
-        print(f"Relative localization started. Saved position: {self.saved_position}")
 
     def update_position_with_steering(self, speed: float, steering_angle_deg: float):
         """
@@ -187,17 +180,43 @@ class Localization:
         # Update the current location
         x, y = self.location
         self.location = (x + dx, y + dy)
-        print(f"Updated position with speed {speed} and steering angle {steering_angle_deg}: {self.location}")
 
-    def stop_relative_localization(self):
+    def clamp_location_to_graph(self):
         """
-        Reset the car's position to the last saved position.
+        Clamp the current location to the nearest point on the graph vectors.
         """
-        if hasattr(self, 'saved_position'):
-            self.location = self.saved_position
-            print(f"Relative localization stopped. Reset position to: {self.location}")
-        else:
-            print("Error: No saved position to reset to.")
+        if self.current_segment is None:
+            print("Error: No current segment to clamp location.")
+            return
+
+        nodes = self.current_segment["nodes"]
+        closest_point = None
+        min_distance = float('inf')
+
+        for i in range(len(nodes) - 1):
+            x0, y0 = nodes[i]["pos"]
+            x1, y1 = nodes[i + 1]["pos"]
+
+            # Project the current location onto the segment
+            px, py = self.location
+            dx, dy = x1 - x0, y1 - y0
+            segment_length_squared = dx**2 + dy**2
+            if segment_length_squared == 0:
+                # Degenerate segment, use the start point
+                projection = (x0, y0)
+            else:
+                t = max(0, min(1, ((px - x0) * dx + (py - y0) * dy) / segment_length_squared))
+                projection = (x0 + t * dx, y0 + t * dy)
+
+            # Calculate the distance to the projection
+            distance = math.sqrt((px - projection[0])**2 + (py - projection[1])**2)
+            if distance < min_distance:
+                min_distance = distance
+                closest_point = projection
+
+        # Update the location to the closest point
+        self.location = closest_point
+        print(f"Clamped location to: {self.location}")
 
 if __name__ == "__main__":
     segments_data = [
@@ -244,12 +263,11 @@ if __name__ == "__main__":
     print("Speed error:", loc.speed_error)
 
     # Test relative localization
-    loc.start_relative_localization()
     loc.update_position_with_steering(speed=50.0, steering_angle_deg=20)
     time.sleep(0.5)
     loc.update_position_with_steering(speed=50.0, steering_angle_deg=-20)
     time.sleep(0.5)
-    loc.stop_relative_localization()
+    loc.clamp_location_to_graph()
     print(f"Final position after stopping relative localization: {loc.get_location()}")
 
     print("\nDone.")
