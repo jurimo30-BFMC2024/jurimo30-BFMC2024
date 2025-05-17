@@ -12,31 +12,32 @@ class StopLineDetector:
         self.camera_fov_degrees = camera_fov_degrees
         
         # Parameters for stop line detection
-        self.min_line_length = int(width * 0.3)  # Minimum length of line
+        self.min_line_length = int(width * 0.2)  # Minimum length of line
         self.max_line_gap = int(width * 0.05)    # Maximum allowed gap between line segments
-        self.horizontal_angle_threshold = 30     # Maximum angle from horizontal (in degrees)
-        self.previous_detections = []            # Store previous detections for smoothing
-        self.detection_history_size = 5          # Number of previous frames to consider
-        self.detection_threshold = 3             # Minimum detections to consider valid
-        self.last_detected = False               # Was a stop line detected in the previous frame
+        self.horizontal_angle_threshold = 15     # Maximum angle from horizontal (in degrees)
         
         # Define polygon ROI for stop line detection
         self.roi_polygon = np.array([
-            [int(width * 0.1), int(height * 0.7)],    # Bottom left
-            [int(width * 0.1), int(height * 0.3)],    # Top left
-            [int(width * 0.9), int(height * 0.3)],    # Top right
-            [int(width * 0.9), int(height * 0.7)]     # Bottom right
+            [int(width * 0.2), int(height * 0.7)],    # Bottom left
+            [int(width * 0.2), int(height * 0.4)],    # Top left
+            [int(width * 0.8), int(height * 0.4)],    # Top right
+            [int(width * 0.8), int(height * 0.7)]     # Bottom right
         ], np.int32)
         
         # ROI polygon color and thickness for visualization
         self.roi_color = (150, 50, 80)
         self.roi_thickness = 2
 
+        # Frame retention parameters
+        self.last_detected_line = None  # Store the last detected line data
+        self.frames_to_retain = 5       # Number of frames to retain the last detected line
+        self.frames_since_last_detection = 0
+
 
     def process_frame(self, frame: np.ndarray, edges: np.ndarray):
         detected = False
-        distance = 0
-        angle = 0
+        distance = None
+        angle = None
         best_line = None  # Store the best line data
         
         # Apply polygon ROI mask
@@ -50,7 +51,7 @@ class StopLineDetector:
             rho=1, 
             theta=np.pi/180, 
             threshold=10, 
-            minLineLength=self.min_line_length, 
+            minLineLength=self.min_line_length/2,
             maxLineGap=self.max_line_gap
         )
         
@@ -68,14 +69,14 @@ class StopLineDetector:
                     line_angle = degrees(atan2((y2 - y1) , (x2 - x1)))
                 
                 # Check if the line is approximately horizontal (within threshold)
-                if line_angle <= self.horizontal_angle_threshold:
+                if abs(line_angle) <= self.horizontal_angle_threshold:
                     # Calculate line width (horizontal span)
                     line_width = abs(x2 - x1)
                     
                     # Check if line spans a significant portion of the image width
                     if line_width > self.min_line_length:
-                        # Calculate line position (y-coordinate) - average of endpoints
-                        line_position = (y1 + y2) / 2
+                        # Calculate line position (y-coordinate) closest to the bottom of the frame
+                        line_position = max(y1, y2)
                         
                         # Calculate distance from bottom of the frame
                         line_distance = self.height - line_position
@@ -89,35 +90,43 @@ class StopLineDetector:
         
         # Select the best stop line candidate
         if potential_stop_lines:
-            # Sort by width (descending) and then by distance (ascending)
-            potential_stop_lines.sort(key=lambda x: (-x['width'], x['distance']))
-            best_line = potential_stop_lines[0]
+            # Find the most left and down point and the most right and down point
+            left_down = min(potential_stop_lines, key=lambda x: (x['points'][1], x['points'][0]))
+            right_down = min(potential_stop_lines, key=lambda x: (x['points'][3], x['points'][2]))
             
-            x1, y1, x2, y2 = best_line['points']
-            distance = best_line['distance']
-            angle = best_line['angle']
+            x1, y1 = left_down['points'][:2]
+            x2, y2 = right_down['points'][2:]
+            best_line = {'points': (x1, y1, x2, y2)}
             
-            # Update detection history
-            self.previous_detections.append(1)
-            if len(self.previous_detections) > self.detection_history_size:
-                self.previous_detections.pop(0)
+            distance = self.height - max(y1, y2)  # Distance from the bottom of the image
+            angle = degrees(atan2((y2 - y1), (x2 - x1)))
             
             # Draw the detected stop line (only visual, no text)
             cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
             
             detected = True
+
+            # Update last detected line and reset frame counter
+            self.last_detected_line = best_line
+            self.frames_since_last_detection = 0
         else:
-            # No potential stop lines found
-            self.previous_detections.append(0)
-            if len(self.previous_detections) > self.detection_history_size:
-                self.previous_detections.pop(0)
-        
-        # Check if we have consistent detections
-        if sum(self.previous_detections) >= self.detection_threshold:
-            detected = True
-        else:
-            detected = False
-        
+            # If no line is detected, check if we can use the last detected line
+            if self.last_detected_line and self.frames_since_last_detection < self.frames_to_retain:
+                best_line = self.last_detected_line
+                x1, y1, x2, y2 = best_line['points']
+                distance = self.height - max(y1, y2)
+                angle = degrees(atan2((y2 - y1), (x2 - x1)))
+                
+                # Draw the last detected stop line
+                cv2.line(frame, (x1, y1), (x2, y2), (0, 255, 0), 3)
+                
+                detected = True
+                self.frames_since_last_detection += 1
+            else:
+                # Clear the last detected line if retention period is over
+                self.last_detected_line = None
+                detected = False
+
         # Always draw the ROI polygon on the frame
         cv2.polylines(frame, [self.roi_polygon], True, self.roi_color, self.roi_thickness)
         
