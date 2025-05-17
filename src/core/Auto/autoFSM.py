@@ -258,7 +258,7 @@ class autoFSM(ControlModeThread):
         elif self.state == autoFSMState.ROUNDABOUT:
 
             angle, module_stoping =self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position, self.leftVisible, self.rightVisible)
-            speed = 250
+            speed = 150
             if module_stoping:
                 self.state = autoFSMState.DRIVE
 

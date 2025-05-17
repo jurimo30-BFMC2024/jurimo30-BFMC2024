@@ -21,12 +21,12 @@ class RoundaboutController:
         self.phase_start_time = None        # Vrijeme početka trenutne faze
         
         # PID kontroleri za praćenje lijeve i desne linije
-        self.right_pid = PIDController(kp=0.6, ki=0.01, kd=0.0, output_limits=(-25, 25))
+        self.right_pid = PIDController(kp=0.5, ki=0.01, kd=0.0, output_limits=(-25, 25))
         self.left_pid = PIDController(kp=0.6, ki=0.1, kd=0.0, output_limits=(-25, 25))
         
         # Vremena trajanja faza (u sekundama)
-        self.entry_phase_time = 2.5         # Vrijeme za fazu ulaska
-        self.exit_phase_time = 3         # Vrijeme za fazu izlaska
+        self.entry_phase_time = 5         # Vrijeme za fazu ulaska
+        self.exit_phase_time = 5        # Vrijeme za fazu izlaska
         
         # Parametri za detekciju izlaza
         self.exit_detection_region = {      # Region u kojem se detektuje izlaz
@@ -37,8 +37,8 @@ class RoundaboutController:
         }
         
         # Potrebna udaljenost od linije
-        self.right_line_target_offset = 80  # Željena udaljenost od desne linije (piksel)
-        self.left_line_target_offset = 120 # Željena udaljenost od lijeve linije (piksel)
+        self.right_line_target_offset = 65  # Željena udaljenost od desne linije (piksel)
+        self.left_line_target_offset = 110 # Željena udaljenost od lijeve linije (piksel)
         
         # Podatci o zadnjem detektovanom izlazu
         self.last_exit_data = None  # sada će ovo biti (x1, y1, x2, y2) ili None
@@ -148,7 +148,6 @@ class RoundaboutController:
     def _track_exit(self, exit_data):
         # Proveri da li je izlaz prisutan i u regionu
         exit_detected = self.is_exit_in_region(exit_data)
-        print("print 3")
         # Brojanje kada izlaz nestane iz regiona (tranzicija sa detected na not detected)
         if self.last_exit_detected and not exit_detected:
             self.exit_count += 1
@@ -160,16 +159,16 @@ class RoundaboutController:
     
     def _follow_right_line(self, right_x,rightVisible, dt):
         if not rightVisible:
-            return 18
+            return 25
         
-        center_x = self.width // 2
+        center_x = self.width * 0.47
         target_position = right_x - self.right_line_target_offset
         error = center_x - target_position
 
         steering_angle = self.right_pid.compute(-error, dt)
 
-        if steering_angle < 8:
-            steering_angle = 8
+        if steering_angle < 0:
+            steering_angle = 5
 
         if self.debugging:
             print(f"Follow right: error={error:.1f}, angle={steering_angle:.1f}")
@@ -179,10 +178,10 @@ class RoundaboutController:
     def _follow_left_line(self, left_x,leftVisible, dt):
         if not leftVisible:
             # Nema lijeve linije, nastaviti ravno
-            return -25
+            return -20
         
         # Računanje greške (odstupanje od željene udaljenosti)
-        center_x = self.width // 2
+        center_x = self.width * 0.47
         target_position = left_x + self.left_line_target_offset
         error = center_x - target_position
         
