@@ -67,7 +67,7 @@ class threadLaneDetect(ThreadWithStop):
 
                 # obradi frejm
                 frame, stop_line_data = self.stopLineDetector.process_frame(frame, edges)
-                frame, leftX, rightX = self.laneDetector.process_frame(edges, frame)
+                frame, leftX, rightX, leftVisible, rightVisible = self.laneDetector.process_frame(edges, frame)
                 frame, parking_line = self.parkingSpotDetector.process_frame(frame, edges)
                 frame, roundaboutAngle = self.roundAboutDetector.process_frame(frame, edges)
 
@@ -81,7 +81,7 @@ class threadLaneDetect(ThreadWithStop):
 
                 # Slanje rezultate
                 self.stopLineDetectionSender.send(stop_line_data)
-                self.laneDetectionSender.send((leftX, rightX))
+                self.laneDetectionSender.send((leftX, rightX, leftVisible, rightVisible))
                 if parking_line is not None:
                     self.parkingSpotDetectionSender.send(True)
                 self.roundAboutAngleSender.send(float(roundaboutAngle))

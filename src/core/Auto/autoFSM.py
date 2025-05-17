@@ -8,7 +8,8 @@ from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.core.Auto.LaneFollow.LaneFollow import LaneFollower as LaneFollowController
 from src.core.Auto.SpeedControl import SpeedControl
 from src.core.Auto.IntersectionControl import IntersectionControl
-from src.core.Auto.RoundaboutControl import RoundaboutControl
+from src.core.Auto.RoundaboutControl import RoundaboutController 
+from src.core.Auto.Crosswalk import CrosswalkController
 from src.utils.messages.allMessages import (
     LaneDetect,
     CoreSteerMotor,
@@ -55,12 +56,13 @@ class autoFSM(ControlModeThread):
 
     def start(self):
         self.planer = PathPlanner(start=43, goal=10, mode="pacman")
-        self.laneFollowContrler = LaneFollowController(512, 270, self.logging, self.debugging)
+        self.laneFollowContrler = LaneFollowController(512, 270, self.logging, False)
         self.speedControler = SpeedControl(self.logging, False)
         self.intersectionController = IntersectionControl(self.logging, self.debugging)
         self.parkingController = Parking(self.logging, self.debugging)
         self.overtakeController = Overtake(self.logging, self.debugging)
-        self.roundaboutController = RoundaboutControl(self.logging, self.debugging)
+        self.roundaboutController = RoundaboutController(512, 270, self.logging, True)
+        self.crosswalkController = CrosswalkController()
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -76,7 +78,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
         #self.navigateCommand = self.planer.planPath()
-        self.navigateCommand = ["Straight", "Straight", "Straight", "Right"]
+        self.navigateCommand = ["Exit 2", "Right", "Straight", "Right"]
 
         print(self.navigateCommand)
         self.traffic_signs = TrafficSignController([
@@ -89,10 +91,10 @@ class autoFSM(ControlModeThread):
             "red", "green", "yellow", "red_yellow"
         ])
 
-        self.sign_car_position = False
+        self.sign_car_position = None
         self.obstacle_start_time = None
-        self.stephanie_position = False
-        self.roundaboutExit_position = False
+        self.stephanie_position = None
+        self.roundaboutExit_position = None
         self.intersectionSign = "None"
 
         self.state = autoFSMState.DRIVE
@@ -103,7 +105,7 @@ class autoFSM(ControlModeThread):
         super().stop()
 
     def loop(self):
-        self.leftX, self.rightX = self.laneDetectSubscriber.receiveWithBlock()
+        self.leftX, self.rightX, self.leftVisible, self.rightVisible = self.laneDetectSubscriber.receiveWithBlock()
         stop_line_present, stop_line_distance, stop_line_angle = self.stopLineDetectionSubscriber.receiveWithBlock() # stopLine je sad tuple (intersection(bool), slope_degrees (float))
         stop_line_present_close = stop_line_present and stop_line_distance < 130
 
@@ -136,6 +138,7 @@ class autoFSM(ControlModeThread):
                 self.traffic_signs.set_active(sign)
                 if self.debugging: print(f"Traffic sign detected: {sign}")
             else:
+
                  raise ValueError(f'Unknown sign detected: {sign}')
             
             if self.debugging:
@@ -151,7 +154,7 @@ class autoFSM(ControlModeThread):
         roundabout_angle = self.roundaboutAngleSubscriber.receiveWithBlock()  # Corrected to RoundAboutAngle
         traffic_light_present = self.traffic_light_states.get_active() != None
 
-        obstacle = front_sensors["distance"] <= 80 and self.sign_car_detected
+        obstacle = front_sensors["distance"] <= 80 and self.sign_car_position
         angle = self.laneFollowContrler.process_following(self.leftX, self.rightX) # calculate steering angle from lane follow data
 
         if not obstacle:
@@ -192,12 +195,11 @@ class autoFSM(ControlModeThread):
             elif stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
                 if self.debugging:
                     print("Entering roundabout")
+                isStarted = self.roundaboutController.start(self.navigateCommand.pop(0))
                 self.traffic_signs.clear()
                 self.state = autoFSMState.ROUNDABOUT
 
-
-            elif stop_line_present and self.traffic_signs.get_active() == "crosswalk" and self.stephanie_position:
-              
+            elif stop_line_present and self.traffic_signs.get_active() == "crosswalk":
                 self.crosswalkStart = time.time()
                 self.state = autoFSMState.CROSSWALK
                         
@@ -246,24 +248,16 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.CROSSWALK:
-            angle = 0
-            speed = 0
-            if time.time() - self.crosswalkStart >= 3:
-                self.stephanie_position = False
-                self.traffic_signs.clear()
+            angle, speed, module_stoping = self.crosswalkController.control(self.stephanie_position)
+            if module_stoping:
                 self.state = autoFSMState.DRIVE
+                self.stephanie_position = None
+                self.crosswalkStart = None
 
         elif self.state == autoFSMState.ROUNDABOUT:
-            angle, speed, module_running, self.roundaboutExit_position  = self.roundaboutController.getControlData(
-                angleForRoundabout=roundabout_angle,  # Use the received angle
-                navigate=self.navigateCommand,
-
-                exitFlag=self.roundaboutExit_position,
-                stop_line_present=stop_line_present,
-                stop_line_slope=stop_line_slope
-            )
-
-            if not module_running:
+            angle, module_stoping = self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position, self.leftVisible, self.rightVisible)
+            speed = 150
+            if module_stoping:
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:

@@ -1,10 +1,10 @@
 class PIDController:
-    def __init__(self, kp=1.0, ki=0.0, kd=0.0, kaw=None, output_limits=(-float('inf'), float('inf'))):
+    def __init__(self, kp=1.0, ki=0.0, kd=0.0, kaw=8, output_limits=(-float('inf'), float('inf'))):
         self.kp = kp  # Proporcionalni faktor
         self.ki = ki  # Integralni faktor
         self.kd = kd  # Derivativni faktor
         # Anti-windup koeficijent; po defaultu jednak ki ako nije specificiran
-        self.kaw = 8
+        self.kaw = kaw
 
         self.previous_error = 0.0      # Prethodna greška
         self.integral = 0.0            # Integralna akumulacija

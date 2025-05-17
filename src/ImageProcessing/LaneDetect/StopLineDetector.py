@@ -28,6 +28,7 @@ class StopLineDetector:
         self.roi_color = (150, 50, 80)
         self.roi_thickness = 2
 
+
         # Frame retention parameters
         self.last_detected_line = None  # Store the last detected line data
         self.frames_to_retain = 5       # Number of frames to retain the last detected line
@@ -50,7 +51,7 @@ class StopLineDetector:
             masked_edges, 
             rho=1, 
             theta=np.pi/180, 
-            threshold=10, 
+            threshold=10,
             minLineLength=self.min_line_length/2,
             maxLineGap=self.max_line_gap
         )
