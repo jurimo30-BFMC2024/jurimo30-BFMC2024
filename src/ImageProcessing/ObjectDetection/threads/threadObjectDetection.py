@@ -48,6 +48,13 @@ class threadObjectDetection(ThreadWithStop):
         self.lost_sign_count = 0          # Frames without current sign
         self.lost_sign_threshold = 17     # Frames to consider sign lost
         
+        # Target frame dimensions
+        self.target_width = 512
+        self.target_height = 270
+        
+        # Processing frame dimensions
+        self.processing_width = 256
+        self.processing_height = 256
 
         self.lost_timeout = 1             # Timeout for lost objects
 
@@ -73,6 +80,25 @@ class threadObjectDetection(ThreadWithStop):
     def subscribe(self):
         """Subscribes to required messages."""
         self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
+        
+    def scale_coordinates(self, coords):
+        """Scale coordinates from processing frame to target frame size."""
+        if coords is None:
+            return None
+            
+        x1, y1, x2, y2 = coords
+        
+        # Scale factors
+        scale_x = self.target_width / self.processing_width
+        scale_y = self.target_height / self.processing_height
+        
+        # Scale coordinates
+        scaled_x1 = int(x1 * scale_x)
+        scaled_y1 = int(y1 * scale_y)
+        scaled_x2 = int(x2 * scale_x)
+        scaled_y2 = int(y2 * scale_y)
+        
+        return (scaled_x1, scaled_y1, scaled_x2, scaled_y2)
 
     def run(self):
         while self._running:
@@ -80,7 +106,7 @@ class threadObjectDetection(ThreadWithStop):
                 videoData = self.videoSubscriber.receiveWithBlock()
                 frame = self.decode_frame(videoData)
                 frame_cropped = self.crop_frame(frame)
-                frame_cropped = cv2.resize(frame_cropped, (256,256), interpolation=cv2.INTER_AREA)
+                frame_cropped = cv2.resize(frame_cropped, (self.processing_width, self.processing_height), interpolation=cv2.INTER_AREA)
                 
                 # Process frame and get detections
                 processed_frame, best_sign, detected_objects = self.process_frame(frame_cropped)
@@ -97,9 +123,7 @@ class threadObjectDetection(ThreadWithStop):
     def process_frame(self, frame):
         """Process frame and return annotated frame, best detection, and detected objects."""
         # Get YOLO results
-
         results = self.model(frame, verbose=False)[0]
-
 
         # List to store relevant objects
         detected_objects = []
@@ -212,6 +236,9 @@ class threadObjectDetection(ThreadWithStop):
         for obj in detected_objects:
             name = obj["name"]
             current_position = obj["position"]
+            
+            # Scale position coordinates to target frame size
+            scaled_position = self.scale_coordinates(current_position) if current_position is not None else None
 
             if obj["present"]:
                # Ako je detektovan, ažuriraj vreme i pošalji poruku
@@ -219,13 +246,13 @@ class threadObjectDetection(ThreadWithStop):
 
                if self.relevant_objects[name]["present"]:
                    if self.debugging:
-                        print(f"[DETEKCIJA] Objekat '{name}' detektovan na {current_position}")
+                        print(f"[DETEKCIJA] Objekat '{name}' detektovan na {scaled_position}")
 
                    self.relevant_objects[name]["position"] = current_position
                    self.relevant_objects[name]["sent_lost_message"] = False
                    self.objectDetectionSender.send({
                         "name": name,
-                        "position": current_position
+                        "position": scaled_position
                     })
             else:
                 if self.relevant_objects[name]["last_seen_time"] is not None:
