@@ -60,6 +60,8 @@ class CrosswalkController:
             
             if current_side != self.previous_side and current_side != "middle":
                 self.detected_other_side = True
+                self.waiting_complete = True
+
                 self.waiting_time = time.time()
                 print("[Crosswalk] Detected Stephanie on the other side")
             else:
