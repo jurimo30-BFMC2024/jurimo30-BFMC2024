@@ -37,8 +37,8 @@ class StopLineDetector:
 
     def process_frame(self, frame: np.ndarray, edges: np.ndarray):
         detected = False
-        distance = None
-        angle = None
+        distance = 0.0
+        angle = 0.0
         best_line = None  # Store the best line data
         
         # Apply polygon ROI mask
@@ -135,4 +135,4 @@ class StopLineDetector:
         #if self.logging and detected:
         #    print(f"Stop line detected: Distance={distance:.1f}px, Angle={angle:.1f}°")
         
-        return frame, (detected, distance, angle)
+        return frame, (detected, float(distance), float(angle))
