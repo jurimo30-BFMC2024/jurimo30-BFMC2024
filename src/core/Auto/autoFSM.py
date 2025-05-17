@@ -9,6 +9,7 @@ from src.core.Auto.LaneFollow.LaneFollow import LaneFollower as LaneFollowContro
 from src.core.Auto.SpeedControl import SpeedControl
 from src.core.Auto.IntersectionControl import IntersectionControl
 from src.core.Auto.RoundaboutControl import RoundaboutController 
+from src.core.Auto.Crosswalk import CrosswalkController
 from src.utils.messages.allMessages import (
     LaneDetect,
     CoreSteerMotor,
@@ -61,6 +62,7 @@ class autoFSM(ControlModeThread):
         self.parkingController = Parking(self.logging, self.debugging)
         self.overtakeController = Overtake(self.logging, self.debugging)
         self.roundaboutController = RoundaboutController(512, 270, self.logging, True)
+        self.crosswalkController = CrosswalkController()
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -76,7 +78,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
         #self.navigateCommand = self.planer.planPath()
-        self.navigateCommand = ["Exit 3", "Right", "Straight", "Right"]
+        self.navigateCommand = ["Exit 2", "Right", "Straight", "Right"]
 
         print(self.navigateCommand)
         self.traffic_signs = TrafficSignController([
@@ -106,6 +108,7 @@ class autoFSM(ControlModeThread):
         self.leftX, self.rightX, self.leftVisible, self.rightVisible = self.laneDetectSubscriber.receiveWithBlock()
         stop_line_present, stop_line_distance, stop_line_angle = self.stopLineDetectionSubscriber.receiveWithBlock() # stopLine je sad tuple (intersection(bool), slope_degrees (float))
         stop_line_present_close = stop_line_present and stop_line_distance < 130
+
         while self.objectDetectionSubscriber.isDataInPipe():
             detected_objects_dict = self.objectDetectionSubscriber.receive() # This is now a dict
             object_name = detected_objects_dict.get("name")
@@ -198,7 +201,7 @@ class autoFSM(ControlModeThread):
 
 
 
-            elif stop_line_present and self.traffic_signs.get_active() == "crosswalk" and self.stephanie_position:
+            elif stop_line_present and self.traffic_signs.get_active() == "crosswalk":
 
                 self.crosswalkStart = time.time()
                 self.state = autoFSMState.CROSSWALK
@@ -248,12 +251,11 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.CROSSWALK:
-            angle = 0
-            speed = 0
-            if time.time() - self.crosswalkStart >= 3:
-                self.stephanie_position = False
-                self.traffic_signs.clear()
+            angle, speed, module_stoping = self.crosswalkController.control(self.stephanie_position)
+            if module_stoping:
                 self.state = autoFSMState.DRIVE
+                self.stephanie_position = None
+                self.crosswalkStart = None
 
         elif self.state == autoFSMState.ROUNDABOUT:
 
