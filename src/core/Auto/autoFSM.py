@@ -199,10 +199,7 @@ class autoFSM(ControlModeThread):
                 self.traffic_signs.clear()
                 self.state = autoFSMState.ROUNDABOUT
 
-
-
             elif stop_line_present and self.traffic_signs.get_active() == "crosswalk":
-
                 self.crosswalkStart = time.time()
                 self.state = autoFSMState.CROSSWALK
                         
@@ -258,12 +255,10 @@ class autoFSM(ControlModeThread):
                 self.crosswalkStart = None
 
         elif self.state == autoFSMState.ROUNDABOUT:
-
-            angle, module_stoping =self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position, self.leftVisible, self.rightVisible)
+            angle, module_stoping = self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position, self.leftVisible, self.rightVisible)
             speed = 150
             if module_stoping:
                 self.state = autoFSMState.DRIVE
-
 
         elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
             no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
