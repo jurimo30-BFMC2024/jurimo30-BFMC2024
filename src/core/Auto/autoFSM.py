@@ -229,7 +229,10 @@ class autoFSM(ControlModeThread):
             if park_angle is not None:
                 angle = park_angle
 
+            self.localization.update_position_with_steering(speed, angle)
+
             if not module_running:
+                self.localization.clamp_location_to_graph()
                 self.state = autoFSMState.DRIVE
             
         elif self.state == autoFSMState.INTERSECTION:
@@ -238,6 +241,8 @@ class autoFSM(ControlModeThread):
                 stop_line_slope=stop_line_angle,
                 trafficLights=self.traffic_light_states
             )
+
+            self.localization.update_position_with_steering(speed, angle)
             
             if not module_running:
                 self.localization.start_new_segment()
@@ -248,7 +253,10 @@ class autoFSM(ControlModeThread):
             if overtake_angle is not None:
                 angle = overtake_angle
 
+            self.localization.update_position_with_steering(speed, angle)
+
             if not module_running:
+                self.localization.clamp_location_to_graph()
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.CROSSWALK:
@@ -268,6 +276,8 @@ class autoFSM(ControlModeThread):
                 stop_line_slope=stop_line_angle
             )
 
+            self.localization.update_position_with_steering(speed, angle)
+            
             if not module_running:
                 self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
