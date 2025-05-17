@@ -105,12 +105,24 @@ if __name__ == "__main__":
     nx.draw(pf.graph, pos, ax=ax, with_labels=True, node_size=300, node_color="lightblue")
     best_node_marker, = ax.plot([], [], 'ro', markersize=10)  # Marker for the best node
 
-    def on_mouse_move(event):
+    last_mouse_pos = [None]  # Store the last mouse position in a mutable list
+
+    def on_mouse_move(event, last_mouse_pos):
         if event.xdata is None or event.ydata is None:
             return  # Ignore events outside the plot area
 
         x, y = event.xdata, event.ydata
-        best_node, _ = pf.find_best_node(x, y)
+
+        # Calculate rotation_deg based on the last mouse position
+        rotation_deg = None
+        if last_mouse_pos[0] is not None:
+            dx = x - last_mouse_pos[0][0]
+            dy = y - last_mouse_pos[0][1]
+            rotation_deg = math.degrees(math.atan2(dy, dx))
+
+        last_mouse_pos[0] = (x, y)  # Update the last mouse position
+
+        best_node, _ = pf.find_best_node(x, y, rotation_deg)
         best_node_pos = pos[best_node]
 
         # Update the marker for the best node
@@ -118,7 +130,7 @@ if __name__ == "__main__":
         fig.canvas.draw_idle()
 
     # Connect the mouse move event to the handler
-    fig.canvas.mpl_connect('motion_notify_event', on_mouse_move)
+    fig.canvas.mpl_connect('motion_notify_event', lambda event: on_mouse_move(event, last_mouse_pos))
 
     plt.title("Move the mouse to find the best node")
     plt.show()
