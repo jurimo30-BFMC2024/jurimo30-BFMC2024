@@ -6,9 +6,9 @@ import matplotlib.pyplot as plt
 
 class PositionFinder:
     def __init__(self, file_path):
-        self.graph = self.parse_graphml(file_path)
+        self.graph = self._parse_graphml(file_path)
 
-    def parse_graphml(self, file_path):
+    def _parse_graphml(self, file_path):
         tree = ET.parse(file_path)
         root = tree.getroot()
 
@@ -39,18 +39,18 @@ class PositionFinder:
 
         for node_id, data in self.graph.nodes(data=True):
             node_pos = np.array(data['pos'])
-            score = self.calculate_score(node_pos, input_vec, node_id, rotation_deg)
+            score = self._calculate_score(node_pos, input_vec, node_id, rotation_deg)
 
             if score < min_score:
                 min_score = score
                 best_node = node_id
 
-        length, angle = self.calculate_vector_and_angle(best_node, input_vec, rotation_deg)
+        length, angle = self._calculate_vector_and_angle(best_node, input_vec, rotation_deg)
         length = np.cos(math.radians(angle)) * length  # Project length onto the direction of the angle
 
         return best_node, length
 
-    def calculate_score(self, node_pos, input_vec, node_id, rotation_deg):
+    def _calculate_score(self, node_pos, input_vec, node_id, rotation_deg):
         """
         Calculate the score for a node based on distance and rotation.
         """
@@ -58,12 +58,12 @@ class PositionFinder:
         score = dist
 
         if rotation_deg is not None:
-            best_heading_diff = self.calculate_heading_diff(node_pos, node_id, rotation_deg)
+            best_heading_diff = self._calculate_heading_diff(node_pos, node_id, rotation_deg)
             score += math.degrees(best_heading_diff)
 
         return score
 
-    def calculate_heading_diff(self, node_pos, node_id, rotation_deg):
+    def _calculate_heading_diff(self, node_pos, node_id, rotation_deg):
         """
         Calculate the best heading difference for a node based on its outgoing edges.
         """
@@ -80,7 +80,7 @@ class PositionFinder:
 
         return best_heading_diff
 
-    def calculate_vector_and_angle(self, best_node, input_vec, rotation_deg):
+    def _calculate_vector_and_angle(self, best_node, input_vec, rotation_deg):
         """
         Calculate the vector length and relative angle to the best node.
         """
