@@ -40,7 +40,7 @@ class PIDController:
         self.integral = 0.0
         self.last_output = 0.0
 
-    def set_tunings(self, kp=None, ki=None, kd=None, kaw=None):
+    def set_tunings(self, kp=None, ki=None, kd=None, kaw=None, output_limits=None):
         if kp is not None:
             self.kp = kp
         if ki is not None:
@@ -49,6 +49,8 @@ class PIDController:
             self.kd = kd
         if kaw is not None:
             self.kaw = kaw
+        if output_limits is not None:
+            self.output_limits = output_limits
 
     def set_output_limits(self, min_output, max_output):
         self.output_limits = (min_output, max_output)

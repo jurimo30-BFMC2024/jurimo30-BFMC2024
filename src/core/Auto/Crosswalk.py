@@ -42,7 +42,7 @@ class CrosswalkController:
         
         if (stephanie_position is None and self.previous_side is None) or self.waiting_complete:
             self.curentTime = time.time()
-            if self.curentTime - self.waiting_time > 2:
+            if self.curentTime - self.waiting_time > 1:
                 print("[Crosswalk] Waiting complete")
                 return 0, 300, True
             else:

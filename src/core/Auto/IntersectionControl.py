@@ -17,7 +17,7 @@ class IntersectionControl():
         self.motions = {
             "Right": [
                 (0, 168, 1.7),
-                (240, 168, 5.3),
+                (240, 168, 5.7),
             ],
             "Left": [
                 (0, 168, 3.7),
@@ -63,7 +63,7 @@ class IntersectionControl():
     
     def createCorrectedMotion(self):
         straighten_distance = self.calculate_distance_to_straighten(self.slope_degrees)
-        straighten_time = (straighten_distance / 20)
+        straighten_time = (straighten_distance / 16.8)
 
         # Determine the angle to correct the direction based on slope sign
         if self.slope_degrees < 0:

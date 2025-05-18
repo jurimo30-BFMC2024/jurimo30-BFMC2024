@@ -78,7 +78,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
         #self.navigateCommand = self.planer.planPath()
-        self.navigateCommand = ["Exit 2", "Right", "Straight", "Right"]
+        self.navigateCommand = ["Exit 4", "Left", "Exit 1", "Right"]
 
         print(self.navigateCommand)
         self.traffic_signs = TrafficSignController([
@@ -238,6 +238,7 @@ class autoFSM(ControlModeThread):
             
             if not module_running:
                 self.state = autoFSMState.DRIVE
+                self.laneFollowContrler.restartPid()
 
         elif self.state == autoFSMState.OVERTAKE:
             overtake_angle, speed, module_running = self.overtakeController.run(False, front_sensors, side_sensors)
@@ -253,12 +254,16 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.DRIVE
                 self.stephanie_position = None
                 self.crosswalkStart = None
+                self.laneFollowContrler.restartPid()
 
         elif self.state == autoFSMState.ROUNDABOUT:
             angle, module_stoping = self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position, self.leftVisible, self.rightVisible)
             speed = 150
             if module_stoping:
                 self.state = autoFSMState.DRIVE
+                self.laneFollowContrler.restartPid()
+
+                
 
         elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
             no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
