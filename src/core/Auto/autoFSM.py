@@ -19,12 +19,15 @@ from src.utils.messages.allMessages import (
     SideSensors,
     FrontSensors,
     ParkingSpotDetect,
-    RoundAboutAngle
+    RoundAboutAngle,
+    ImuData
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.core.Auto.pathPlanning.pathPlanning import PathPlanner
+from src.core.Auto.pathPlanning.PositionFinder import PositionFinder
 from src.core.Auto.Localization.Localization import Localization
+from src.core.Auto.Localization.UDPLocationBroadcaster import UDPLocationBroadcaster
 from src.core.Auto.TrafficSignController import TrafficSignController
 import time
 from enum import Enum, auto
@@ -55,13 +58,10 @@ class autoFSM(ControlModeThread):
         super().__init__()
 
     def start(self):
-        self.planer = PathPlanner(start=10, goal=43, mode="pacman")
-        self.laneFollowContrler = LaneFollowController(512, 270, self.logging, False)
-        self.speedControler = SpeedControl(self.logging, False)
-        self.intersectionController = IntersectionControl(self.logging, self.debugging)
-        self.parkingController = Parking(self.logging, self.debugging)
-        self.overtakeController = Overtake(self.logging, self.debugging)
-        self.roundaboutController = RoundaboutControl(self.logging, self.debugging)
+        self.oldAngle = 0
+        self.oldSpeed = 0
+        self.steerMotorSender.send("0")
+        self.speedMotorSender.send("0")
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -71,13 +71,29 @@ class autoFSM(ControlModeThread):
         self.frontSensorSubscriber.empty()
         self.parkingSpotDetectionSubscriber.empty()
         self.roundaboutAngleSubscriber.empty()
+        self.imuSubscriber.empty()
 
-        self.oldAngle = 0
-        self.oldSpeed = 0
-        self.steerMotorSender.send("0")
-        self.speedMotorSender.send("0")
+        self.udpLocationSender = UDPLocationBroadcaster(5001, 5)
+        positionFinder = PositionFinder("Small_map_roundabout.graphml")
+        while self.udpLocationSender.get_location() is None:
+            print("Waiting for location data...")
+            time.sleep(0.1)
+        
+        imu_data = self.imuSubscriber.receiveWithBlock()
+        gps_location = self.udpLocationSender.get_location()
+        print(f"GPS location: {gps_location}, IMU data: {imu_data}")
+        best_node, distance_to_best_node = positionFinder.find_best_node(gps_location[0], gps_location[1], rotation_deg=imu_data["yaw"])
+        print(f"Best node: {best_node}, Distance to best node: {distance_to_best_node}")
+
+        self.planer = PathPlanner(start=best_node, goal=43, mode="pacman")
         self.navigateCommand, segmentsData = self.planer.planPath()
         self.localization = Localization(segmentsData)
+        self.laneFollowContrler = LaneFollowController(512, 270, self.logging, False)
+        self.speedControler = SpeedControl(self.logging, False)
+        self.intersectionController = IntersectionControl(self.logging, self.debugging)
+        self.parkingController = Parking(self.logging, self.debugging)
+        self.overtakeController = Overtake(self.logging, self.debugging)
+        self.roundaboutController = RoundaboutControl(self.logging, self.debugging)
         self.localization.start_new_segment()
 
         print(self.navigateCommand)
@@ -102,6 +118,7 @@ class autoFSM(ControlModeThread):
         super().start()
     
     def stop(self):
+        self.udpLocationSender.stop()
         super().stop()
 
     def loop(self):
@@ -315,6 +332,9 @@ class autoFSM(ControlModeThread):
             # if self.debugging:
             #     self.logging.info(f"New speed: {speed}")
         
+        location = self.localization.get_location()
+        self.udpLocationSender.update_location(location[0], location[1])
+        
         # time.sleep(0.05)
 
     def getTime(self):
@@ -330,3 +350,4 @@ class autoFSM(ControlModeThread):
         self.frontSensorSubscriber = messageHandlerSubscriber(self.queuesList, FrontSensors, "LastOnly", True)
         self.parkingSpotDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ParkingSpotDetect, "LastOnly", True)
         self.roundaboutAngleSubscriber = messageHandlerSubscriber(self.queuesList, RoundAboutAngle, "LastOnly", True)  # Corrected to RoundAboutAngle
+        self.imuSubscriber = messageHandlerSubscriber(self.queuesList, ImuData, "LastOnly", True)
