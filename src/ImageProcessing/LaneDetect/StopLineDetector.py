@@ -28,7 +28,6 @@ class StopLineDetector:
         self.roi_color = (150, 50, 80)
         self.roi_thickness = 2
 
-
         # Frame retention parameters
         self.last_detected_line = None  # Store the last detected line data
         self.frames_to_retain = 5       # Number of frames to retain the last detected line
@@ -50,7 +49,7 @@ class StopLineDetector:
         lines = cv2.HoughLinesP(
             masked_edges, 
             rho=1, 
-            theta=np.pi/180, 
+            theta=np.pi/180,
             threshold=10,
             minLineLength=self.min_line_length/2,
             maxLineGap=self.max_line_gap
@@ -106,7 +105,6 @@ class StopLineDetector:
             cv2.line(frame, (x1, y1), (x2, y2), (0, 0, 255), 3)
             
             detected = True
-
             # Update last detected line and reset frame counter
             self.last_detected_line = best_line
             self.frames_since_last_detection = 0
@@ -127,7 +125,6 @@ class StopLineDetector:
                 # Clear the last detected line if retention period is over
                 self.last_detected_line = None
                 detected = False
-
         # Always draw the ROI polygon on the frame
         cv2.polylines(frame, [self.roi_polygon], True, self.roi_color, self.roi_thickness)
         

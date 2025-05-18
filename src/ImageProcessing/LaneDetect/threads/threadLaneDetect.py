@@ -82,6 +82,7 @@ class threadLaneDetect(ThreadWithStop):
                 # Slanje rezultate
                 self.stopLineDetectionSender.send(stop_line_data)
                 self.laneDetectionSender.send((leftX, rightX, leftVisible, rightVisible))
+
                 if parking_line is not None:
                     self.parkingSpotDetectionSender.send(True)
                 self.roundAboutAngleSender.send(float(roundaboutAngle))
