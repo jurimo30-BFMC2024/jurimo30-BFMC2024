@@ -56,7 +56,7 @@ class threadObjectDetection(ThreadWithStop):
         self.processing_width = 256
         self.processing_height = 256
 
-        self.lost_timeout = 1             # Timeout for lost objects
+        self.lost_timeout = 0.6            # Timeout for lost objects
 
    
         # Initialize relevant_objects structure

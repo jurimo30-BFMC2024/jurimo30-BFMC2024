@@ -42,11 +42,17 @@ class CrosswalkController:
         
         if (stephanie_position is None and self.previous_side is None) or self.waiting_complete:
             self.curentTime = time.time()
-            if self.curentTime - self.waiting_time > 1:
+            if self.curentTime - self.waiting_time > 1.2:
                 print("[Crosswalk] Waiting complete")
-                return 0, 300, True
+                self.finished = False
+                self.waiting_time = time.time()
+                self.previous_side = None
+                self.detected_other_side = False
+                self.waiting_complete = False
+                self.started = False  # Flag to track if we've started detection
+                return 0, 400, True
             else:
-                return 0, 300, False
+                return 0, 400, False
         
         if stephanie_position is not None and self.previous_side is None:
             # First detection of Stephanie

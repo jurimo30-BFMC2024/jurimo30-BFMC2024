@@ -78,7 +78,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
         #self.navigateCommand = self.planer.planPath()
-        self.navigateCommand = ["Exit 4", "Left", "Exit 1", "Right"]
+        self.navigateCommand = ["Exit 2", "Right", "Exit 2", "Right", "Exit 1", "Straight", "Exit 4", "Left", "Exit 2"]
 
         print(self.navigateCommand)
         self.traffic_signs = TrafficSignController([
@@ -136,7 +136,8 @@ class autoFSM(ControlModeThread):
                 if self.debugging: print(f"Traffic light detected: {sign}")
             elif sign in self.traffic_signs:
                 self.traffic_signs.set_active(sign)
-                if self.debugging: print(f"Traffic sign detected: {sign}")
+                #if self.debugging: 
+                print(f"Traffic sign detected: {sign}")
             else:
 
                  raise ValueError(f'Unknown sign detected: {sign}')
@@ -237,6 +238,8 @@ class autoFSM(ControlModeThread):
             )
             
             if not module_running:
+                self.traffic_light_states.clear()
+                self.traffic_signs.clear()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
 

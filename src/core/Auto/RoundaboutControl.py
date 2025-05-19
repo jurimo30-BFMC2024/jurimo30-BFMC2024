@@ -25,7 +25,8 @@ class RoundaboutController:
         self.left_pid = PIDController(kp=0.4, ki=0.01, kd=0.0, kaw = 0, output_limits=(-25, 25))
         
         # Vremena trajanja faza (u sekundama)
-        self.entry_phase_time = 5        # Vrijeme za fazu ulaska
+        self.approach_phase_time = 0.8  # Vrijeme za fazu prilaska (vožnja pravo)
+        self.entry_phase_time = 4.4        # Vrijeme za fazu ulaska
         self.exit_phase_time = 8.5       # Vrijeme za fazu izlaska
         
         # Parametri za detekciju izlaza
@@ -38,7 +39,7 @@ class RoundaboutController:
         
         # Potrebna udaljenost od linije
         self.right_line_target_offset = 130  # Željena udaljenost od desne linije (piksel)
-        self.left_line_target_offset = 155 # Željena udaljenost od lijeve linije (piksel)
+        self.left_line_target_offset = 185 # Željena udaljenost od lijeve linije (piksel)
         
         # Podatci o zadnjem detektovanom izlazu
         self.last_exit_data = None  # sada će ovo biti (x1, y1, x2, y2) ili None
@@ -46,6 +47,11 @@ class RoundaboutController:
         
         # Dodavanje varijable za praćenje vremena za izračun dt
         self.last_process_time = time.time()
+
+        # Parameters for the intermediate phase
+        self.intermediate_phase_time = 0.7  # Duration of the intermediate phase in seconds
+        self.intermediate_angle = -25  # Fixed angle during the intermediate phase
+        self.approach_angle = 0 # Angle for the approach phase (straight)
     
     def start(self, command: str):
 
@@ -68,7 +74,7 @@ class RoundaboutController:
 
         self.target_exit = target_exit
         self.active = True
-        self.current_phase = "entry"
+        self.current_phase = "approach"  # Start with the approach phase
         self.exit_count = 0
         self.phase_start_time = time.time()
         self.right_pid.reset()
@@ -110,7 +116,16 @@ class RoundaboutController:
         self._track_exit(exit_data)
         
         # Upravljanje fazama
-        if self.current_phase == "entry":
+        if self.current_phase == "approach":
+            # Approach phase - go straight for a defined time
+            if phase_elapsed >= self.approach_phase_time:
+                self.current_phase = "entry"
+                self.phase_start_time = current_time
+                if self.debugging:
+                    print("RoundaboutController: Prelazak na 'entry'")
+            return self.approach_angle, False
+
+        elif self.current_phase == "entry":
             # Faza ulaska - pratimo desnu liniju određeno vrijeme
             if phase_elapsed >= self.entry_phase_time and leftVisible:
                 # Prelazak na fazu praćenja lijeve linije
@@ -120,21 +135,30 @@ class RoundaboutController:
                     print("RoundaboutController: Prelazak na 'follow_left'")
             
             x = int(self._follow_right_line(right_x, rightVisible, dt)*10)
-            if x < 0:
-                x = 6
+            if x < -5:
+                x = -5
             return x, False
             
         elif self.current_phase == "follow_left":
             # Faza praćenja lijeve linije - sve dok ne dođemo do ciljanog izlaza
             if self.exit_count >= self.target_exit and rightVisible:
-                # Pronađen ciljani izlaz, prelazak na fazu izlaska
+                # Pronađen ciljani izlaz, prelazak na fazu intermediate
+                self.current_phase = "intermediate"
+                self.phase_start_time = current_time
+                if self.debugging:
+                    print(f"RoundaboutController: Dostignut ciljni izlaz ({self.exit_count}), prelazak na 'intermediate'")
+            return int(self._follow_left_line(left_x, leftVisible, dt) * 10), False
+
+        elif self.current_phase == "intermediate":
+            # Intermediate phase - move at a fixed angle for a short time
+            if phase_elapsed >= self.intermediate_phase_time and rightVisible:
+                # Transition to the exit phase
                 self.current_phase = "exit"
                 self.phase_start_time = current_time
                 if self.debugging:
-                    print(f"RoundaboutController: Dostignut ciljni izlaz ({self.exit_count}), prelazak na 'exit'")
-            
-            return int(self._follow_left_line(left_x,leftVisible, dt)*10), False
-            
+                    print("RoundaboutController: Prelazak na 'exit'")
+            return self.intermediate_angle*10, False
+
         elif self.current_phase == "exit":
             # Faza izlaska - pratimo desnu liniju određeno vrijeme
             if phase_elapsed >= self.exit_phase_time:
@@ -144,7 +168,8 @@ class RoundaboutController:
                     print("RoundaboutController: Kontrola završena uspješno")
                 return 0.0, True
 
-            return int(self._follow_right_line(right_x,rightVisible, dt)*10), False
+            x = int(self._follow_right_line(right_x, rightVisible, dt) * 10)
+            return x, False
             
         return 0, False
     
