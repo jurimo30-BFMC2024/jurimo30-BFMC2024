@@ -139,8 +139,7 @@ class autoFSM(ControlModeThread):
                 #if self.debugging: 
                 print(f"Traffic sign detected: {sign}")
             else:
-
-                 raise ValueError(f'Unknown sign detected: {sign}')
+                raise ValueError(f'Unknown sign detected: {sign}')
             
             if self.debugging:
                 print(f"Preuzet je saobracajni znak: {sign}")

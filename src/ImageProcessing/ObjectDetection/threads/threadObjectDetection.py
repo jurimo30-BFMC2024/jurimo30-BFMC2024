@@ -47,7 +47,7 @@ class threadObjectDetection(ThreadWithStop):
         self.confirmation_threshold = 3   # Frames needed to confirm new sign
         self.lost_sign_count = 0          # Frames without current sign
         self.lost_sign_threshold = 17     # Frames to consider sign lost
-        
+
         # Target frame dimensions
         self.target_width = 512
         self.target_height = 270
@@ -57,7 +57,6 @@ class threadObjectDetection(ThreadWithStop):
         self.processing_height = 256
 
         self.lost_timeout = 0.6            # Timeout for lost objects
-
    
         # Initialize relevant_objects structure
         self.relevant_objects = {
