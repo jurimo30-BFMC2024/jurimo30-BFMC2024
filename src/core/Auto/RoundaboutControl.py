@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import time
-from src.ImageProcessing.LaneDetect.pid_controller import PIDController
+from src.core.Auto.PIDController import PIDController
 from typing import Tuple
 
 
@@ -27,7 +27,7 @@ class RoundaboutController:
         # Vremena trajanja faza (u sekundama)
         self.approach_phase_time = 0.8  # Vrijeme za fazu prilaska (vožnja pravo)
         self.entry_phase_time = 4.4        # Vrijeme za fazu ulaska
-        self.exit_phase_time = 8.5       # Vrijeme za fazu izlaska
+        self.exit_phase_time = 7.6       # Vrijeme za fazu izlaska
         
         # Parametri za detekciju izlaza
         self.exit_detection_region = {      # Region u kojem se detektuje izlaz
@@ -166,7 +166,7 @@ class RoundaboutController:
                 self.stop()
                 if self.debugging:
                     print("RoundaboutController: Kontrola završena uspješno")
-                return 0.0, True
+                return 0, True
 
             x = int(self._follow_right_line(right_x, rightVisible, dt) * 10)
             return x, False

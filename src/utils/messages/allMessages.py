@@ -104,12 +104,6 @@ class ParkingSpotDetect(Enum):
     msgID = 8
     msgType = "bool"
 
-class RoundAboutAngle(Enum):
-    Queue = "General"
-    Owner = "threadLaneDetect"
-    msgID = 9
-    msgType = "float"
-
 ################################# processObjectDetection ##################################
 class ObjectDetection(Enum):
     Queue = "General"

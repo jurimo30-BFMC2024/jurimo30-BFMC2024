@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import math
 import time
-from src.ImageProcessing.LaneDetect.pid_controller import PIDController
+from src.core.Auto.PIDController import PIDController
 
 class LaneFollower:
     def __init__(self, width: int, height: int, logging, debugging=False, pc=False):

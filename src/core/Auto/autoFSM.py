@@ -19,8 +19,7 @@ from src.utils.messages.allMessages import (
     TrafficSignsDetection,
     SideSensors,
     FrontSensors,
-    ParkingSpotDetect,
-    RoundAboutAngle
+    ParkingSpotDetect
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -71,7 +70,6 @@ class autoFSM(ControlModeThread):
         self.sideSensorSubscriber.empty()
         self.frontSensorSubscriber.empty()
         self.parkingSpotDetectionSubscriber.empty()
-        self.roundaboutAngleSubscriber.empty()
 
         self.oldAngle = 0
         self.oldSpeed = 0
@@ -150,8 +148,7 @@ class autoFSM(ControlModeThread):
         front_sensors = self.frontSensorSubscriber.receiveWithBlock()
         side_sensors = self.sideSensorSubscriber.receiveWithBlock()
 
-        # Receive roundabout-related messages
-        roundabout_angle = self.roundaboutAngleSubscriber.receiveWithBlock()  # Corrected to RoundAboutAngle
+
         traffic_light_present = self.traffic_light_states.get_active() != None
 
         obstacle = front_sensors["distance"] <= 80 and self.sign_car_position
@@ -310,4 +307,3 @@ class autoFSM(ControlModeThread):
         self.sideSensorSubscriber = messageHandlerSubscriber(self.queuesList, SideSensors, "LastOnly", True)
         self.frontSensorSubscriber = messageHandlerSubscriber(self.queuesList, FrontSensors, "LastOnly", True)
         self.parkingSpotDetectionSubscriber = messageHandlerSubscriber(self.queuesList, ParkingSpotDetect, "LastOnly", True)
-        self.roundaboutAngleSubscriber = messageHandlerSubscriber(self.queuesList, RoundAboutAngle, "LastOnly", True)  # Corrected to RoundAboutAngle
