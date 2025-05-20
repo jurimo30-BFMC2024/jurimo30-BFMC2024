@@ -14,11 +14,13 @@ class LaneFollower:
         self.last_frame_time = time.time()
         self.lastStatus = 0
 
+        self.restartNeeded = False
+
         # Measurement point - height in the image where we calculate lane center
         self.measure_height = int(self.height * 0.8)  # 80% down the image
 
         # PID controller for steering
-        self.pid = PIDController(kp=0.35, ki=0.01, kd=0.01, output_limits=(-25, 25))
+        self.pid = PIDController(kp=0.35, ki=0.01, kd=0.01, kaw = 3, output_limits=(-25, 25))
 
         # Image center reference point
         self.center_x = self.width * 0.47
@@ -39,14 +41,16 @@ class LaneFollower:
 
     def set_pid_highway(self, highway: bool):
        if highway:
-           kp = 0.25
-           ki = 0.0
+           kp = 0.08
+           ki = 0.01
            kd = 0.1
+           outputLimits = (-16, 16)
        else:
            kp = 0.35
            ki = 0.01
            kd = 0.01
-       self.pid.set_tunings(kp=kp, ki=ki, kd=kd)
+           outputLimits = (-25, 25)
+       self.pid.set_tunings(kp=kp, ki=ki, kd=kd, output_limits = outputLimits)
        self.pid.reset()
 
     def process_following(self, left_x: int | None, right_x: int | None):
@@ -55,8 +59,6 @@ class LaneFollower:
         current_time = time.time()
         dt = current_time - self.last_frame_time
         self.last_frame_time = current_time
-
-        print(f" LAst frame time: {dt}")
 
         # Calculate lane center
         if left_x is not None and right_x is not None:
@@ -76,16 +78,24 @@ class LaneFollower:
 
         # Calculate error (offset from center)
         error = self.center_x - lane_center
-        print(f"Error: {error}")
+
 
         angle_degrees = self.pid.compute(error, dt=dt)
+
+        if abs(angle_degrees) > 24:
+            self.restartNeeded = True
+
+        if self.restartNeeded and abs(angle_degrees) < 3:
+            self.restartNeeded = False
+            self.restartPid()
+
         
         # Upisivanje podataka u fajl
         self.log_file.write(f"{dt:.6f} {error} {-angle_degrees}\n")
         self.log_file.flush()  # Osigurava da se podaci odmah upišu
 
         # Debug log for terminal
-        if self.logging:
+        if self.debugging:
             print(f"Lane Following: LeftX={left_x}, RightX={right_x}, "
                   f"Center={lane_center}, Error={error:.1f}px, Angle={angle_degrees:.1f}°")
 
@@ -101,6 +111,6 @@ class LaneFollower:
         }
 
         self.finalAngle = -int(angle_degrees*10)
-        print (f"Ugao je {self.finalAngle}")
+
         return self.finalAngle
 

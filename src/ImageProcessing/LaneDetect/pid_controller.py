@@ -1,10 +1,10 @@
 class PIDController:
-    def __init__(self, kp=1.0, ki=0.0, kd=0.0, kaw=None, output_limits=(-float('inf'), float('inf'))):
+    def __init__(self, kp=1.0, ki=0.0, kd=0.0, kaw=8, output_limits=(-float('inf'), float('inf'))):
         self.kp = kp  # Proporcionalni faktor
         self.ki = ki  # Integralni faktor
         self.kd = kd  # Derivativni faktor
         # Anti-windup koeficijent; po defaultu jednak ki ako nije specificiran
-        self.kaw = 8
+        self.kaw = kaw
 
         self.previous_error = 0.0      # Prethodna greška
         self.integral = 0.0            # Integralna akumulacija
@@ -40,7 +40,7 @@ class PIDController:
         self.integral = 0.0
         self.last_output = 0.0
 
-    def set_tunings(self, kp=None, ki=None, kd=None, kaw=None):
+    def set_tunings(self, kp=None, ki=None, kd=None, kaw=None, output_limits=None):
         if kp is not None:
             self.kp = kp
         if ki is not None:
@@ -49,6 +49,8 @@ class PIDController:
             self.kd = kd
         if kaw is not None:
             self.kaw = kaw
+        if output_limits is not None:
+            self.output_limits = output_limits
 
     def set_output_limits(self, min_output, max_output):
         self.output_limits = (min_output, max_output)

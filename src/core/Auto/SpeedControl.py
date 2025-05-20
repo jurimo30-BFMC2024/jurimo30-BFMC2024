@@ -35,12 +35,12 @@ class SpeedControl():
             else:
                 speed = self.map_value(angle, 30, 145, 280, 350)
         else:
-            if abs(angle) < 70:
-                speed = 520
-            elif abs(angle) > 170:
-                speed = 420
+            if abs(angle) < 30:
+                speed = 480
+            elif abs(angle) > 100:
+                speed = 400
             else:
-                speed = self.map_value(angle, 70, 170, 420, 500)
+                speed = self.map_value(angle, 30, 100, 400, 480)
 
         # Low distance override
         if lowDistance:

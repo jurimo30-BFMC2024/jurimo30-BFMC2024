@@ -16,13 +16,15 @@ class LaneDetector:
         # Define road region for processing
         self.roadReg = np.array([[
             (int(self.width * 0.02), self.height - int(self.height * 0.02)),   # donji lijevi ugao
-            (int(self.width * 0.20), self.height - int(self.height * 0.02)),  # donji lijevi prije ulegnuća
-            (int(self.width * 0.28), self.height - int(self.height * 0.39)), # donji lijevi ulegnuće
-            (int(self.width * 0.68), self.height - int(self.height * 0.39)), # donji desni ulegnuće
-            (int(self.width * 0.76), self.height - int(self.height * 0.02)),  # donji desni prije ulegnuća
+            (int(self.width * 0.22), self.height - int(self.height * 0.02)),  # donji lijevi prije ulegnuća
+            (int(self.width * 0.30), self.height - int(self.height * 0.35)), # donji lijevi ulegnuće
+            (int(self.width * 0.65), self.height - int(self.height * 0.35)), # donji desni ulegnuće
+            (int(self.width * 0.73), self.height - int(self.height * 0.02)),  # donji desni prije ulegnuća
             (int(self.width * 0.98), self.height - int(self.height * 0.02)),  # donji desni ugao
-            (int(self.width * 0.9), self.height // 2 - int(self.height * 0.15)), # gornji desni ugao
-            (int(self.width * 0.1), self.height // 2 - int(self.height * 0.15))  # gornji lijevi ugao
+            (int(self.width * 0.98), self.height - int(self.height * 0.2)),  
+            (int(self.width * 0.8), self.height // 2 - int(self.height * 0.05)), # gornji desni ugao
+            (int(self.width * 0.2), self.height // 2 - int(self.height * 0.05)),  # gornji lijevi ugao
+            (int(self.width * 0.02), int(self.height*0.7))  # gornji lijevi ugao
         ]], np.int32)
 
         # Line history for smoothing
@@ -42,12 +44,25 @@ class LaneDetector:
         self.min_lane_line_length = 15  # Minimum length for lane lines (pixels)
 
         # Measurement point - height in the image where we calculate lane center
-        self.measure_height = int(self.height * 0.50)  # 80% down the image
+        # Promena sa 80% na 65% visine slike - tačka će biti više udaljena od dna
+        self.measure_height = int(self.height * 0.55)  # 65% down the image (povećana udaljenost od dna)
 
         # Colors for visualization
         self.color_left_lane = (255, 100, 0)    # Blue-ish
         self.color_right_lane = (0, 0, 255)     # Red
         self.color_road_region = (100, 255, 0)    # Green
+
+        # Zadnje vidljive pozicije linija
+        self.last_left_x = None
+        self.last_right_x = None
+
+        # Flegovi vidljivosti
+        self.left_visible = False
+        self.right_visible = False
+
+        # Boja za tačke pozicije linija
+        self.color_lane_point = (0, 255, 255)  # Žuta
+        self.lane_point_radius = 6
 
     def region_of_interest(self, img):
         """Apply a region of interest mask to focus only on the road area"""
@@ -73,13 +88,14 @@ class LaneDetector:
 
     def filter_lines(self, lines):
         """Filter lines based on size, angle, and position to separate left and right lanes"""
-        left_lines = []
-        right_lines = []
-
         if lines is None:
             return [], []
 
         image_center_x = self.width // 2
+
+        # Potential line containers
+        potential_left_lines = []
+        potential_right_lines = []
 
         for line in lines:
             for x1, y1, x2, y2 in line:
@@ -96,30 +112,92 @@ class LaneDetector:
 
                 length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
                 midpoint_x = (x1 + x2) / 2
+                midpoint_y = (y1 + y2) / 2
+
+                # For steep curves, relax the slope filtering to capture more angled lines
+                # Dynamic slope threshold based on position in the image (tighter at bottom, looser at top)
+                # This helps with curved roads where lines have varying slopes
+                relative_height = midpoint_y / self.height
+                min_slope_threshold = self.min_slope_threshold * (1.0 - relative_height * 0.5)  # Relax threshold for higher points
 
                 # Filter out horizontal lines and very short lines
-                # Also filter based on slope thresholds
-                if abs(slope) < self.min_slope_threshold or length < self.min_lane_line_length:
+                if abs(slope) < min_slope_threshold or length < self.min_lane_line_length:
                     # Keep near-vertical lines if slope is inf
                     if slope != np.inf:
                         continue
 
-                # Classification based on position and slope
-                if slope < 0:  # Potential left line (negative slope)
-                    # Allow lines slightly to the right of center in curves
-                    if midpoint_x < image_center_x + int(self.width * 0.15):
-                        left_lines.append(line)
-                elif slope > 0:  # Potential right line (positive slope)
-                    # Allow lines slightly to the left of center in curves
-                    if midpoint_x > image_center_x - int(self.width * 0.15):
-                        right_lines.append(line)
-                elif slope == np.inf:  # Vertical lines - classify based on position
+                # More adaptive classification for curved roads
+                # Instead of strictly classifying by slope sign, use a combination of position and slope
+                # This allows detecting lines that might bend or have unusual angles in curves
+                
+                # Left side of the image with predominantly negative slope OR
+                # Far left side with any significant slope - could be part of a sharp curve
+                is_left_side = midpoint_x < image_center_x - (image_center_x * 0.1)  # Left 40% of image
+                is_far_left = midpoint_x < image_center_x * 0.3  # Left 30% of image
+                
+                # Right side of the image with predominantly positive slope OR
+                # Far right side with any significant slope - could be part of a sharp curve
+                is_right_side = midpoint_x > image_center_x + (image_center_x * 0.1)  # Right 40% of image
+                is_far_right = midpoint_x > image_center_x * 1.7  # Right 30% of image
+                
+                # Lane line classification using both position and slope
+                if (slope < 0 and is_left_side) or (is_far_left and abs(slope) > min_slope_threshold):
+                    # Left lane candidate - negative slope on left side or any significant slope on far left
+                    potential_left_lines.append((line, midpoint_x, length, abs(slope)))
+                elif (slope > 0 and is_right_side) or (is_far_right and abs(slope) > min_slope_threshold):
+                    # Right lane candidate - positive slope on right side or any significant slope on far right
+                    potential_right_lines.append((line, midpoint_x, length, abs(slope)))
+                elif slope == np.inf:  # Vertical lines - classify by position only
                     if midpoint_x < image_center_x:
-                        left_lines.append(line)
+                        potential_left_lines.append((line, midpoint_x, length, float('inf')))
                     else:
-                        right_lines.append(line)
+                        potential_right_lines.append((line, midpoint_x, length, float('inf')))
 
-        return left_lines, right_lines
+        # Minimum lane width for validation
+        min_lane_width = int(self.width * 0.2)  # Minimum 20% of image width
+        
+        # For curved roads, we might have multiple line segments for each side
+        # Sort lines by a combination of position, length and slope to get the most prominent ones
+        # Longer lines with appropriate slopes are preferred
+        
+        # Sort by a weighted score (length * slope significance)
+        if potential_left_lines:
+            potential_left_lines.sort(key=lambda item: item[2] * item[3], reverse=True)  # Sort by length*slope
+        
+        if potential_right_lines:
+            potential_right_lines.sort(key=lambda item: item[2] * item[3], reverse=True)  # Sort by length*slope
+        
+        # Take the top candidates (most significant lines)
+        max_lines_per_side = 3  # Allow multiple segments per side for curved roads
+        final_left_lines = [item[0] for item in potential_left_lines[:max_lines_per_side]] if potential_left_lines else []
+        final_right_lines = [item[0] for item in potential_right_lines[:max_lines_per_side]] if potential_right_lines else []
+        
+        # Validation: check if the detected lanes are too close to each other
+        # This helps filter out cases where the same line is detected as both left and right
+        if final_left_lines and final_right_lines:
+            left_x_points = []
+            right_x_points = []
+            
+            for line in final_left_lines:
+                for x1, y1, x2, y2 in line:
+                    left_x_points.extend([x1, x2])
+            
+            for line in final_right_lines:
+                for x1, y1, x2, y2 in line:
+                    right_x_points.extend([x1, x2])
+            
+            if left_x_points and right_x_points:
+                left_avg_x = sum(left_x_points) / len(left_x_points)
+                right_avg_x = sum(right_x_points) / len(right_x_points)
+                
+                # If lanes are too close, keep only the one with more supporting evidence
+                if right_avg_x - left_avg_x < min_lane_width:
+                    if len(left_x_points) > len(right_x_points):
+                        final_right_lines = []  # Left lane has more evidence
+                    else:
+                        final_left_lines = []  # Right lane has more evidence
+
+        return final_left_lines, final_right_lines
 
     def extrapolate_lane_line(self, lines_history, height):
         """Extrapolate a lane line to reach the given height in the image using line history."""
@@ -153,16 +231,16 @@ class LaneDetector:
             if 0 <= x <= self.width:
                 return x
             else:
-                if self.logging:
+                if self.debugging:
                     print(f"Warning: Extrapolated X ({x}) out of bounds.")
                 return None  # Out of bounds
 
         except (np.linalg.LinAlgError, ValueError) as e:
-            if self.logging:
+            if self.debugging:
                 print(f"Warning: Polyfit failed - {e}")
             return None  # Fitting failed
 
-    def process_frame(self, edges: np.ndarray, frame_to_draw_on: np.ndarray):
+    def process_frame(self, edges: np.ndarray, frame_to_draw_on: np.ndarray, left_offset_distance=50, right_offset_distance=50):
         """Process edges, detect lanes, draw on frame, and return drawn frame + positions."""
         # Apply region of interest mask to edges
         roi_edges = self.region_of_interest(edges)
@@ -184,8 +262,23 @@ class LaneDetector:
         right_lines_stable = [line for lines_group in self.right_lines_history for line in lines_group]
 
         # Find lane line x-coordinates at the measurement height using history
-        left_x = self.extrapolate_lane_line(self.left_lines_history, self.measure_height)
-        right_x = self.extrapolate_lane_line(self.right_lines_history, self.measure_height)
+        current_left_x = self.extrapolate_lane_line(self.left_lines_history, self.measure_height)
+        current_right_x = self.extrapolate_lane_line(self.right_lines_history, self.measure_height)
+
+        # Ažuriranje flegova vidljivosti - true SAMO ako su linije stvarno vidljive u trenutnom frejmu
+        # Ključna promena: provjera postojanja linija u trenutnom frejmu, ne iz historije
+        self.left_visible = len(left_lines) > 0 and current_left_x is not None
+        self.right_visible = len(right_lines) > 0 and current_right_x is not None
+
+        # Ažuriranje zadnjih pozicija ako su vidljive
+        if current_left_x is not None:
+            self.last_left_x = current_left_x
+        if current_right_x is not None:
+            self.last_right_x = current_right_x
+
+        # Vrednosti koje ćemo vratiti - ili trenutne ako su vidljive, ili zadnje poznate
+        left_x = current_left_x if current_left_x is not None else self.last_left_x
+        right_x = current_right_x if current_right_x is not None else self.last_right_x
 
         # --- Drawing Logic ---
         # Draw region of interest with transparent overlay
@@ -209,18 +302,78 @@ class LaneDetector:
                 for x1, y1, x2, y2 in line:
                     cv2.line(frame_to_draw_on, (x1, y1), (x2, y2), self.color_right_lane, 2)
 
-        # Draw measurement points
+        # Draw horizontal line at measurement height
+        cv2.line(frame_to_draw_on, (0, self.measure_height), (self.width, self.measure_height), 
+                 (255, 255, 255), 1, cv2.LINE_AA)
+
+        # Draw left lane point
         if left_x is not None:
-            cv2.circle(frame_to_draw_on, (left_x, self.measure_height), radius=7, color=(255, 255, 0), thickness=-1)
+            # Prilagođena boja: žuta ako je vidljiva, tamnija ako koristimo zadnju poznatu
+            point_color = self.color_lane_point if self.left_visible else (0, 128, 128)
+            cv2.circle(frame_to_draw_on, (left_x, self.measure_height), 
+                       self.lane_point_radius, point_color, -1)
+
+        # Draw right lane point
         if right_x is not None:
-            cv2.circle(frame_to_draw_on, (right_x, self.measure_height), radius=7, color=(255, 0, 255), thickness=-1)
+            # Prilagođena boja: žuta ako je vidljiva, tamnija ako koristimo zadnju poznatu
+            point_color = self.color_lane_point if self.right_visible else (0, 128, 128)
+            cv2.circle(frame_to_draw_on, (right_x, self.measure_height), 
+                       self.lane_point_radius, point_color, -1)
 
         # --- End of Drawing Logic ---
 
         # Debug log for terminal (simplified)
-        if self.logging and self.debugging:
-            print(f"Lane Detection: LeftX={left_x}, RightX={right_x}, "
-                  f"LeftLines={len(left_lines_stable)}, RightLines={len(right_lines_stable)}")
+        if self.debugging:
+            print(f"Lane Detection: LeftX={left_x} (visible={self.left_visible}), "
+                  f"RightX={right_x} (visible={self.right_visible})")
+                  
+        # Draw debug lines at the top of the screen if requested
+        if True:
+            frame_to_draw_on = self.draw_debug_lines(
+                frame_to_draw_on, 
+                left_x, 
+                right_x, 
+                210, 
+                130
+            )
 
-        # Return the frame with drawings and the detection results
-        return frame_to_draw_on, left_x, right_x
+        # Return the frame with drawings, detection results and visibility flags
+        return frame_to_draw_on, left_x, right_x, self.left_visible, self.right_visible
+
+    def draw_debug_lines(self, frame, left_x, right_x, left_offset_distance, right_offset_distance):
+        """
+        Draw debug lines with staggered ending points all the way to the top of the screen:
+        - Reference line at 47% of width
+        - Yellow line showing the center between left and right lanes
+        - Blue line at fixed distance right from left lane
+        - Red line at fixed distance left from right lane
+        """
+        # End positions at different heights
+        ref_end_y = int(self.height * 0.2)       # 20% from top
+        center_end_y = int(self.height * 0.25)   # 25% from top
+        left_end_y = int(self.height * 0.3)      # 30% from top
+        right_end_y = int(self.height * 0.35)    # 35% from top
+        
+        # Reference line at 47% width - from top to ref_end_y
+        reference_x = int(self.width * 0.47)
+        cv2.line(frame, (reference_x, 0), (reference_x, ref_end_y), 
+                (255, 255, 255), 2)  # White line
+                
+        # If both lane positions are available
+        if left_x is not None and right_x is not None:
+            # Center line between lanes (yellow) - from top to center_end_y
+            center_x = (left_x + right_x) // 2
+            cv2.line(frame, (center_x, 0), (center_x, center_end_y), 
+                    (0, 255, 255), 2)  # Yellow line
+            
+            # Blue line at fixed distance right from left lane - from top to left_end_y
+            left_offset_x = left_x + left_offset_distance
+            cv2.line(frame, (left_offset_x, 0), (left_offset_x, left_end_y), 
+                    (255, 0, 0), 2)  # Blue line
+            
+            # Red line at fixed distance left from right lane - from top to right_end_y
+            right_offset_x = right_x - right_offset_distance
+            cv2.line(frame, (right_offset_x, 0), (right_offset_x, right_end_y), 
+                    (0, 0, 255), 2)  # Red line
+
+        return frame
