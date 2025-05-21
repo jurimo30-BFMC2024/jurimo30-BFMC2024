@@ -1,58 +1,116 @@
-from src.core.Auto.LaneFollow.MovingAverage import MovingAverage
+import cv2
+import numpy as np
+import math
+import time
+from src.core.Auto.PIDController import PIDController
 
-class LaneFollow():
-    """This thread handles LaneFollow.
-    Args:
-        logging (logging object): Made for debugging.
-        debugging (bool, optional): A flag for debugging. Defaults to False.
-    """
-
-    def __init__(self, logging, debugging=False):
-        self.logging = logging
+class LaneFollower:
+    def __init__(self, width: int, height: int, logging, debugging=False, pc=False):
         self.debugging = debugging
-        self.avgAngle = MovingAverage(2)
-        self.oldAngle = 0
-        self.finalAngle = 0
+        self.logging = logging
+        self.width = width
+        self.height = height
+        self.pc = pc
+        self.last_frame_time = time.time()
+        self.lastStatus = 0
 
-    def filter(self, angle, alpha = 0.3):
-        self.oldAngle = angle * alpha + self.oldAngle * (1 - alpha)
-        return self.oldAngle
-    
+        self.restartNeeded = False
 
-    def map_value(self, value, in_min=30, in_max=170, out_min=150, out_max=300):
-        value = max(min(value, in_max), in_min)
-        return out_min + (out_max - out_min) * (value - in_min) / (in_max - in_min)
+        # Measurement point - height in the image where we calculate lane center
+        self.measure_height = int(self.height * 0.8)  # 80% down the image
 
-    def getControlData(self, highway, stop_line, input_angle):
-        angle = int(input_angle * 10)
+        # PID controller for steering
+        self.pid = PIDController(kp=0.35, ki=0.01, kd=0.01, kaw = 3, output_limits=(-25, 25))
 
-        if not highway:
-            if abs(self.finalAngle) > 225 and abs(self.finalAngle - angle) > 5:
-                if self.finalAngle < 0:
-                    self.finalAngle = angle - 5
-                else:
-                    self.finalAngle = angle + 5
-            else:
-                self.finalAngle = angle
-            if stop_line:
-                self.finalAngle = self.finalAngle*2.5
-            self.finalAngle = int(self.avgAngle.filter(self.finalAngle) * 1.1) 
+        # Image center reference point
+        self.center_x = self.width * 0.47
+        
+        # Otvori fajl za upisivanje podataka o obradi
+        self.log_file = open("lane_follow_log.txt", "w")
+        self.log_file.write("dt greska izlaz_pid\n")
+
+    def __del__(self):
+        """Zatvori log fajl prilikom uništenja objekta"""
+        if hasattr(self, 'log_file'):
+            self.log_file.close()
+
+    def restartPid(self):
+        """Restart PID controller"""
+        self.pid.reset()
+        self.last_frame_time = time.time()
+
+    def set_pid_highway(self, highway: bool):
+       if highway:
+           kp = 0.08
+           ki = 0.01
+           kd = 0.1
+           outputLimits = (-16, 16)
+       else:
+           kp = 0.35
+           ki = 0.01
+           kd = 0.01
+           outputLimits = (-25, 25)
+       self.pid.set_tunings(kp=kp, ki=ki, kd=kd, output_limits = outputLimits)
+       self.pid.reset()
+
+    def process_following(self, left_x: int | None, right_x: int | None):
+        """Calculates lane center, error, steering angle. Does NOT draw on the frame."""
+        # Calculate time delta
+        current_time = time.time()
+        dt = current_time - self.last_frame_time
+        self.last_frame_time = current_time
+
+        # Calculate lane center
+        if left_x is not None and right_x is not None:
+            lane_center = (left_x + right_x) // 2
+            lane_width_estimate = right_x - left_x
+        elif left_x is not None:
+            # Estimate based on typical lane width (adjust 200px if needed)
+            lane_width_estimate = 200
+            lane_center = left_x + lane_width_estimate // 2
+        elif right_x is not None:
+            # Estimate based on typical lane width (adjust 200px if needed)
+            lane_width_estimate = 200
+            lane_center = right_x - lane_width_estimate // 2
         else:
-            if abs(self.finalAngle - angle) > 40:
-                if angle > self.finalAngle:
-                    self.finalAngle += 40
-                else:
-                    self.finalAngle -= 40
-            else:
-                self.finalAngle = int(angle*0.65)
+            lane_center = self.center_x  # Default to center if no lanes detected
+            lane_width_estimate = 200 # Default estimate
+
+        # Calculate error (offset from center)
+        error = self.center_x - lane_center
 
 
-        if self.finalAngle > 250:
-            self.finalAngle = 240
-        if self.finalAngle < -250:
-            self.finalAngle = -240
+        angle_degrees = self.pid.compute(error, dt=dt)
+
+        if abs(angle_degrees) > 24:
+            self.restartNeeded = True
+
+        if self.restartNeeded and abs(angle_degrees) < 3:
+            self.restartNeeded = False
+            self.restartPid()
+
+        
+        # Upisivanje podataka u fajl
+        self.log_file.write(f"{dt:.6f} {error} {-angle_degrees}\n")
+        self.log_file.flush()  # Osigurava da se podaci odmah upišu
+
+        # Debug log for terminal
         if self.debugging:
-            self.logging.info(f"Lane detect out: {self.finalAngle}")
+            print(f"Lane Following: LeftX={left_x}, RightX={right_x}, "
+                  f"Center={lane_center}, Error={error:.1f}px, Angle={angle_degrees:.1f}°")
 
+        # Return calculation data only
+        lane_data = {
+            "left_detected": left_x is not None,
+            "right_detected": right_x is not None,
+            "lane_center": lane_center,
+            "error": error,
+            "left_x": left_x,
+            "right_x": right_x,
+            "lane_width_estimate": lane_width_estimate
+        }
+
+        self.finalAngle = -int(angle_degrees*10)
 
         return self.finalAngle
+

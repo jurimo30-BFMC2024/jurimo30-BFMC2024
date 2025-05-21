@@ -6,10 +6,8 @@ import time
 from src.utils.messages.allMessages import (
     serialCamera,
     LaneDetect,
-    IntersectionDetect,
-    IntersectionDetect2,
-    ParkingSpotDetect,
-    RoundAboutAngle
+    StopLineDetect,
+    ParkingSpotDetect
 )
 from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
@@ -19,7 +17,6 @@ from src.ImageProcessing.LaneDetect.imagePreProcessing import ImagePreProcessing
 from src.ImageProcessing.LaneDetect.StopLineDetector import StopLineDetector as StopDetect
 from src.ImageProcessing.LaneDetect.ParkingSpotDetector import ParkingSpotDetector
 from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream as vs
-from src.ImageProcessing.LaneDetect.RoundaboutNavigator import RoundaboutNavigator  # Import the new module
 
 
 class threadLaneDetect(ThreadWithStop):
@@ -35,19 +32,17 @@ class threadLaneDetect(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.laneDetector = LaneDetector(512, 270, logging, debugging, False)
+        self.laneDetector = LaneDetector(512, 270, logging, False, False)
         self.imgProcessor = ImgProcessor(512, 270, logging, debugging, False)
-        self.stopLineDetector = StopDetect(512, 270, logging, debugging, False)
+        self.stopLineDetector = StopDetect(512, 270, logging, False, False)
         self.parkingSpotDetector = ParkingSpotDetector()
         self.strm = vs(1, 0)
-        self.roundAboutDetector = RoundaboutNavigator(512, 270, logging, debugging)  # Initialize RoundAboutDetector
+
 
         # Sender za slanje rezultata detekcije
         self.laneDetectionSender = messageHandlerSender(self.queuesList, LaneDetect)
-        self.intersectionDetectionSender = messageHandlerSender(self.queuesList, IntersectionDetect)
-        self.intersectionDetectionSender2 = messageHandlerSender(self.queuesList, IntersectionDetect2)
+        self.stopLineDetectionSender = messageHandlerSender(self.queuesList, StopLineDetect)
         self.parkingSpotDetectionSender = messageHandlerSender(self.queuesList, ParkingSpotDetect)
-        self.roundAboutAngleSender = messageHandlerSender(self.queuesList, RoundAboutAngle)
         self.subscribe()
 
     def subscribe(self):
@@ -68,11 +63,9 @@ class threadLaneDetect(ThreadWithStop):
                 edges = self.imgProcessor.process_frame(frame)
 
                 # obradi frejm
-                frame, (intersection, slope_degrees), intersectionA = self.stopLineDetector.process_frame(frame, edges)
-                frame, angle = self.laneDetector.process_frame(frame, edges)
+                frame, stop_line_data = self.stopLineDetector.process_frame(frame, edges)
+                frame, leftX, rightX, leftVisible, rightVisible = self.laneDetector.process_frame(edges, frame)
                 frame, parking_line = self.parkingSpotDetector.process_frame(frame, edges)
-                frame, roundaboutAngle = self.roundAboutDetector.process_frame(frame, edges)
-                roundaboutExitDetected = False
 
                 # Increment frame count
                 frame_count += 1
@@ -83,12 +76,10 @@ class threadLaneDetect(ThreadWithStop):
                     start_time_second = time.time()
 
                 # Slanje rezultate
-                self.laneDetectionSender.send(angle)
-                self.intersectionDetectionSender.send((intersection, slope_degrees))
-                self.intersectionDetectionSender2.send(bool(intersectionA))
+                self.stopLineDetectionSender.send(stop_line_data)
+                self.laneDetectionSender.send((leftX, rightX, leftVisible, rightVisible))
                 if parking_line is not None:
-                    self.parkingSpotDetectionSender.send(True)
-                self.roundAboutAngleSender.send(float(roundaboutAngle))
+                    self.parkingSpotDetectionSender.send(True)  
                 self.strm.display(frame)
             except Exception as e:
                 print(e)

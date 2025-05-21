@@ -90,36 +90,31 @@ class LaneDetect(Enum):
     Queue = "General"
     Owner = "threadLaneDetect"
     msgID = 6
-    msgType = "float"
+    msgType = "tuple"
     
-class IntersectionDetect(Enum):
+class StopLineDetect(Enum):
     Queue = "General"
     Owner = "threadLaneDetect"
     msgID = 7
     msgType = "tuple"
 
-class IntersectionDetect2(Enum):
+class ParkingSpotDetect(Enum):
     Queue = "General"
     Owner = "threadLaneDetect"
     msgID = 8
     msgType = "bool"
-
-class ParkingSpotDetect(Enum):
-    Queue = "General"
-    Owner = "threadLaneDetect"
-    msgID = 9
-    msgType = "bool"
-class RoundAboutAngle(Enum):
-    Queue = "General"
-    Owner = "threadLaneDetect"
-    msgID = 11
-    msgType = "float"
 
 ################################# processObjectDetection ##################################
 class ObjectDetection(Enum):
     Queue = "General"
     Owner = "threadObjectDetection"
     msgID = 8
+    msgType = "dict"
+
+class TrafficSignsDetection(Enum):
+    Queue = "General"
+    Owner = "threadObjectDetection"
+    msgID = 9
     msgType = "str"
 
 ################################# processCarsAndSemaphores ##################################

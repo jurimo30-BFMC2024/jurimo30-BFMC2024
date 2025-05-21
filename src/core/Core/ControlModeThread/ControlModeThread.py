@@ -25,7 +25,7 @@ class ControlModeThread:
             self._suspend_cond.notify()
 
     def stop(self):
-        """Suspend the thread and block until it is suspended."""
+        """Suspend the thread and block until it is resumed."""
         with self._suspend_cond:
             if self._is_suspended:
                 return  # Already suspended
@@ -45,7 +45,7 @@ class ControlModeThread:
             try:
                 self.loop()  # Call the user-defined method
             except Exception as e:
-                print(f"Error in thread: {e}")
+                print(f"Exception in Core: {e}")
             
             # Ensure the thread suspends when `_running` is cleared
             with self._suspend_cond:

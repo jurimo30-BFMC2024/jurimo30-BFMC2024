@@ -59,7 +59,7 @@ class threadCamera(ThreadWithStop):
         self.queuesList = queuesList
         self.logger = logger
         self.debugger = debugger
-        self.frame_rate = 5
+        self.frame_rate = 20
         self.recording = False
 
         self.video_writer = ""

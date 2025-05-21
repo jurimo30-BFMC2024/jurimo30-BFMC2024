@@ -1,5 +1,5 @@
 import time
-from src.core.Auto.Parking.MotionScheduler import MotionScheduler
+from src.core.Auto.MotionScheduler import MotionScheduler
 
 class Parking():
     """This thread handles Parking.
@@ -43,13 +43,13 @@ class Parking():
             "unpark": {
                 "left": [
                     (0, -300, .4),
-                    (230, 300, 1.5),
-                    (-230, 300, 1.5),
+                    (210, 300, 1.5),
+                    (-250, 300, 1.5),
                 ],
                 "right": [
                     (0, -300, .4),
-                    (-230, 300, 1.5),
-                    (230, 300, 1.5),
+                    (-210, 300, 1.5),
+                    (250, 300, 1.5),
                 ],
             },
             "wait": [

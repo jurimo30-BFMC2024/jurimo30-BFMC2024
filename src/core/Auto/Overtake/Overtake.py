@@ -1,4 +1,4 @@
-from src.core.Auto.Parking.MotionScheduler import MotionScheduler
+from src.core.Auto.MotionScheduler import MotionScheduler
 import time
 
 class Overtake():
