@@ -104,6 +104,12 @@ class ParkingSpotDetect(Enum):
     msgID = 8
     msgType = "bool"
 
+class DashedLineDetect(Enum):
+    Queue = "General"
+    Owner = "threadLaneDetect"
+    msgID = 9
+    msgType = "bool"
+    
 ################################# processObjectDetection ##################################
 class ObjectDetection(Enum):
     Queue = "General"
