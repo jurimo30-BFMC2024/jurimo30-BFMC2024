@@ -25,6 +25,7 @@ from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.core.Auto.pathPlanning.pathPlanning import PathPlanner
 from src.core.Auto.TrafficSignController import TrafficSignController
+from src.core.Auto.TunnelController import TunnelController
 import time
 from enum import Enum, auto
 
@@ -40,6 +41,7 @@ class autoFSMState(Enum):
     ROUNDABOUT = auto()
     CROSSWALK = auto()
     HIGHWAY = auto()
+    TUNNEL = auto()
 
 class autoFSM(ControlModeThread):
     def __init__(self, queueList, logging, debugging=False):
@@ -62,6 +64,7 @@ class autoFSM(ControlModeThread):
         self.overtakeController = Overtake(self.logging, self.debugging)
         self.roundaboutController = RoundaboutController(512, 270, self.logging, True)
         self.crosswalkController = CrosswalkController()
+        self.tunnelController = TunnelController()
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -278,6 +281,12 @@ class autoFSM(ControlModeThread):
                 car_in_front=self.sign_car_position,
                 stephanie_in_front=stephanie_crossing
             )
+        
+
+        elif self.state == autoFSMState.TUNNEL:
+            speed = 250
+            angle = self.tunnelController.getControlData(side_sensors["right"])
+
 
         ############################ Sending data ##############################
 
