@@ -53,7 +53,7 @@ class Localization:
         for d in dists:
             self._cum_dists.append(self._cum_dists[-1] + d)
 
-        print(f"_cum_dists: {self._cum_dists}")
+        # print(f"_cum_dists: {self._cum_dists}")
 
         # reset timers & distance
         self.start_time = time.time()
@@ -155,13 +155,14 @@ class Localization:
     def update_position_with_steering(self, speed: float, steering_angle_deg: float, orientation_deg: float):
         """
         Update the car's position based on speed, steering angle, and absolute orientation.
-        :param speed: Speed of the car (units per second).
+        Negative speed values are allowed for reversing.
+        :param speed: Speed of the car (units per second). Negative values mean reversing.
         :param steering_angle_deg: Steering angle in degrees (relative change).
         :param orientation_deg: Absolute orientation in degrees
+        :raises ValueError: If location is not set
         """
         if self.location is None:
-            print("Error: Current location is not set.")
-            return
+            raise ValueError("Current location is not set")
 
         # Measure time since the last update
         current_time = time.time()
@@ -186,10 +187,13 @@ class Localization:
     def clamp_location_to_graph(self):
         """
         Clamp the current location to the nearest point on the graph vectors.
+        :raises ValueError: If no current segment is set or if location is not set
         """
         if self.current_segment is None:
-            print("Error: No current segment to clamp location.")
-            return
+            raise ValueError("No current segment to clamp location")
+            
+        if self.location is None:
+            raise ValueError("Current location is not set")
 
         nodes = self.current_segment["nodes"]
         closest_point = None
@@ -218,7 +222,7 @@ class Localization:
 
         # Update the location to the closest point
         self.location = closest_point
-        print(f"Clamped location to: {self.location}")
+        # print(f"Clamped location to: {self.location}")
 
 if __name__ == "__main__":
     def plot_track_and_position(segments, positions=None):
