@@ -2,6 +2,8 @@ import time
 from typing import List, Tuple
 import random
 import math
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
 
 class Localization:
     def __init__(self, segments_data):
@@ -16,7 +18,7 @@ class Localization:
         self.segments_data = segments_data
         self.current_segment = None
 
-        scale_factor = 13  # e.g., each unit in graph
+        scale_factor = 1  # e.g., each unit in graph
 
         for segment in segments_data:
             for node in segment['nodes']:
@@ -87,9 +89,10 @@ class Localization:
         self.total_distance += estimated_speed * dt
 
         # update position on current segment
-        self._update_location()
+        current_node = self._update_location()
 
         self.last_update_time = current_time
+        return current_node
 
     def _update_location(self):
         """
@@ -108,7 +111,7 @@ class Localization:
         # if at very end, snap to last node
         if d >= self._cum_dists[-1]:
             self.location = nodes[-1]["pos"]
-            return
+            return nodes[-1]["idx"]
 
         # binary or linear search
         for i in range(len(self._cum_dists)-1):
@@ -126,7 +129,8 @@ class Localization:
                 x = x0 + t * (x1 - x0)
                 y = y0 + t * (y1 - y0)
                 self.location = (x, y)
-                return
+                return nodes[i]["idx"]
+        return None
 
     def update_speed_error(self):
         """
@@ -217,55 +221,140 @@ class Localization:
         print(f"Clamped location to: {self.location}")
 
 if __name__ == "__main__":
-    segments_data = [
-        {
-            'nodes': [{'idx': '1', 'pos': (0, 0)}, {'idx': '2', 'pos': (10, 0)}],
-            'distances': [10.0],
-            'length': 10.0
-        },
-        {
-            'nodes': [{'idx': '2', 'pos': (10, 0)}, {'idx': '3', 'pos': (10, 10)}, {'idx': '4', 'pos': (10, 20)}],
-            'distances': [10.0, 10.0],
-            'length': 20.0
-        }
-    ]
+    def plot_track_and_position(segments, positions=None):
+        """Plot the track segments and optionally the car's positions"""
+        plt.figure(figsize=(10, 10))
+        
+        # Plot track segments
+        for segment in segments:
+            nodes = segment['nodes']
+            x_coords = [node['pos'][0] for node in nodes]
+            y_coords = [node['pos'][1] for node in nodes]
+            plt.plot(x_coords, y_coords, 'b-', linewidth=2, label='Track')
+            
+            # Plot nodes
+            plt.plot(x_coords, y_coords, 'ko', markersize=8)
+            
+            # Add node labels
+            for node in nodes:
+                x, y = node['pos']
+                plt.annotate(f"Node {node['idx']}", (x, y), 
+                           xytext=(5, 5), textcoords='offset points')
+        
+        if positions:
+            # Plot car positions
+            x_pos = [p[0] for p in positions]
+            y_pos = [p[1] for p in positions]
+            plt.plot(x_pos, y_pos, 'r.--', linewidth=1, markersize=5, label='Car Path')
+        
+        plt.grid(True)
+        plt.axis('equal')
+        plt.title('Localization Test Track')
+        plt.xlabel('X Position')
+        plt.ylabel('Y Position')
+        if positions:
+            plt.legend()
+        plt.show()
 
-    loc = Localization(segments_data.copy())
-    loc.start_new_segment()
+    def test_initialization():
+        print("\n=== Testing Initialization ===")
+        # Simple test track: two segments forming an L shape
+        test_segments = [
+            {
+                'nodes': [
+                    {'idx': '1', 'pos': (0, 0)},
+                    {'idx': '2', 'pos': (10, 0)}
+                ],
+                'distances': [10],
+                'length': 10
+            },
+            {
+                'nodes': [
+                    {'idx': '2', 'pos': (10, 0)},
+                    {'idx': '3', 'pos': (15, 5)}
+                ],
+                'distances': [10],
+                'length': 10
+            }
+        ]
+        
+        # Plot initial track
+        plot_track_and_position(test_segments)
+        
+        loc = Localization(test_segments.copy())
+        print("Initialized with test segments")
+        assert len(loc.segments_data) == 2, "Should have 2 segments"
+        print("✓ Initialization test passed")
+        return loc, test_segments
 
-    print("Initial position:", loc.get_location())
+    def test_segment_navigation(loc):
+        print("\n=== Testing Segment Navigation ===")
+        positions = []  # Store positions for plotting
+        
+        loc.start_new_segment()
+        initial_pos = loc.get_location()
+        positions.append(initial_pos)
+        print(f"Initial position: {initial_pos}")
+        assert initial_pos == (0, 0), "Should start at origin"
 
-    # Simulate moving along the first segment at 2 units/sec
-    for i in range(6):
-        loc.update_position(25.0)
-        print(f"Distance[est]: {loc.total_distance:.2f}, Distance[ctrl]: {loc.average_target_speed * (0.5 * i)}, Position: {loc.get_location()}")
-        time.sleep(0.5)
+        # Move along first segment
+        target_speed = 5.0  # 5 units/sec
+        while loc.total_distance < 10:
+            loc.update_position(target_speed)
+            positions.append(loc.get_location())
+            time.sleep(0.1)
+            
+        print(f"End of segment position: {loc.get_location()}")
+        print("✓ Segment navigation test passed")
+        return positions
 
-    print("\nReached end of first segment.")
-    loc.update_speed_error()
-    print("Speed error:", loc.speed_error)
+    def test_speed_error(loc):
+        print("\n=== Testing Speed Error Calculation ===")
+        loc.update_speed_error()
+        print(f"Speed error after first segment: {loc.speed_error}")
+        assert loc.speed_error != 0, "Speed error should be calculated"
+        print("✓ Speed error calculation test passed")
 
-    loc.start_new_segment()
-    print("\nStarted new segment")
-    print("Initial position:", loc.get_location())
+    def test_steering(loc, positions):
+        loc.start_new_segment()
+        print("\n=== Testing Steering ===")
+        initial_pos = loc.get_location()
+        positions.append(initial_pos)
+        print(f"Position before steering: {initial_pos}")
+        
+        # Test small turn
+        for _ in range(5):  # Simulate several steering updates
+            loc.update_position_with_steering(speed=5.0, steering_angle_deg=10, orientation_deg=10*_)
+            positions.append(loc.get_location())
+            time.sleep(0.1)
+        
+        pos_after_turn = loc.get_location()
+        print(f"Position after steering: {pos_after_turn}")
+        assert pos_after_turn != initial_pos, "Position should change after steering"
+        
+        # Test clamping to graph
+        loc.clamp_location_to_graph()
+        clamped_pos = loc.get_location()
+        positions.append(clamped_pos)
+        print(f"Position after clamping: {clamped_pos}")
+        assert clamped_pos != pos_after_turn, "Position should be clamped to nearest point on graph"
+        print("✓ Steering and clamping test passed")
+        return positions
 
-    # Simulate moving along second segment with same speed
-    for i in range(10):
-        loc.update_position(40.0)
-        print(f"Distance[est]: {loc.total_distance:.2f}, Distance[ctrl]: {loc.average_target_speed * (0.5 * i)}, Position: {loc.get_location()}")
-        # print(f"Distance: {loc.total_distance:.2f}, Position: {loc.get_location()}")
-        time.sleep(0.5)
+    def run_all_tests():
+        try:
+            loc, test_segments = test_initialization()
+            positions = test_segment_navigation(loc)
+            test_speed_error(loc)
+            positions = test_steering(loc, positions)
+            
+            # Plot final results
+            plot_track_and_position(test_segments, positions)
+            
+            print("\n=== All tests passed successfully! ===")
+        except AssertionError as e:
+            print(f"\n❌ Test failed: {e}")
+        except Exception as e:
+            print(f"\n❌ Unexpected error: {e}")
 
-    print("\nReached end of second segment.")
-    loc.update_speed_error()
-    print("Speed error:", loc.speed_error)
-
-    # Test relative localization
-    loc.update_position_with_steering(speed=50.0, steering_angle_deg=20, orientation_deg=0)
-    time.sleep(0.5)
-    loc.update_position_with_steering(speed=50.0, steering_angle_deg=-20, orientation_deg=0)
-    time.sleep(0.5)
-    loc.clamp_location_to_graph()
-    print(f"Final position after stopping relative localization: {loc.get_location()}")
-
-    print("\nDone.")
+    run_all_tests()
