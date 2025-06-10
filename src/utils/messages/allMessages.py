@@ -143,6 +143,12 @@ class SideSensors(Enum):
     msgID = 2
     msgType = "dict"
 
+class Heading(Enum):
+    Queue = "General"
+    Owner = "threadSensors"
+    msgID = 3
+    msgType = "float"
+
 ################################# From Dashboard ##################################
 class SpeedMotor(Enum):
     Queue = "General"
