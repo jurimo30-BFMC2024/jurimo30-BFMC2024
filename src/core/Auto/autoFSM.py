@@ -314,6 +314,7 @@ class autoFSM(ControlModeThread):
             )
 
             self.localization.update_position(speed / 10)
+            self.localization.calibrate_heading(heading)
 
         ############################ Sending data ##############################
 
@@ -344,7 +345,7 @@ class autoFSM(ControlModeThread):
             })
             self.vehicleToEverythingSender.send({
                 "type": "deviceRot",
-                "values": [heading]
+                "values": [heading - self.localization.heading_error]
             })
             self.vehicleToEverythingSender.send({
                 "type": "deviceSpeed",

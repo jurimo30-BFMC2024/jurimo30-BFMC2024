@@ -36,6 +36,9 @@ class Localization:
         self.location: Tuple[float, float] = (0.0, 0.0)
         self._cum_dists: List[float] = []  # cumulative distances along nodes
 
+        self.heading_error = 0.0  # Difference between IMU and calculated heading
+        self.orientation = 0.0  # Current calculated orientation in degrees
+
     def start_new_segment(self):
         """
         Begin a new segment:
@@ -152,14 +155,55 @@ class Localization:
         """
         return self.location
 
+    def _calculate_path_heading(self):
+        """
+        Calculate expected heading based on current path segment
+        Returns heading in degrees (0-360)
+        """
+        if not self.current_segment:
+            return 0.0
+
+        nodes = self.current_segment["nodes"]
+        # Find current segment we're on
+        for i in range(len(nodes) - 1):
+            x0, y0 = nodes[i]["pos"]
+            x1, y1 = nodes[i + 1]["pos"]
+
+            # Check if we're between these nodes
+            if self._cum_dists[i] <= self.total_distance < self._cum_dists[i + 1]:
+                dx = x1 - x0
+                dy = y1 - y0
+                heading = math.degrees(math.atan2(dy, dx))
+                return heading % 360
+
+        # Handle edge case: if at or beyond the last node, use the last segment's heading
+        if len(nodes) >= 2 and self.total_distance >= self._cum_dists[-1]:
+            x0, y0 = nodes[-2]["pos"]
+            x1, y1 = nodes[-1]["pos"]
+            dx = x1 - x0
+            dy = y1 - y0
+            heading = math.degrees(math.atan2(dy, dx))
+            return heading % 360
+
+        return 0.0
+
+    def calibrate_heading(self, imu_heading):
+        """
+        Update heading error based on difference between IMU and calculated heading
+        :param imu_heading: Heading from IMU in degrees (0-360)
+        """
+        calculated_heading = self._calculate_path_heading()
+        error = imu_heading - calculated_heading
+        # Normalize error to [-180, 180]
+        error = (error + 180) % 360 - 180
+        # Update error with some smoothing
+        self.heading_error = 0.95 * self.heading_error + 0.05 * error
+        return self.heading_error
+
     def update_position_with_steering(self, speed: float, steering_angle_deg: float, orientation_deg: float):
         """
         Update the car's position based on speed, steering angle, and absolute orientation.
-        Negative speed values are allowed for reversing.
-        :param speed: Speed of the car (units per second). Negative values mean reversing.
-        :param steering_angle_deg: Steering angle in degrees (relative change).
-        :param orientation_deg: Absolute orientation in degrees
-        :raises ValueError: If location is not set
+        Now accounts for heading calibration.
         """
         if self.location is None:
             raise ValueError("Current location is not set")
@@ -169,16 +213,37 @@ class Localization:
         dt = current_time - self.last_update_time
         self.last_update_time = current_time
 
+        # Apply heading correction
+        corrected_orientation = orientation_deg - self.heading_error
+        
         # Convert angles to radians
         steering_angle_rad = math.radians(steering_angle_deg)
-        orientation_rad = math.radians(orientation_deg)
+        orientation_rad = math.radians(corrected_orientation)
 
-        # Update orientation with steering
-        orientation_rad += steering_angle_rad
+        # Car parameters (adjust these based on your car's dimensions)
+        wheelbase = 20.0  # distance between front and rear axles in units
+        max_steering_angle = math.radians(25.0)  # maximum steering angle in radians
+        
+        # Limit steering angle
+        steering_angle_rad = max(-max_steering_angle, min(max_steering_angle, steering_angle_rad))
 
-        # Calculate the change in position
-        dx = speed * math.cos(orientation_rad) * dt
-        dy = speed * math.sin(orientation_rad) * dt
+        if abs(steering_angle_rad) < 0.001:
+            # For straight motion, use simple linear update
+            dx = speed * math.cos(orientation_rad) * dt
+            dy = speed * math.sin(orientation_rad) * dt
+        else:
+            # Calculate turning radius using bicycle model
+            turning_radius = wheelbase / math.tan(steering_angle_rad)
+            
+            # Calculate angular velocity (omega)
+            angular_velocity = speed / turning_radius
+            
+            # Calculate change in orientation
+            delta_orientation = angular_velocity * dt
+            
+            # Calculate position change
+            dx = turning_radius * (math.sin(orientation_rad + delta_orientation) - math.sin(orientation_rad))
+            dy = turning_radius * (math.cos(orientation_rad) - math.cos(orientation_rad + delta_orientation))
 
         # Update the current location
         x, y = self.location
