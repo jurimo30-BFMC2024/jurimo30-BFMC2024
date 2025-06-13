@@ -26,7 +26,7 @@ class threadSensors(ThreadWithStop):
         self.sideSensorSender = messageHandlerSender(self.queuesList, SideSensors)
         self.headingSender = messageHandlerSender(self.queuesList, Heading)
 
-        self.heading_error = 63.37  # Change this to match location error value
+        self.heading_error = 288.0  # Change this to match location error value
 
         super(threadSensors, self).__init__()
 
@@ -55,13 +55,11 @@ class threadSensors(ThreadWithStop):
 
                         # Extract heading data safely
                         yaw = data.get('yaw', 0.0)
-                        yaw -= self.heading_error
-                        # Mirror the angle along x-axis
                         yaw = 360 - yaw
-                        if yaw < 0:
-                            yaw += 360
-                        elif yaw >= 360:
-                            yaw -= 360
+                        # Normalize to 0-360
+                        yaw = yaw % 360
+                        # Apply heading error correction
+                        yaw = (yaw - self.heading_error) % 360
                         
                         self.frontSensorSender.send({
                             "distance": front_data[0] if front_data[0] != 0.0 else 10000.0,
