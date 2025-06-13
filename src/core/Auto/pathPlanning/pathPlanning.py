@@ -24,10 +24,13 @@ class PathPlanner:
             raise ValueError("PathPlanner: mode must be either \"p2p\" or \"pacman\"")
         else:
             self.mode = mode
-        # Small_map.graphml for test track/Competition_track_graph.graphml for Romania
-        self.file_path = "src/core/Auto/pathPlanning/Small_map.graphml" 
-        self.roundabout_entries = ["317", "367", "397", "405"]
-        self.roundabout_exits = ["368", "342", "398", "318"]
+        self.file_path = "Small_map_roundabout.graphml" # change this to Competition_track_graph.graphml when in Romania
+        if self.file_path == "Small_map_roundabout.graphml":
+            self.roundabout_entries = ["14", "49", "22"]
+            self.roundabout_exits = ["24", "34", "40", "48"]
+        else:   
+            self.roundabout_entries = ["317", "367", "397", "405"]
+            self.roundabout_exits = ["368", "342", "398", "318"]
 
     def planPath(self):
         '''Generates a queue of instructions'''
@@ -38,25 +41,24 @@ class PathPlanner:
             turns = self.determine_turns(graph, best_path)
             for node, direction in turns:
                 instructionQueue.append(direction)
+            segments = self.calculate_path_segments(graph, best_path)
 
-        return instructionQueue
+        return instructionQueue, segments
 
 
     def parse_graphml(self, file_path, mode):
-        tree = ET.parse(file_path)
+        tree = ET.parse("src/core/Auto/pathPlanning/" + file_path)
         root = tree.getroot()
         
         ns = {'graphml': 'http://graphml.graphdrawing.org/xmlns'}
         graph = nx.DiGraph()
         
-        # For competition map
-        # collectibles = {"75", "128", "116", "98", "110", "185", "71", "25", "31", "29", "93", "80", "82", "136",
-        # "419", "125", "403", "399", "343", "386", "363", "368", "318", "317", "56", "54", "261", "239", "228",
-        # "225", "198", "42", "289", "6", "8"}
-
-
-        # For small map
-        collectibles = {"32", "22", "14", "38", "7"}
+        if self.file_path == "Competition_track_graph.graphml":
+            collectibles = {"75", "128", "116", "98", "110", "185", "71", "25", "31", "29", "93", "80", "82", "136",
+            "419", "125", "403", "399", "343", "386", "363", "368", "318", "317", "56", "54", "261", "239", "228",
+            "225", "198", "42", "289", "6", "8"}
+        else:
+            collectibles = {"32", "22", "14", "38", "7"}
         
         for node in root.findall(".//graphml:node", ns):
             node_id = node.get("id")
@@ -73,14 +75,14 @@ class PathPlanner:
             target = edge.get("target")
             graph.add_edge(source, target)
         
-        # Improved intersection identification
+        # intersection identification
         for node in graph.nodes():
             graph.nodes[node]['intersection'] = graph.out_degree(node) > 1  # 3 or more connections
         
         if self.file_path == "Competition_track_graph.graphml":
             graph.nodes["270"]['intersection'] = True
             graph.nodes["245"]['intersection'] = True
-            
+
             # highway lane split nodes
             graph.nodes["401"]['intersection'] = False
             graph.nodes["423"]['intersection'] = False
@@ -113,12 +115,67 @@ class PathPlanner:
             visited_collectibles.add(nearest)
             current_node = nearest
         
-        # Finally, go to the goal (this part is skipped if pacman)
+        # finally, go to the goal (this part is skipped if pacman)
         if self.mode == "p2p":
             final_segment = nx.shortest_path(graph, source=current_node, target=goal, method='dijkstra')
             path.extend(final_segment[1:])
         
         return path
+    
+    def calculate_path_segments(self, graph, path):
+        def calculate_segment_metrics(start_idx, end_idx):
+            waypoints = []
+            segment_lengths = []
+
+            for i in range(start_idx, end_idx + 1):
+                current_node = path[i]
+                waypoints.append({
+                    "idx": current_node,
+                    "pos": graph.nodes[current_node]['pos']
+                })
+                if i > start_idx:
+                    previous_pos = np.array(graph.nodes[path[i - 1]]['pos'])
+                    current_pos = np.array(graph.nodes[current_node]['pos'])
+                    segment_lengths.append(np.linalg.norm(current_pos - previous_pos))
+
+            return {
+                "nodes": waypoints,
+                "distances": segment_lengths,
+                "length": sum(segment_lengths)
+            }
+
+        path_segments = []
+        intersection_points = [
+            (i, node) for i, node in enumerate(path)
+            if graph.nodes[node].get('intersection', False)
+        ]
+
+        # Start to first intersection
+        if intersection_points:
+            first_idx = intersection_points[0][0] - 1
+            if first_idx > 0 and path[first_idx - 1] in self.roundabout_entries:
+                first_idx -= 1
+            if first_idx > 0:
+                path_segments.append(calculate_segment_metrics(0, first_idx))
+
+        # Between intersections
+        for i in range(len(intersection_points) - 1):
+            start_idx = intersection_points[i][0] + 1
+            end_idx = intersection_points[i + 1][0] - 1
+
+            if end_idx > 0 and path[end_idx - 1] in self.roundabout_entries:
+                end_idx -= 1
+
+            if end_idx > start_idx:
+                path_segments.append(calculate_segment_metrics(start_idx, end_idx))
+
+        # Last intersection to end
+        if intersection_points:
+            last_idx = intersection_points[-1][0] + 1
+            if last_idx < len(path) - 1:
+                path_segments.append(calculate_segment_metrics(last_idx, len(path) - 1))
+
+        return path_segments
 
     def determine_turns(self, graph, path):
         directions = []
@@ -135,13 +192,13 @@ class PathPlanner:
                         break
                     counter += 1
                 if counter == 2:
-                    directions.append((current_node, "First exit"))
+                    directions.append((current_node, "Exit 1"))
                 elif counter == 4:
-                    directions.append((current_node, "Second exit"))
+                    directions.append((current_node, "Exit 2"))
                 elif counter == 6:
-                    directions.append((current_node, "Third exit"))
+                    directions.append((current_node, "Exit 3"))
                 elif counter == 8:
-                    directions.append((current_node, "Fourth exit"))
+                    directions.append((current_node, "Exit 4"))
                 else:
                     if i + counter + 1 > len(path) - 1:
                         print("W: Your end node is inside the roundabout (reconsider)")
@@ -152,45 +209,38 @@ class PathPlanner:
                 i += counter + 1
                 continue
 
-            # Skip if not an intersection
+            # skip if not an intersection
             if not graph.nodes[current_node].get('intersection', False):
                 i += 1
                 continue
             
-            # Get coordinates for vectors
+            # get coordinates for vectors
             x_prev, y_prev = graph.nodes[prev_node]['pos']
             x_curr, y_curr = graph.nodes[current_node]['pos']
             x_next, y_next = graph.nodes[next_node]['pos']
 
-            # Create direction vectors
+            # create direction vectors
             incoming_vec = np.array([x_curr - x_prev, y_curr - y_prev])
             outgoing_vec = np.array([x_next - x_curr, y_next - y_curr])
             
-            # Normalize vectors
+            # normalize vectors
             with np.errstate(divide='ignore', invalid='ignore'):
                 incoming_vec = incoming_vec / np.linalg.norm(incoming_vec)
                 outgoing_vec = outgoing_vec / np.linalg.norm(outgoing_vec)
             
-            # Handle potential zero vectors
+            # handle potential zero vectors
             if np.any(np.isnan(incoming_vec)) or np.any(np.isnan(outgoing_vec)):
                 i += 1
                 continue
             
-            # Calculate angle difference using arctan2
+            # calculate angle difference using arctan2
             angle_in = np.arctan2(incoming_vec[1], incoming_vec[0])
             angle_out = np.arctan2(outgoing_vec[1], outgoing_vec[0])
             angle_diff = np.degrees(angle_out - angle_in)
             
-            # Normalize angle to [-180, 180)
+            # normalize angle to [-180, 180)
             angle_diff = (angle_diff + 180) % 360 - 180
             
-            # Debugging: Print intermediate values
-            # print(f"At node {current_node}:")
-            # print(f"  Incoming vector: {incoming_vec}")
-            # print(f"  Outgoing vector: {outgoing_vec}")
-            # print(f"  Angle difference: {angle_diff:.2f}°")
-            
-            # Determine turn direction
             if angle_diff > 45:
                 turn = "Left"
             elif angle_diff < -45:
@@ -200,7 +250,11 @@ class PathPlanner:
             
             directions.append((current_node, turn))
             i += 1
+            
         return directions
-
-# pp = PathPlanner("315", "95", "pacman")
-# print(pp.planPath())
+    
+if __name__ == "__main__":
+    pathPlanner = PathPlanner(52, 43, "pacman")
+    instructions, segments = pathPlanner.planPath()
+    for segment in segments:
+        print(segment)

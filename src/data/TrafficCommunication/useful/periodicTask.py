@@ -26,14 +26,18 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
 from twisted.internet import task
+from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
+from src.utils.messages.allMessages import VehicleToEverything
 
 
 class periodicTask(task.LoopingCall):
-    def __init__(self, interval, shrd_mem, tcp_factory):
+    def __init__(self, interval, queuesList, tcp_factory):
         super().__init__(self.periodicCheck)
         self.interval = interval
-        self.shrd_mem = shrd_mem
         self.tcp_factory = tcp_factory
+        
+        # Single subscriber for all message types
+        self.subscriber = messageHandlerSubscriber(queuesList, VehicleToEverything, "FIFO", True)
 
     def start(self):
         """
@@ -41,10 +45,38 @@ class periodicTask(task.LoopingCall):
         """
         super().start(self.interval)
 
+    def _format_outgoing_data(self, type, values):
+        """
+        Format data for server transmission.
+        
+        Message types and their values:
+        - devicePos: [x, y] - Position coordinates of the vehicle
+            value1: x coordinate (float)
+            value2: y coordinate (float)
+        
+        - deviceRot: [angle] - Rotation/heading of the vehicle
+            value1: angle in degrees (float)
+            
+        - deviceSpeed: [speed] - Current speed of the vehicle
+            value1: speed value (float)
+            
+        - historyData: [x, y, angle] - Historical position of obstacles
+            value1: x coordinate (float)
+            value2: y coordinate (float)
+            value3: type of obstacle
+        """
+        data = {"reqORinfo": "info", "type": type}
+        for i, v in enumerate(values[:3], 1):
+            data[f"value{i}"] = v
+        return data
+
     def periodicCheck(self):
         """
         Perform the periodic check and send data to the server.
         """
-        tosend = self.shrd_mem.get()
-        for mem in tosend:
-            self.tcp_factory.send_data_to_server(mem)
+        # Only process messages if connected
+        if self.tcp_factory.isConnected():
+            while self.subscriber.isDataInPipe():
+                msg = self.subscriber.receive()
+                formatted_msg = self._format_outgoing_data(msg["type"], msg["values"])
+                self.tcp_factory.send_data_to_server(formatted_msg)

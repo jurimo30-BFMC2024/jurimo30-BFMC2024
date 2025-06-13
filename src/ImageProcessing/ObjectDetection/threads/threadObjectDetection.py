@@ -2,6 +2,7 @@ import cv2
 import base64
 import numpy as np
 import os
+import time
 
 os.environ['OMP_NUM_THREADS'] = "2"
 os.environ['MKL_NUM_THREADS'] = "2"
@@ -11,7 +12,8 @@ from ultralytics import YOLO
 from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.allMessages import (
     serialCamera,
-    ObjectDetection
+    ObjectDetection,
+    TrafficSignsDetection
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -19,38 +21,84 @@ from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream
 from src.hardware.camera.encoder import decode_frame
 
 class threadObjectDetection(ThreadWithStop):
-    """This thread handles ObjectDetection."""
+    """This thread handles ObjectDetection.
+    Args:
+        queueList (dict of multiprocessing.queues.Queue): Dictionary of queues.
+        logging (logging object): For debugging.
+        debugging (bool, optional): Debugging flag. Defaults to False.
+    """
+    """
+    - Razdvojiti objekte(auto, exit, stefanija) od znakova
+    - Poslati kada se objekat pojavi i kada nestane iz frejma
+    - Slati koordinate box-a oko objekta na slici dok je u frejmu
+    - Logika stanja znakova je bila dobra (trazio si sa najvecom povrsinom) i
+      slao samo taj jedan znak po frejmu, ali ostale objekte moras poslati sve koje vidis
+      
+    """
     def __init__(self, queueList, logging, debugging=False):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_2.7/detect/train/weights/best.pt')
+        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_2.9/detect/train/weights/best.pt')
         self.streamer = VideoStream(0, 0)
         
-        # State management for signs
-        self.current_sign = None
-        self.previous_sign = None
-        self.confirmation_counter = 0
-        self.confirmation_threshold = 3
-        self.lost_sign_count = 0
-        self.lost_sign_threshold = 17
+        # State management variables
+        self.current_sign = None          # Currently active sign
+        self.confirmation_counter = 0     # Frames with consistent new sign
+        self.confirmation_threshold = 3   # Frames needed to confirm new sign
+        self.lost_sign_count = 0          # Frames without current sign
+        self.lost_sign_threshold = 17     # Frames to consider sign lost
+
+        # Target frame dimensions
+        self.target_width = 512
+        self.target_height = 270
         
-        # State management for relevant objects
-        self.relevant_objects_state = {
-            'car': {'presence_count': 0, 'absence_count': 0, 'active': False, 'reported': False},
-            'exit': {'presence_count': 0, 'absence_count': 0, 'active': False, 'reported': False},
-            'stefanija': {'presence_count': 0, 'absence_count': 0, 'active': False, 'reported': False}
+        # Processing frame dimensions
+        self.processing_width = 256
+        self.processing_height = 256
+
+        self.lost_timeout = 0.6            # Timeout for lost objects
+   
+        # Initialize relevant_objects structure
+        self.relevant_objects = {
+            "car": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False},
+            "exit": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False},
+            "stefanija": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False}
         }
-        self.required_presence_frames = 3
-        self.required_absence_frames = 17
         
         super(threadObjectDetection, self).__init__()
+        self.subscribe() # Subscribe on serialCamera topic
+        self.send()      #      Sending on topics:
+                         #      ------------------
+                         ##      ObjectDetection    ##
+                         ##   TrafficSignsDetection    ##
+
+    def send(self):
         self.objectDetectionSender = messageHandlerSender(self.queuesList, ObjectDetection)
-        self.subscribe()
+        self.trafficSignsDetectionSender = messageHandlerSender(self.queuesList, TrafficSignsDetection)
 
     def subscribe(self):
         """Subscribes to required messages."""
         self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
+        
+    def scale_coordinates(self, coords):
+        """Scale coordinates from processing frame to target frame size."""
+        if coords is None:
+            return None
+            
+        x1, y1, x2, y2 = coords
+        
+        # Scale factors
+        scale_x = self.target_width / self.processing_width
+        scale_y = self.target_height / self.processing_height
+        
+        # Scale coordinates
+        scaled_x1 = int(x1 * scale_x)
+        scaled_y1 = int(y1 * scale_y)
+        scaled_x2 = int(x2 * scale_x)
+        scaled_y2 = int(y2 * scale_y)
+        
+        return (scaled_x1, scaled_y1, scaled_x2, scaled_y2)
 
     def run(self):
         while self._running:
@@ -58,78 +106,51 @@ class threadObjectDetection(ThreadWithStop):
                 videoData = self.videoSubscriber.receiveWithBlock()
                 frame = decode_frame(videoData)
                 frame_cropped = self.crop_frame(frame)
-                frame_cropped = cv2.resize(frame_cropped, (256,256), interpolation=cv2.INTER_AREA)
-                processed_frame, best_sign, relevant_objects = self.process_frame(frame_cropped)
+                frame_cropped = cv2.resize(frame_cropped, (self.processing_width, self.processing_height), interpolation=cv2.INTER_AREA)
                 
-                # Update states
-                self.update_state(best_sign)
-                active_relevant_objects = self.handle_relevant_objects(relevant_objects)
+                # Process frame and get detections
+                processed_frame, best_sign, detected_objects = self.process_frame(frame_cropped)
                 
-                # Check if we need to send a message
-                send_message = False
-                message_content = {}
+                # Update state and send messages
+                self.update_state(best_sign, detected_objects)
                 
-                # Check sign changes
-                if self.current_sign != self.previous_sign:
-                    message_content['sign'] = self.current_sign
-                    self.previous_sign = self.current_sign
-                    send_message = True
-                
-                # Check relevant objects changes
-                new_active_objects = [obj for obj in active_relevant_objects 
-                                    if not self.relevant_objects_state[obj]['reported']]
-                if new_active_objects:
-                    message_content['relevant_objects'] = new_active_objects
-                    for obj in new_active_objects:
-                        self.relevant_objects_state[obj]['reported'] = True
-                    send_message = True
-                
-                # Send message if needed
-                if send_message:
-                    if 'sign' in message_content and message_content['sign'] is not None:
-                        self.objectDetectionSender.send(message_content['sign'])
-                    
-                    if 'relevant_objects' in message_content:
-                        for obj in message_content['relevant_objects']:
-                            self.objectDetectionSender.send(obj)
-
-                    # print(message_content)
-                
+                # Display frame on server
                 self.streamer.display(processed_frame)
+
             except Exception as e:
                 print(e)
 
     def process_frame(self, frame):
-        """Process frame and return annotated frame, best detection, and relevant object list."""
-        results = self.model(frame, verbose=self.debugging)[0]
-        cv2.rectangle(frame, (200, 200), (255, 255), (150, 255, 150), 3)
+        """Process frame and return annotated frame, best detection, and detected objects."""
+        # Get YOLO results
+        results = self.model(frame, verbose=False)[0]
 
-        h, w = frame.shape[:2]
-        center_box = (w // 2 - 20, int(h * 0.2), w // 2 + 20, h)
+        # List to store relevant objects
+        detected_objects = []
 
+        # List to store traffic signs
+        traffic_signs = []
+
+        # Find best detection
         best_sign = None
-        detections = []
-        relevant_objects = []
+
+        # Reset relevant_objects presence
+        for obj_key in self.relevant_objects:
+            self.relevant_objects[obj_key]["present"] = False
 
         for box in results.boxes.data:
             x1, y1, x2, y2, conf, cls = box.tolist()
             label = self.model.model.names[int(cls)]
-
-            box_cx = (x1 + x2) / 2
-            box_cy = (y1 + y2) / 2
+            
             area = (x2 - x1) * (y2 - y1)
-            in_center = (
-                center_box[0] <= box_cx <= center_box[2] and
-                center_box[1] <= box_cy <= center_box[3]
-            )
-
+            
             # Apply filtering logic
             if label == "car":
-                if not (conf > 0.75 and in_center):
+                if not (conf > 0.75):
                     continue
                 color = (0, 0, 255)
             elif label == "exit":
-                if not (conf > 0.15 and y2 > 180 and x2 > 180):
+                if not (conf > 0.15):
                     continue
                 color = (0, 255, 0)
             elif label == "stefanija":
@@ -140,12 +161,16 @@ class threadObjectDetection(ThreadWithStop):
                 color = (0, 204, 180)
             else:
                 continue
+            
+            if label not in ("car", "exit", "stefanija"):
+                traffic_signs.append((conf, area, label, (x1, y1, x2, y2)))
 
-            if label in ("car", "exit", "stefanija"):
-                relevant_objects.append(label)
-            else:
-                detections.append((conf, area, label, (x1, y1, x2, y2)))
+            # Update relevant_objects if label matches
+            if label in self.relevant_objects:
+                self.relevant_objects[label]["position"] = (x1, y1, x2, y2)
+                self.relevant_objects[label]["present"] = True
 
+            # Draw bounding box and label
             cv2.rectangle(frame, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
             cv2.putText(
                 frame, f"{label} {conf:.2f}",
@@ -153,79 +178,95 @@ class threadObjectDetection(ThreadWithStop):
                 cv2.FONT_HERSHEY_SIMPLEX, 0.4, color, 2
             )
 
-        if detections:
-            detections.sort(key=lambda x: (-x[0], -x[1]))
-            best_sign = detections[0][2]
+        # Append relevant objects to detected_objects list
+        for obj, data in self.relevant_objects.items():
+            detected_objects.append({
+                "name": obj,
+                "position": data["position"],
+                "present": data["present"]
+            })
 
-        return frame, best_sign, relevant_objects
+        if traffic_signs:
+            # Sort by confidence (desc), then area (desc)
+            traffic_signs.sort(key=lambda x: (-x[0], -x[1]))
+            best_sign = traffic_signs[0][2]
 
-    def update_state(self, new_sign):
-        """Update detection state for signs."""
+        return frame, best_sign, detected_objects
+
+    def update_state(self, new_sign, detected_objects):
+        """Update detection state and handle messaging for traffic signs and detected objects."""
+        # Reset counters if no sign detected
         if new_sign is None:
             self.lost_sign_count += 1
             self.confirmation_counter = 0
-            if self.lost_sign_count >= self.lost_sign_threshold and self.current_sign is not None:
+            if self.lost_sign_count >= self.lost_sign_threshold:
                 self.current_sign = None
                 self.lost_sign_count = 0
-            return
-
-        if self.current_sign is not None:
-            if new_sign == self.current_sign:
-                self.lost_sign_count = 0
-                self.confirmation_counter = 0
+        else:
+            # Case 1: New potential sign while we have current sign
+            if self.current_sign is not None:
+                if new_sign == self.current_sign:
+                    # Reset counters for current sign
+                    self.lost_sign_count = 0
+                    self.confirmation_counter = 0
+                else:
+                    # Track confirmation for new candidate
+                    self.confirmation_counter += 1
+                    
+                    # If new candidate confirmed before losing current
+                    if self.confirmation_counter >= self.confirmation_threshold:
+                        if self.debugging:
+                            print(f"[INFO]: Novi detektovani znak {new_sign}")
+                        self.trafficSignsDetectionSender.send(new_sign)  # Send new sign
+                        self.current_sign = new_sign
+                        self.confirmation_counter = 0
+                        self.lost_sign_count = 0
+            # Case 2: No current sign, new detection
             else:
                 self.confirmation_counter += 1
                 if self.confirmation_counter >= self.confirmation_threshold:
+                    if self.debugging:
+                        print(f"[INFO]: Novi detektovani znak {new_sign}")
+                    self.trafficSignsDetectionSender.send(new_sign)
                     self.current_sign = new_sign
                     self.confirmation_counter = 0
                     self.lost_sign_count = 0
-        else:
-            self.confirmation_counter += 1
-            if self.confirmation_counter >= self.confirmation_threshold:
-                self.current_sign = new_sign
-                self.confirmation_counter = 0
-                self.lost_sign_count = 0
 
-    def handle_relevant_objects(self, current_relevant_objects):
-        """
-        Track relevant objects and return active ones.
-        An object needs to be seen for 3 consecutive frames to be considered active,
-        and needs to be absent for 17 frames to be considered inactive.
-        """
-        active_objects = []
-        
-        # Update state for each relevant object
-        for obj in self.relevant_objects_state:
-            state = self.relevant_objects_state[obj]
+        current_time = time.time()
+        for obj in detected_objects:
+            name = obj["name"]
+            current_position = obj["position"]
             
-            if obj in current_relevant_objects:
-                # Object is present in current frame
-                state['presence_count'] += 1
-                state['absence_count'] = 0
-                
-                # Check if we've seen it enough to activate
-                if state['presence_count'] >= self.required_presence_frames and not state['active']:
-                    state['active'] = True
-                    state['reported'] = False
+            # Scale position coordinates to target frame size
+            scaled_position = self.scale_coordinates(current_position) if current_position is not None else None
+
+            if obj["present"]:
+               # Ako je detektovan, ažuriraj vreme i pošalji poruku
+               self.relevant_objects[name]["last_seen_time"] = current_time
+
+               if self.relevant_objects[name]["present"]:
+                   if self.debugging:
+                        print(f"[DETEKCIJA] Objekat '{name}' detektovan na {scaled_position}")
+
+                   self.relevant_objects[name]["position"] = current_position
+                   self.relevant_objects[name]["sent_lost_message"] = False
+                   self.objectDetectionSender.send({
+                        "name": name,
+                        "position": scaled_position
+                    })
             else:
-                # Object is not present in current frame
-                if state['active']:
-                    state['absence_count'] += 1
-                    
-                    # Check if we've not seen it enough to deactivate
-                    if state['absence_count'] >= self.required_absence_frames:
-                        state['active'] = False
-                        state['presence_count'] = 0
-                        state['reported'] = False
-                else:
-                    # Reset presence counter if not active
-                    state['presence_count'] = 0
-            
-            # Add to active objects if currently active
-            if state['active']:
-                active_objects.append(obj)
-        
-        return active_objects
+                if self.relevant_objects[name]["last_seen_time"] is not None:
+                    time_since_seen = current_time - self.relevant_objects[name]["last_seen_time"]
+                    if time_since_seen >= self.lost_timeout and not self.relevant_objects[name]["sent_lost_message"]:
+                        if self.debugging:
+                            print(f"[GUBITAK] Objekat '{name}' nije detektovan {self.lost_timeout} sekunde – smatra se izgubljenim.")
+                        self.relevant_objects[name]["present"] = False
+                        self.relevant_objects[name]["position"] = None
+                        self.relevant_objects[name]["sent_lost_message"] = True
+                        self.objectDetectionSender.send({
+                        "name": name,
+                        "position": None
+                    })
 
     @staticmethod
     def crop_frame(frame):

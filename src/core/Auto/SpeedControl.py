@@ -1,12 +1,12 @@
 from src.core.Auto.LaneFollow.MovingAverage import MovingAverage
-from src.core.Auto.PID import PIDController as pid
+from src.core.Auto.PIDController import PIDController
 
 class SpeedControl():
     def __init__(self, logging, debugging=False):
         self.logging = logging
         self.debugging = debugging
         self.avgSpeed = MovingAverage(20)
-        self.pid = pid(20, 7, 0.5)
+        self.pid = PIDController(20, 7, 0.5)
         self.followDistance = 50  # Desired following distance in cm
         self.emergencyStopDistance = 35  # Emergency stop threshold in cm
         self.emergency_stop_threshold = 3  # Consecutive readings required
@@ -35,12 +35,12 @@ class SpeedControl():
             else:
                 speed = self.map_value(angle, 30, 145, 280, 350)
         else:
-            if abs(angle) < 70:
-                speed = 520
-            elif abs(angle) > 170:
-                speed = 420
+            if abs(angle) < 30:
+                speed = 480
+            elif abs(angle) > 100:
+                speed = 400
             else:
-                speed = self.map_value(angle, 70, 170, 420, 500)
+                speed = self.map_value(angle, 30, 100, 400, 480)
 
         # Low distance override
         if lowDistance:
@@ -80,7 +80,7 @@ class SpeedControl():
         pid_adjustment = 0
         if car_in_front and frontDistance <= 80:
             distanceError = self.followDistance - frontDistance
-            pid_adjustment = self.pid.update(distanceError)
+            pid_adjustment = self.pid.compute(distanceError)
         else:
             self.pid.reset()
 

@@ -17,14 +17,14 @@ class IntersectionControl():
         self.motions = {
             "Right": [
                 (0, 168, 1.7),
-                (240, 168, 5.3),
+                (240, 168, 6.1),
             ],
             "Left": [
                 (0, 168, 3.7),
-                (-190, 168, 6.0),
+                (-190, 168, 6.3),
             ],
             "Straight": [
-                (0, 168, 9.0)
+                (20, 168, 9.7)
             ],
             "Wait": [
                 (0, 0, 3.0)
@@ -63,7 +63,7 @@ class IntersectionControl():
     
     def createCorrectedMotion(self):
         straighten_distance = self.calculate_distance_to_straighten(self.slope_degrees)
-        straighten_time = (straighten_distance / 30)
+        straighten_time = (straighten_distance / 16.8)
 
         # Determine the angle to correct the direction based on slope sign
         if self.slope_degrees < 0:
@@ -74,7 +74,7 @@ class IntersectionControl():
             angle = 0
 
         # Create the correction motion (angle, speed, duration)
-        correction_motion = (angle, 300, straighten_time)
+        correction_motion = (angle, 200, straighten_time)
 
         # Get a copy of the motion sequence for the current direction
         motion = self.motions[self.direction].copy()
@@ -95,7 +95,7 @@ class IntersectionControl():
         if direction not in ["Right", "Left", "Straight"]:
             raise ValueError(f"Unsuported direction requested: {direction}")
         
-        if sign not in ["priority", "stop"]:
+        if not traffic_light_present and sign not in ["priority", "stop"]:
             raise ValueError(f"Unknown sign received: {sign}")
         
         self.full_stop_required = (sign == "stop")
