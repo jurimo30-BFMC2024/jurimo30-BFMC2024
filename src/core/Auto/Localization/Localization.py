@@ -18,7 +18,7 @@ class Localization:
         self.segments_data = segments_data
         self.current_segment = None
 
-        scale_factor = 1  # e.g., each unit in graph
+        scale_factor = 13  # e.g., each unit in graph
 
         for segment in segments_data:
             for node in segment['nodes']:

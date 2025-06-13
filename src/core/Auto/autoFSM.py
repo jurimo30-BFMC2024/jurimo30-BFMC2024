@@ -32,7 +32,7 @@ from src.core.Auto.pathPlanning.pathPlanning import PathPlanner
 from src.core.Auto.TrafficSignController import TrafficSignController
 import time
 from enum import Enum, auto
-from data.TrafficCommunication.useful.Obstacles import Obstacles
+from src.data.TrafficCommunication.useful.Obstacles import Obstacles
 
 """
     - stopline staviti u jedan stopline subscriber

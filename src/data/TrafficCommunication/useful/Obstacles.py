@@ -48,10 +48,10 @@ class Obstacles(Enum):
 
 if __name__ == "__main__":
     # Test the enum
-    print(f"Stop sign ID: {TrafficSign.STOP.value}")
-    print(f"Description: {TrafficSign.get_description(TrafficSign.STOP.value)}")
+    print(f"Stop sign ID: {Obstacles.STOP.value}")
+    print(f"Description: {Obstacles.get_description(Obstacles.STOP.value)}")
     
     # Print all signs
     print("\nAll traffic signs:")
-    for sign in TrafficSign:
-        print(f"{sign.name}: {sign.value} - {TrafficSign.get_description(sign.value)}")
+    for sign in Obstacles:
+        print(f"{sign.name}: {sign.value} - {Obstacles.get_description(sign.value)}")
