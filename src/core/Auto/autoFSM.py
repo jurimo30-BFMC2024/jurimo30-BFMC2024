@@ -245,7 +245,7 @@ class autoFSM(ControlModeThread):
             if park_angle is not None:
                 angle = park_angle
 
-            self.localization.update_position_with_steering(speed / 10, angle, heading)
+            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
 
             if not module_running:
                 self.localization.clamp_location_to_graph()
@@ -258,7 +258,7 @@ class autoFSM(ControlModeThread):
                 trafficLights=self.traffic_light_states
             )
 
-            self.localization.update_position_with_steering(speed / 10, angle, heading)
+            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
             
             if not module_running:
                 self.traffic_light_states.clear()
@@ -272,7 +272,7 @@ class autoFSM(ControlModeThread):
             if overtake_angle is not None:
                 angle = overtake_angle
 
-            self.localization.update_position_with_steering(speed / 10, angle, heading)
+            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
 
             if not module_running:
                 self.localization.clamp_location_to_graph()
@@ -291,7 +291,7 @@ class autoFSM(ControlModeThread):
             angle, module_stoping = self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position, self.leftVisible, self.rightVisible)
             speed = 150
 
-            self.localization.update_position_with_steering(speed / 10, angle, heading)
+            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
 
             if module_stoping:
                 self.localization.start_new_segment()
