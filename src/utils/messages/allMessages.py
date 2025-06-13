@@ -54,6 +54,12 @@ class CoreBrake(Enum):
     msgID = 4
     msgType = "float"
 
+class VehicleToEverything(Enum):
+    Queue = "General"
+    Owner = "threadCore"
+    msgID = 5
+    msgType = "dict"
+
 ####################################### processCamera #######################################
 class mainCamera(Enum):
     Queue = "General"

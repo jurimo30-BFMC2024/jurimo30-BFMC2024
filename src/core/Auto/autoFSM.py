@@ -23,7 +23,8 @@ from src.utils.messages.allMessages import (
     FrontSensors,
     ParkingSpotDetect,
     Location,
-    Heading
+    Heading,
+    VehicleToEverything,
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -31,6 +32,7 @@ from src.core.Auto.pathPlanning.pathPlanning import PathPlanner
 from src.core.Auto.TrafficSignController import TrafficSignController
 import time
 from enum import Enum, auto
+from data.TrafficCommunication.useful.Obstacles import Obstacles
 
 """
     - stopline staviti u jedan stopline subscriber
@@ -53,6 +55,7 @@ class autoFSM(ControlModeThread):
         
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
+        self.vehicleToEverythingSender = messageHandlerSender(self.queuesList, VehicleToEverything)
 
         self.subscribe()
         super().__init__()
@@ -77,6 +80,7 @@ class autoFSM(ControlModeThread):
         self.locationSubscriber.empty()
         self.headingSubscriber.empty()
 
+        self.last_sent_time_v2x = 0
         self.oldAngle = 0
         self.oldSpeed = 0
         self.steerMotorSender.send("0")
@@ -324,6 +328,29 @@ class autoFSM(ControlModeThread):
             self.oldSpeed = speed
             # if self.debugging:
             #     self.logging.info(f"New speed: {speed}")
+
+        # TODO: Implement historyData sending for detected obstacles
+        # Example format: {"type": "historyData", "values": [x, y, TrafficSign.STOP.value]} 
+        # Use TrafficSign enum from obstacles.py for identifying obstacle types
+        # Send when traffic signs, pedestrians, or other obstacles are detected
+
+        # Send vehicle position and heading to VehicleToEverything
+        current_time = time.time()
+        if current_time - self.last_sent_time_v2x >= 1.0:  # Check if 1 second has passed
+            vehicle_position = self.localization.get_location()
+            self.vehicleToEverythingSender.send({
+                "type": "devicePos",
+                "values": [vehicle_position[0], vehicle_position[1]]
+            })
+            self.vehicleToEverythingSender.send({
+                "type": "deviceRot",
+                "values": [heading]
+            })
+            self.vehicleToEverythingSender.send({
+                "type": "deviceSpeed",
+                "values": [speed / 10]
+            })
+            self.last_sent_time_v2x = current_time
         
         # time.sleep(0.05)
 
