@@ -3,6 +3,7 @@ from src.utils.messages.allMessages import (serialCamera, mainCamera)
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream
+from src.hardware.camera.encoder import decode_frame
 from threading import Thread
 from multiprocessing import Process
 import numpy as np
@@ -36,21 +37,13 @@ class threadVideoStream(ThreadWithStop):
             #     "col": 0,
             # })
         ]
-
-    @staticmethod
-    def decode_frame(encoded_data):
-        """Decode base64 encoded frame to an OpenCV image."""
-        frame_data = base64.b64decode(encoded_data)
-        np_array = np.frombuffer(frame_data, np.uint8)
-        frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
-        return frame
     
     def displayRawCamera(self, subscriber: messageHandlerSubscriber, row: int, col: int):
         streamer = VideoStream(row, col)
         while self._running:
             videoData = subscriber.receiveWithBlock()
 
-            frame = self.decode_frame(videoData)
+            frame = decode_frame(videoData)
 
             streamer.display(frame)
             time.sleep(0.1)

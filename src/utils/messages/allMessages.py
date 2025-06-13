@@ -71,7 +71,7 @@ class serialCamera(Enum):
     Queue = "General"
     Owner = "threadCamera"
     msgID = 2
-    msgType = "str"
+    msgType = "bytes"
 
 class Recording(Enum):
     Queue = "General"
