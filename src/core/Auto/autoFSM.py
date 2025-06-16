@@ -262,7 +262,6 @@ class autoFSM(ControlModeThread):
             
             if not module_running:
                 self.traffic_light_states.clear()
-                self.traffic_signs.clear()
                 self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
