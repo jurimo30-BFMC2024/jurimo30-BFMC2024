@@ -33,6 +33,8 @@ from src.core.Auto.TrafficSignController import TrafficSignController
 import time
 from enum import Enum, auto
 from src.data.TrafficCommunication.useful.Obstacles import Obstacles
+from src.core.Auto.SpecialReactions.IntersectionCrosswalk import IntersectionCrosswalkController
+from src.core.Auto.SpecialReactions.CrosswalkIntersection import CrosswalkIntersectionController
 
 """
     - stopline staviti u jedan stopline subscriber
@@ -40,12 +42,14 @@ from src.data.TrafficCommunication.useful.Obstacles import Obstacles
 
 class autoFSMState(Enum):
     DRIVE = auto()
-    OVERTAKE = auto()
+    DRIVE_OVERTAKE = auto()
     PARKING = auto()
     INTERSECTION = auto()
     ROUNDABOUT = auto()
     CROSSWALK = auto()
     HIGHWAY = auto()
+    INTERSECTION_CROSSWALK = auto()
+    CROSSWALK_INTERSECTION = auto()
 
 class autoFSM(ControlModeThread):
     def __init__(self, queueList, logging, debugging=False):
@@ -69,6 +73,8 @@ class autoFSM(ControlModeThread):
         self.overtakeController = Overtake(self.logging, self.debugging)
         self.roundaboutController = RoundaboutController(512, 270, self.logging, True)
         self.crosswalkController = CrosswalkController()
+        self.intersectionCrosswalkController = IntersectionCrosswalkController(self.intersectionController, self.crosswalkController)
+        self.crosswalkIntersectionController = CrosswalkIntersectionController(self.intersectionController, self.crosswalkController)
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -184,7 +190,13 @@ class autoFSM(ControlModeThread):
         
         ##############################         SET STATES            #############################
 
+        # Get current node for special cases
+        current_node = self.localization.get_current_node()
         
+        # Nodes where intersection and crosswalk appear together
+        intersection_crosswalk_nodes = [4, 12, 23]  # Example nodes, adjust based on your map
+        crosswalk_intersection_nodes = [7, 15, 28]  # Example nodes, adjust based on your map
+
         if self.state == autoFSMState.HIGHWAY:
             if self.traffic_signs.get_active() == "highway_exit" or stop_line_present:
                 if self.debugging:
@@ -200,16 +212,28 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.PARKING
             
             elif stop_line_present_close and (self.traffic_signs.get_active() in ["stop", "priority"] or traffic_light_present):
-                if self.debugging:
-                    print("Krecemo sa raskrsnicom")
-                
-                self.intersectionController.setCourse(
-                    sign=self.traffic_signs.get_active(), 
-                    direction=self.navigateCommand.pop(0),
-                    traffic_light_present=traffic_light_present
-                )
-                self.traffic_signs.clear()
-                self.state = autoFSMState.INTERSECTION
+                if current_node in intersection_crosswalk_nodes:
+                    if self.debugging:
+                        print("Intersection and crosswalk detected together")
+
+                    self.intersectionCrosswalkController.setCourse(
+                        sign=self.traffic_signs.get_active(), 
+                        direction=self.navigateCommand.pop(0),
+                        traffic_light_present=traffic_light_present
+                    )
+                    self.traffic_signs.clear()
+                    self.state = autoFSMState.INTERSECTION_CROSSWALK
+                else: 
+                    if self.debugging:
+                        print("Krecemo sa raskrsnicom")
+                    
+                    self.intersectionController.setCourse(
+                        sign=self.traffic_signs.get_active(), 
+                        direction=self.navigateCommand.pop(0),
+                        traffic_light_present=traffic_light_present
+                    )
+                    self.traffic_signs.clear()
+                    self.state = autoFSMState.INTERSECTION
 
             elif stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
                 if self.debugging:
@@ -219,8 +243,21 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.ROUNDABOUT
 
             elif stop_line_present and self.traffic_signs.get_active() == "crosswalk":
-                self.crosswalkStart = time.time()
-                self.state = autoFSMState.CROSSWALK
+                if current_node in crosswalk_intersection_nodes:
+                    if self.debugging:
+                        print("Detected intersection after crosswalk")
+                    
+                    self.intersectionController.setCourse(
+                        sign="priority", 
+                        direction=self.navigateCommand.pop(0),
+                        traffic_light_present=False
+                    )
+                    self.traffic_signs.clear()
+                    self.state = autoFSMState.CROSSWALK_INTERSECTION
+                else:
+                    if self.debugging:
+                        print("Krecemo sa pesackim prelazom")
+                    self.state = autoFSMState.CROSSWALK
                         
             elif self.traffic_signs.get_active() == "highway_entrance":
                 if self.debugging:
@@ -236,7 +273,7 @@ class autoFSM(ControlModeThread):
                 if time.time() - self.obstacle_start_time >= 1:
                     print("Pass static obstacle start")
                     self.sign_car_position = None
-                    self.state = autoFSMState.OVERTAKE
+                    self.state = autoFSMState.DRIVE_OVERTAKE
 
         ##############################         FSM            #############################
 
@@ -266,7 +303,7 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
 
-        elif self.state == autoFSMState.OVERTAKE:
+        elif self.state == autoFSMState.DRIVE_OVERTAKE:
             overtake_angle, speed, module_running = self.overtakeController.run(False, front_sensors, side_sensors)
             if overtake_angle is not None:
                 angle = overtake_angle
@@ -283,7 +320,6 @@ class autoFSM(ControlModeThread):
             if module_stoping:
                 self.state = autoFSMState.DRIVE
                 self.stephanie_position = None
-                self.crosswalkStart = None
                 self.laneFollowContrler.restartPid()
 
         elif self.state == autoFSMState.ROUNDABOUT:
@@ -293,6 +329,41 @@ class autoFSM(ControlModeThread):
             self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
 
             if module_stoping:
+                self.localization.start_new_segment()
+                self.state = autoFSMState.DRIVE
+                self.laneFollowContrler.restartPid()
+
+        elif self.state == autoFSMState.INTERSECTION_CROSSWALK:
+            angle, speed, module_running = self.intersectionCrosswalkController.getControlData(
+                stop_line_present=stop_line_present_close,
+                stop_line_slope=stop_line_angle,
+                trafficLights=self.traffic_light_states,
+                stephanie_position=self.stephanie_position,
+                crosswalk_sign_present=self.traffic_signs.get_active() == "crosswalk"
+            )
+
+            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            
+            if not module_running:
+                self.traffic_light_states.clear()
+                self.stephanie_position = None
+                self.localization.start_new_segment()
+                self.state = autoFSMState.DRIVE
+                self.laneFollowContrler.restartPid()
+
+        elif self.state == autoFSMState.CROSSWALK_INTERSECTION:
+            angle, speed, module_running = self.crosswalkIntersectionController.getControlData(
+                stop_line_present=stop_line_present_close,
+                stop_line_slope=stop_line_angle,
+                trafficLights=self.traffic_light_states,
+                stephanie_position=self.stephanie_position
+            )
+
+            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            
+            if not module_running:
+                self.traffic_light_states.clear()
+                self.stephanie_position = None
                 self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
