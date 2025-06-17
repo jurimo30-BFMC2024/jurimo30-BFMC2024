@@ -64,7 +64,7 @@ class autoFSM(ControlModeThread):
         self.overtakeController = Overtake(self.logging, self.debugging)
         self.roundaboutController = RoundaboutController(512, 270, self.logging, True)
         self.crosswalkController = CrosswalkController()
-        self.tunnelController = TunnelController()
+        self.tunnelController = TunnelController(target_distance=18.0, logging=self.logging, debugging=True, log_to_file=False)
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -218,6 +218,13 @@ class autoFSM(ControlModeThread):
                     print("Pass static obstacle start")
                     self.sign_car_position = False
                     self.state = autoFSMState.OVERTAKE
+            
+            # Check for tunnel control activation (right wall detection)
+            elif side_sensors["right"] <= 35 and side_sensors["right"] > 0:
+                if self.debugging:
+                    print(f"Tunnel control activated - right wall at {side_sensors['right']}cm")
+                self.tunnelController.restartPid()
+                self.state = autoFSMState.TUNNEL
 
         ##############################         FSM            #############################
 
@@ -285,7 +292,14 @@ class autoFSM(ControlModeThread):
 
         elif self.state == autoFSMState.TUNNEL:
             speed = 250
-            angle = self.tunnelController.getControlData(side_sensors["right"])
+            angle = self.tunnelController.process_tunnel_control(side_sensors["right"])
+            
+            # Exit tunnel when no wall detected on right side or wall is too far
+            if side_sensors["right"] > 35 or side_sensors["right"] <= 0:
+                if self.debugging:
+                    print(f"Tunnel control deactivated - right wall at {side_sensors['right']}cm")
+                self.state = autoFSMState.DRIVE
+                self.laneFollowContrler.restartPid()
 
 
         ############################ Sending data ##############################
