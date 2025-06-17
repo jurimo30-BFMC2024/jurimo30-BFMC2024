@@ -8,17 +8,11 @@ class CollisionDetector:
         center_x = self.target_width / 2
         center_y = self.target_height/ 2
 
-        self.fixed_x_min = center_x - fixed_box_width 
-        self.fixed_y_min = center_y - fixed_box_height
-        self.fixed_x_max = center_x + fixed_box_width
-        self.fixed_y_max = center_y + fixed_box_height
+        self.draw_x1 = int(center_x - fixed_box_width)
+        self.draw_y1 = int(center_y - fixed_box_height)
+        self.draw_x2 = int(center_x + fixed_box_width)
+        self.draw_y2 = int(center_y + fixed_box_height)
         
-        # Calculate processing coordinates for drawing
-        target_coords = (int(self.fixed_x_min), int(self.fixed_y_min), 
-                        int(self.fixed_x_max), int(self.fixed_y_max))
-        
-        self.draw_x1, self.draw_y1, self.draw_x2, self.draw_y2 = target_coords
-
     def check_collision(self, object_bbox):
         x1, y1, x2, y2 = object_bbox
 
