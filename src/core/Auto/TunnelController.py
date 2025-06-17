@@ -10,7 +10,7 @@ class TunnelController:
         self.target_distance = target_distance  # Desired distance from right wall in cm
         
         # PID controller for maintaining wall distance
-        self.pid = PIDController(kp=0.4, ki=0.01, kd=0.05, kaw=3, output_limits=(-25, 25))
+        self.pid = PIDController(kp=3, ki=0.01, kd=0.1, kaw=3, output_limits=(-25, 25))
         
         # Restart mechanism
         self.restartNeeded = False
