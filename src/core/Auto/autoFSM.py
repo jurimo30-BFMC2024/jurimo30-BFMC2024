@@ -220,7 +220,8 @@ class autoFSM(ControlModeThread):
                     self.state = autoFSMState.OVERTAKE
             
             # Check for tunnel control activation (right wall detection)
-            elif side_sensors["right"] <= 35 and side_sensors["right"] > 0:
+            # Treba dodati uslov i za nalazenje u skupu nodova tunela
+            elif side_sensors["right"] <= 20 and side_sensors["right"] > 0:
                 if self.debugging:
                     print(f"Tunnel control activated - right wall at {side_sensors['right']}cm")
                 self.tunnelController.restartPid()
