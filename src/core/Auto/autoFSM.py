@@ -65,7 +65,7 @@ class autoFSM(ControlModeThread):
     def start(self):
         self.positionFinder = PositionFinder("Small_map_roundabout.graphml")
         self.laneFollowContrler = LaneFollowController(512, 270, self.logging, False)
-        self.collisionDetector = CollisionDetector(512, 270, fixed_box_width=100, fixed_box_height=100)
+        self.collisionDetector = CollisionDetector(512, 270, 100, 100, self.logging, self.debugging)
         self.speedControler = SpeedControl(self.logging, False)
         self.intersectionController = IntersectionControl(self.logging, self.debugging)
         self.parkingController = Parking(self.logging, self.debugging)
@@ -145,11 +145,10 @@ class autoFSM(ControlModeThread):
             is_in_central_zone = False
             if object_position and (object_name == "stefanija" or object_name == "car"):
                 is_in_central_zone = self.collisionDetector.check_collision(object_position)
-
+                print(f"Detekcija opasne zone: {is_in_central_zone}")
             if object_name == "stefanija":
                 self.stephanie_position = object_position
                 self.stefanija_in_danger_zone = is_in_central_zone # Ažuriranje flag-a
-
                 if self.debugging: print(f"Stephanie present: {self.stephanie_position}")
             elif object_name == "exit":
                 self.roundaboutExit_position = object_position
