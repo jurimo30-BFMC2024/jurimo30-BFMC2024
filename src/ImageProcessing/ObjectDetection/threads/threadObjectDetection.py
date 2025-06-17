@@ -58,7 +58,10 @@ class threadObjectDetection(ThreadWithStop):
         self.processing_height = 256
 
         self.lost_timeout = 0.6            # Timeout for lost objects
-   
+        
+        # Calculate and store fixed box coordinates (only once)
+        self.setup_fixed_box()
+        
         # Initialize relevant_objects structure
         self.relevant_objects = {
             "car": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False},
@@ -80,7 +83,32 @@ class threadObjectDetection(ThreadWithStop):
     def subscribe(self):
         """Subscribes to required messages."""
         self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
+    
+    def setup_fixed_box(self):
+        """Calculate fixed box coordinates once during initialization."""
+        # Calculate center and box coordinates in target space
+        center_x_target = self.target_width / 2
+        center_y_target = self.target_height / 2
+
+        # Store box coordinates in target space
+        self.fixed_x_min = center_x_target - 100
+        self.fixed_y_min = center_y_target - 100
+        self.fixed_x_max = center_x_target + 100
+        self.fixed_y_max = center_y_target + 100
         
+        # Calculate processing coordinates for drawing
+        target_coords = (int(self.fixed_x_min), int(self.fixed_y_min), 
+                        int(self.fixed_x_max), int(self.fixed_y_max))
+        
+        draw_cords = self.scale_coordinates(target_coords)
+        self.draw_x1, self.draw_y1, self.draw_x2, self.draw_y2 = draw_cords
+
+    def draw_fixed_box(self, frame):
+        """Draw the fixed box using pre-calculated coordinates."""
+        cv2.rectangle(frame, (self.draw_x1, self.draw_y1), 
+                    (self.draw_x2, self.draw_y2), (0, 255, 0), 2)
+        return frame
+    
     def scale_coordinates(self, coords):
         """Scale coordinates from processing frame to target frame size."""
         if coords is None:
@@ -100,54 +128,16 @@ class threadObjectDetection(ThreadWithStop):
         
         return (scaled_x1, scaled_y1, scaled_x2, scaled_y2)
 
-    def draw_fixed_box(self, frame):
-        # Calculate center and box coordinates in the "target" coordinate space
-        center_x_target = self.target_width / 2
-        center_y_target = self.target_height / 2
-
-        # These attributes store the box coordinates in the "target" space
-        self.fixed_x_min = center_x_target - 100   # Top-left x in target space
-        self.fixed_y_min = center_y_target - 100   # Top-left y in target space
-        self.fixed_x_max = center_x_target + 100   # Bottom-right x in target space
-        self.fixed_y_max = center_y_target + 100   # Bottom-right y in target space
-        
-        # Target coordinates
-        tx1 = int(self.fixed_x_min)
-        ty1 = int(self.fixed_y_min)
-        tx2 = int(self.fixed_x_max)
-        ty2 = int(self.fixed_y_max)
-        
-        # Scale factors to convert from target dimensions to processing dimensions
-        # (dimensions of frame_to_draw_on)
-        scale_x_target_to_processing = self.processing_width / self.target_width
-        scale_y_target_to_processing = self.processing_height / self.target_height
-        
-        # Scale the coordinates to the processing frame dimensions
-        draw_x1 = int(tx1 * scale_x_target_to_processing)
-        draw_y1 = int(ty1 * scale_y_target_to_processing)
-        draw_x2 = int(tx2 * scale_x_target_to_processing)
-        draw_y2 = int(ty2 * scale_y_target_to_processing)
-        
-        # Draw the rectangle on the (processing) frame
-        cv2.rectangle(frame, (draw_x1, draw_y1), (draw_x2, draw_y2), (0, 255, 0), 2)
-        
-        return frame
-    
     def run(self):
         while self._running:
             try:
                 videoData = self.videoSubscriber.receiveWithBlock()
                 frame = decode_frame(videoData)
                 frame_cropped = self.crop_frame(frame)
-                # frame_cropped is resized to processing_width x processing_height
                 frame_for_processing = cv2.resize(frame_cropped, (self.processing_width, self.processing_height), interpolation=cv2.INTER_AREA)
                 
-                # Process frame and get detections (draws detection boxes)
-                # processed_frame_detections will be processing_width x processing_height
                 processed_frame_detections, best_sign, detected_objects = self.process_frame(frame_for_processing)
                 
-                # Draw the fixed bounding box on the frame that already has detections
-                # This frame also has dimensions processing_width x processing_height
                 final_processed_frame = self.draw_fixed_box(processed_frame_detections)
                 
                 # Update state and send messages

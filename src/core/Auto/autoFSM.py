@@ -30,7 +30,7 @@ from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.core.Auto.pathPlanning.pathPlanning import PathPlanner
 from src.core.Auto.TrafficSignController import TrafficSignController
-from src.core.Auto.collision_detector import CollisionDetector # DODATO
+from core.Auto.CollisionDetector import CollisionDetector # DODATO
 
 import time
 from enum import Enum, auto
