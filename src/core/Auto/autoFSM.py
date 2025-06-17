@@ -86,14 +86,19 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
 
-        heading = self.headingSubscriber.receiveWithBlock()
-        location = self.locationSubscriber.receiveWithBlock()
+        best_node = 52  # Starting node, for testing purposes, remove later
 
-        # self.navigateCommand = ["Exit 2", "Right", "Exit 2", "Right", "Exit 1", "Straight", "Exit 4", "Left", "Exit 2"]
-        
-        # Initialize localization systems
-        best_node, best_node_offset = self.positionFinder.find_best_node(float(location['x']), float(location['y']), heading)
-        print(f'Current node: {best_node} with offset: {best_node_offset}cm ')
+        if best_node is None:
+            heading = self.headingSubscriber.receiveWithBlock()
+            location = self.locationSubscriber.receiveWithBlock()
+
+            # Initialize localization systems
+            best_node, best_node_offset = self.positionFinder.find_best_node(float(location['x']), float(location['y']), heading)
+            print(f'Current node: {best_node} with offset: {best_node_offset}cm ')
+        else:
+            print(f'Using predefined node: {best_node}')
+            print("Predefined node is used, this should be removed later!")
+            print("Make sure to set the best_node variable to None for automatic node detection!")
 
         self.planer = PathPlanner(start=best_node, goal=10, mode="pacman")
         self.navigateCommand, segments = self.planer.planPath()
