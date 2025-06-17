@@ -61,6 +61,29 @@ class autoFSM(ControlModeThread):
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
         self.vehicleToEverythingSender = messageHandlerSender(self.queuesList, VehicleToEverything)
 
+        # Define special node lists with descriptive names
+        self.tunnel_nodes = [
+            "7", "151", "152", "153", "154", "155", "156", "157", "158", "159", "160", "161", "162", "163", "164", "82",
+            "81", "165", "166", "167", "168", "169", "170", "171", "172", "173", "174", "175", "176", "177", "8"
+        ]
+
+        self.overtake_nodes = [
+            "55", "305", "306", "307", "308", "309", "318", "319", "320", "321",
+            "348", "349", "350", "351", "352", "385", "386", "387", "388", "389",
+            "444", "445", "446", "447", "448", "449", "450", "451", "452", "453", 
+            "454", "455", "456", "457", "458", "459", "460", "461", "462", "463", 
+            "464", "465", "466", "467", "468", "469", "470", "471", "472", "473", 
+            "474", "475", "476", "477", "478", "479", "480", "481", "482"
+        ]
+
+        self.special_intersection_nodes = [
+            "190", "191", "192"
+        ]
+
+        # Nodes where intersection and crosswalk appear together
+        self.intersection_crosswalk_nodes = ["149", "2", "219", "4", "301", "6", "443", "34", "180", "80"]  # Example nodes, adjust based on your map
+        self.crosswalk_intersection_nodes = ["175", "176", "177", "8", "162", "163", "164", "82"]  # Example nodes, adjust based on your map
+
         self.subscribe()
         super().__init__()
 
@@ -192,10 +215,6 @@ class autoFSM(ControlModeThread):
 
         # Get current node for special cases
         current_node = self.localization.get_current_node()
-        
-        # Nodes where intersection and crosswalk appear together
-        intersection_crosswalk_nodes = [4, 12, 23]  # Example nodes, adjust based on your map
-        crosswalk_intersection_nodes = [7, 15, 28]  # Example nodes, adjust based on your map
 
         if self.state == autoFSMState.HIGHWAY:
             if self.traffic_signs.get_active() == "highway_exit" or stop_line_present:
@@ -212,7 +231,7 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.PARKING
             
             elif stop_line_present_close and (self.traffic_signs.get_active() in ["stop", "priority"] or traffic_light_present):
-                if current_node in intersection_crosswalk_nodes:
+                if current_node in self.intersection_crosswalk_nodes:
                     if self.debugging:
                         print("Intersection and crosswalk detected together")
 
@@ -243,7 +262,7 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.ROUNDABOUT
 
             elif stop_line_present and self.traffic_signs.get_active() == "crosswalk":
-                if current_node in crosswalk_intersection_nodes:
+                if current_node in self.crosswalk_intersection_nodes:
                     if self.debugging:
                         print("Detected intersection after crosswalk")
                     
