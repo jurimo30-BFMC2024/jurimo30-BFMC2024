@@ -30,6 +30,8 @@ from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.core.Auto.pathPlanning.pathPlanning import PathPlanner
 from src.core.Auto.TrafficSignController import TrafficSignController
+from src.core.Auto.collision_detector import CollisionDetector # DODATO
+
 import time
 from enum import Enum, auto
 from src.data.TrafficCommunication.useful.Obstacles import Obstacles
@@ -63,6 +65,7 @@ class autoFSM(ControlModeThread):
     def start(self):
         self.positionFinder = PositionFinder("Small_map_roundabout.graphml")
         self.laneFollowContrler = LaneFollowController(512, 270, self.logging, False)
+        self.collisionDetector = CollisionDetector(512, 270, fixed_box_width=100, fixed_box_height=100)
         self.speedControler = SpeedControl(self.logging, False)
         self.intersectionController = IntersectionControl(self.logging, self.debugging)
         self.parkingController = Parking(self.logging, self.debugging)
@@ -116,6 +119,10 @@ class autoFSM(ControlModeThread):
         self.roundaboutExit_position = None
         self.intersectionSign = "None"
 
+        # DODATO: Nove promenljive za praćenje kolizije u centralnoj zoni
+        self.stefanija_in_danger_zone = False
+        self.car_in_danger_zone = False
+
         self.state = autoFSMState.DRIVE
         self.localization.start_new_segment()
 
@@ -134,15 +141,23 @@ class autoFSM(ControlModeThread):
             object_name = detected_objects_dict.get("name")
             object_position = detected_objects_dict.get("position")
 
+            # DODATO: Logika za proveru kolizije za 'stefanija' i 'car'
+            is_in_central_zone = False
+            if object_position and (object_name == "stefanija" or object_name == "car"):
+                is_in_central_zone = self.collisionDetector.check_collision(object_position)
+
             if object_name == "stefanija":
                 self.stephanie_position = object_position
+                self.stefanija_in_danger_zone = is_in_central_zone # Ažuriranje flag-a
+
                 if self.debugging: print(f"Stephanie present: {self.stephanie_position}")
             elif object_name == "exit":
                 self.roundaboutExit_position = object_position
                 if self.debugging: print(f"Roundabout Exit present: {self.roundaboutExit_position}")
             elif object_name == "car":
                 self.sign_car_position = object_position
-                if self.debugging: print(f"Car present: {self.sign_car_position}")
+                self.car_in_danger_zone = is_in_central_zone # Ažuriranje flag-a
+                if self.debugging: print(f"Car present: {self.sign_car_position}, In danger zone: {self.car_in_danger_zone}")
             else:
                 raise ValueError(f'Unknown object detected: {detected_objects_dict}')
             
