@@ -109,50 +109,65 @@ class PathPlanner:
 
     def find_greedy_path(self, graph, start, goal):
         collectibles = {n for n in graph.nodes if graph.nodes[n].get('collectible', False)}
-        visited_collectibles = set()
+        visited = set()
         path = [start]
-        current_node = start
+        current = start
 
-        if graph.nodes[goal]['intersection']:
-            print("W: Your final point is inside an intersection (reconsider)")
-        
-        if self.mode == "pacman" and graph.nodes[start]['start_area']:
-            # find nearest collectible outside of start area nodes and go to it, then collect
-            # all other collectibles normally
-
-            # take away every possible random start node from collectibles list
+        # exit start area first if needed
+        if self.mode == "pacman" and graph.nodes[start].get('start_area', False):
             valid_collectibles = collectibles - self.random_start_nodes
-            nearest = min(
-                valid_collectibles,
-                key=lambda n: nx.shortest_path_length(graph, source=current_node, target=n, method='dijkstra')
-            )
-            segment = nx.shortest_path(graph, source=current_node, target=nearest, method='dijkstra')
-            
-            path.extend(segment[1:])
-            
-            visited_collectibles.add(nearest)
-            current_node = nearest
-            # add path to nearest collectible
+            nearest = min(valid_collectibles,
+                        key=lambda n: nx.shortest_path_length(graph, source=current, target=n))
+            path.extend(nx.shortest_path(graph, source=current, target=nearest)[1:])
+            current = nearest
 
-        # this part is skipped if p2p
-        while visited_collectibles != collectibles:
-            nearest = min(
-                collectibles - visited_collectibles,
-                key=lambda n: nx.shortest_path_length(graph, source=current_node, target=n, method='dijkstra')
-            )
-            segment = nx.shortest_path(graph, source=current_node, target=nearest, method='dijkstra')
+        # lookahead collection
+        while len(visited) < len(collectibles):
+            unvisited = collectibles - visited
             
+            if len(unvisited) <= 3:  # Last few nodes - simple greedy
+                nearest = min(unvisited, 
+                            key=lambda n: nx.shortest_path_length(graph, source=current, target=n))
+            else:
+                # get top 3 closest candidates
+                candidates = sorted(unvisited,
+                                key=lambda n: nx.shortest_path_length(graph, source=current, target=n))[:3]
+                
+                # precompute paths to candidates
+                candidate_paths = {
+                    n: nx.shortest_path_length(graph, source=current, target=n)
+                    for n in candidates
+                }
+                
+                # evaluate which candidate leads to best two-step cost
+                nearest = None
+                min_total_cost = float('inf')
+                
+                for candidate in candidates:
+                    # cost to reach this candidate
+                    cost = candidate_paths[candidate]
+                    
+                    # cost from candidate to nearest remaining node
+                    remaining = [n for n in unvisited if n != candidate]
+                    if remaining:
+                        next_cost = min(
+                            nx.shortest_path_length(graph, source=candidate, target=m)
+                            for m in remaining
+                        )
+                        total_cost = cost + next_cost
+                        
+                        if total_cost < min_total_cost:
+                            min_total_cost = total_cost
+                            nearest = candidate
+                
+            # add the best segment to path
+            segment = nx.shortest_path(graph, source=current, target=nearest)
             path.extend(segment[1:])
-            
-            visited_collectibles.add(nearest)
-            current_node = nearest
-        
-        # finally, go to the goal (this part is skipped if pacman)
-        # -- VAZNO -- MOZDA OVO TREBA DA SE STAVI ZA OBA REZIMA
-        if self.mode == "p2p":
-            final_segment = nx.shortest_path(graph, source=current_node, target=goal, method='dijkstra')
-            path.extend(final_segment[1:])
-        
+            visited.add(nearest)
+            current = nearest
+
+        # final path to goal
+        path.extend(nx.shortest_path(graph, source=current, target=goal)[1:])
         return path
 
     def determine_turns(self, graph, path):
