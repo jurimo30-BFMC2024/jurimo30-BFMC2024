@@ -219,6 +219,7 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.PARKING
             elif parking_sign_detected and recently_exited_parking:
                 # Ignore this parking sign
+                print("Parking sign detected but recently exited parking, ignoring sign")
                 self.traffic_signs.clear()
             
             elif stop_line_present_close and (self.traffic_signs.get_active() in ["stop", "priority"]):
@@ -261,6 +262,8 @@ class autoFSM(ControlModeThread):
                     direction=self.navigateCommand.pop(0),
                     traffic_light_present=False
                 )
+
+                self.state = autoFSMState.INTERSECTION
                         
             elif self.traffic_signs.get_active() == "highway_entrance":
                 print("Ulazak na autoput")
