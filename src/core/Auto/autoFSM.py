@@ -89,8 +89,11 @@ class autoFSM(ControlModeThread):
         best_node = 52  # Starting node, for testing purposes, remove later
 
         if best_node is None:
+            print("No predefined node, using localization system to find best node")
             heading = self.headingSubscriber.receiveWithBlock()
+            print(f'Current heading: {heading}')
             location = self.locationSubscriber.receiveWithBlock()
+            print(f'Current location: {location}')
 
             # Initialize localization systems
             best_node, best_node_offset = self.positionFinder.find_best_node(float(location['x']), float(location['y']), heading)
