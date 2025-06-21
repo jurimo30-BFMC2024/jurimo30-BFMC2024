@@ -136,6 +136,7 @@ class autoFSM(ControlModeThread):
         self.leftX, self.rightX, self.leftVisible, self.rightVisible = self.laneDetectSubscriber.receiveWithBlock()
         stop_line_present, stop_line_distance, stop_line_angle = self.stopLineDetectionSubscriber.receiveWithBlock() # stopLine je sad tuple (intersection(bool), slope_degrees (float))
         stop_line_present_close = stop_line_present and stop_line_distance < 130
+        stop_line_present_semaphore = stop_line_present and stop_line_distance < 110
 
         while self.objectDetectionSubscriber.isDataInPipe():
             detected_objects_dict = self.objectDetectionSubscriber.receive() # This is now a dict
@@ -207,16 +208,27 @@ class autoFSM(ControlModeThread):
                 self.traffic_signs.clear()
                 self.state = autoFSMState.PARKING
             
-            elif stop_line_present_close and (self.traffic_signs.get_active() in ["stop", "priority"] or traffic_light_present):
+            elif stop_line_present_close and (self.traffic_signs.get_active() in ["stop", "priority"]):
                 if self.debugging:
-                    print("Krecemo sa raskrsnicom")
+                    print(f"Intersection detected, sign: {self.traffic_signs.get_active()}")
                 
                 self.intersectionController.setCourse(
                     sign=self.traffic_signs.get_active(), 
                     direction=self.navigateCommand.pop(0),
-                    traffic_light_present=traffic_light_present
+                    traffic_light_present=False
                 )
                 self.traffic_signs.clear()
+                self.state = autoFSMState.INTERSECTION
+
+            elif stop_line_present_semaphore and traffic_light_present:
+                if self.debugging:
+                    print("Intersection with traffic light detected")
+
+                self.intersectionController.setCourse(
+                    sign=self.traffic_light_states.get_active(), 
+                    direction=self.navigateCommand.pop(0),
+                    traffic_light_present=True
+                )
                 self.state = autoFSMState.INTERSECTION
 
             elif stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
@@ -230,6 +242,16 @@ class autoFSM(ControlModeThread):
             elif stop_line_present and self.traffic_signs.get_active() == "crosswalk":
                 self.crosswalkStart = time.time()
                 self.state = autoFSMState.CROSSWALK
+
+            elif stop_line_present_close:
+                if self.debugging:
+                    print("Stop line detected, no sign, entering intersection")
+
+                self.intersectionController.setCourse(
+                    sign="stop", 
+                    direction=self.navigateCommand.pop(0),
+                    traffic_light_present=False
+                )
                         
             elif self.traffic_signs.get_active() == "highway_entrance":
                 if self.debugging:

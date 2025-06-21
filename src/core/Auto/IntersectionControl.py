@@ -32,6 +32,7 @@ class IntersectionControl():
         }
 
         self.motionScheduler = MotionScheduler()
+        self.approach_counter = 0
     
     def calculate_distance_to_straighten(self, alpha_deg, wheelbase=26, max_steering_angle=25):
         """
@@ -46,7 +47,7 @@ class IntersectionControl():
         Returns:
         float: Dužina puta u cm koja je potrebna da se auto ispravi.
         """
-        # Konvertujemo uglove u radijane
+        # Konvertujemo uglole u radijane
         alpha_rad = math.radians(alpha_deg)
         steering_angle_rad = math.radians(max_steering_angle)
     
@@ -128,8 +129,16 @@ class IntersectionControl():
         elif self.state == "traffic_light":
             angle, speed = 0, 0
             if trafficLights.get_active() == "green":
-                self.motionScheduler.set_schedule(self.createCorrectedMotion())
-                self.state = "maneuver"
+                self.state = "approach_stop_line"
+                self.approach_counter = 0
+
+        elif self.state == "approach_stop_line":
+            angle, speed = 0, 200  # go forward until stop line is detected
+            if stop_line_present:
+                self.approach_counter += 1
+                if self.approach_counter >= 5:
+                    self.motionScheduler.set_schedule(self.createCorrectedMotion())
+                    self.state = "maneuver"
 
         elif self.state == "maneuver":
             angle, speed, finished = self.motionScheduler.run()
