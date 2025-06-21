@@ -127,6 +127,8 @@ class autoFSM(ControlModeThread):
         self.state = autoFSMState.DRIVE
         self.localization.start_new_segment()
 
+        self.last_parking_exit_time = 0  # Track last time parking state was exited
+
         super().start()
     
     def stop(self):
@@ -204,9 +206,15 @@ class autoFSM(ControlModeThread):
 
         
         if self.state == autoFSMState.DRIVE:
-            if self.traffic_signs.get_active() == "parking":
+            # Ignore parking sign if detected within 30 seconds after exiting parking
+            parking_sign_detected = self.traffic_signs.get_active() == "parking"
+            recently_exited_parking = (time.time() - self.last_parking_exit_time) < 30
+            if parking_sign_detected and not recently_exited_parking:
                 self.traffic_signs.clear()
                 self.state = autoFSMState.PARKING
+            elif parking_sign_detected and recently_exited_parking:
+                # Ignore this parking sign
+                self.traffic_signs.clear()
             
             elif stop_line_present_close and (self.traffic_signs.get_active() in ["stop", "priority"]):
                 if self.debugging:
@@ -281,7 +289,8 @@ class autoFSM(ControlModeThread):
             if not module_running:
                 self.localization.clamp_location_to_graph()
                 self.state = autoFSMState.DRIVE
-            
+                self.last_parking_exit_time = time.time()  # Update parking exit time
+        
         elif self.state == autoFSMState.INTERSECTION:
             angle, speed, module_running = self.intersectionController.getControlData(
                 stop_line_present=stop_line_present_close,
