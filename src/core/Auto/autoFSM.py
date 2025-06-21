@@ -30,9 +30,13 @@ from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.core.Auto.pathPlanning.pathPlanning import PathPlanner
 from src.core.Auto.TrafficSignController import TrafficSignController
+from src.core.Auto.CollisionDetector import CollisionDetector # DODATO
+
 import time
 from enum import Enum, auto
 from src.data.TrafficCommunication.useful.Obstacles import Obstacles
+from src.core.Auto.SpecialReactions.IntersectionCrosswalk import IntersectionCrosswalkController
+from src.core.Auto.SpecialReactions.CrosswalkIntersection import CrosswalkIntersectionController
 
 """
     - stopline staviti u jedan stopline subscriber
@@ -40,12 +44,14 @@ from src.data.TrafficCommunication.useful.Obstacles import Obstacles
 
 class autoFSMState(Enum):
     DRIVE = auto()
-    OVERTAKE = auto()
+    DRIVE_OVERTAKE = auto()
     PARKING = auto()
     INTERSECTION = auto()
     ROUNDABOUT = auto()
     CROSSWALK = auto()
     HIGHWAY = auto()
+    INTERSECTION_CROSSWALK = auto()
+    CROSSWALK_INTERSECTION = auto()
 
 class autoFSM(ControlModeThread):
     def __init__(self, queueList, logging, debugging=False):
@@ -57,18 +63,47 @@ class autoFSM(ControlModeThread):
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
         self.vehicleToEverythingSender = messageHandlerSender(self.queuesList, VehicleToEverything)
 
+        # Define special node lists with descriptive names
+        self.tunnel_nodes = [
+            "7", "151", "152", "153", "154", "155", "156", "157", "158", "159", "160", "161", "162", "163", "164", "82",
+            "81", "165", "166", "167", "168", "169", "170", "171", "172", "173", "174", "175", "176", "177", "8"
+        ]
+
+        self.overtake_nodes = [
+            "55", "305", "306", "307", "308", "309", "318", "319", "320", "321",
+            "348", "349", "350", "351", "352", "385", "386", "387", "388", "389",
+            "444", "445", "446", "447", "448", "449", "450", "451", "452", "453", 
+            "454", "455", "456", "457", "458", "459", "460", "461", "462", "463", 
+            "464", "465", "466", "467", "468", "469", "470", "471", "472", "473", 
+            "474", "475", "476", "477", "478", "479", "480", "481", "482"
+        ]
+
+        self.special_intersection_nodes = [
+            "190", "191", "192"
+        ]
+
+        # Nodes where intersection and crosswalk appear together
+        self.intersection_crosswalk_nodes = ["149", "2", "219", "4", "301", "6", "443", "34", "180", "80"]  # Example nodes, adjust based on your map
+        self.crosswalk_intersection_nodes = ["175", "176", "177", "8", "162", "163", "164", "82"]  # Example nodes, adjust based on your map
+
         self.subscribe()
         super().__init__()
 
     def start(self):
         self.positionFinder = PositionFinder("Small_map_roundabout.graphml")
         self.laneFollowContrler = LaneFollowController(512, 270, self.logging, False)
+        self.collisionDetector = CollisionDetector(512, 270, 50, 50, self.logging, True)
         self.speedControler = SpeedControl(self.logging, False)
         self.intersectionController = IntersectionControl(self.logging, self.debugging)
         self.parkingController = Parking(self.logging, self.debugging)
         self.overtakeController = Overtake(self.logging, self.debugging)
         self.roundaboutController = RoundaboutController(512, 270, self.logging, True)
+        
+        # Maximum wheel angle for allowing overtaking (in degrees)
+        self.max_wheel_angle_for_overtake = 7
         self.crosswalkController = CrosswalkController()
+        self.intersectionCrosswalkController = IntersectionCrosswalkController(self.intersectionController, self.crosswalkController)
+        self.crosswalkIntersectionController = CrosswalkIntersectionController(self.intersectionController, self.crosswalkController)
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -130,6 +165,10 @@ class autoFSM(ControlModeThread):
         self.roundaboutExit_position = None
         self.intersectionSign = "None"
 
+        # DODATO: Nove promenljive za praćenje kolizije u centralnoj zoni
+        self.stefanija_in_danger_zone = False
+        self.car_in_danger_zone = False
+
         self.state = autoFSMState.DRIVE
         # self.localization.start_new_segment()
 
@@ -151,15 +190,22 @@ class autoFSM(ControlModeThread):
             object_name = detected_objects_dict.get("name")
             object_position = detected_objects_dict.get("position")
 
+            # DODATO: Logika za proveru kolizije za 'stefanija' i 'car'
+            is_in_central_zone = False
+            if object_position and (object_name == "stefanija" or object_name == "car"):
+                is_in_central_zone = self.collisionDetector.check_collision(object_position, object_name)
+                print(f"Detekcija opasne zone: {is_in_central_zone}")
             if object_name == "stefanija":
                 self.stephanie_position = object_position
-                if self.debugging: print(f"Stephanie present: {self.stephanie_position}")
+                self.stefanija_in_danger_zone = is_in_central_zone # Ažuriranje flag-a
+                #print(f"Stephanie present: {self.stephanie_position}")
             elif object_name == "exit":
                 self.roundaboutExit_position = object_position
-                if self.debugging: print(f"Roundabout Exit present: {self.roundaboutExit_position}")
+                print(f"Roundabout Exit present: {self.roundaboutExit_position}")
             elif object_name == "car":
                 self.sign_car_position = object_position
-                if self.debugging: print(f"Car present: {self.sign_car_position}")
+                self.car_in_danger_zone = is_in_central_zone # Ažuriranje flag-a
+                print(f"In danger zone: {self.car_in_danger_zone}")
             else:
                 raise ValueError(f'Unknown object detected: {detected_objects_dict}')
             
@@ -201,7 +247,9 @@ class autoFSM(ControlModeThread):
         
         ##############################         SET STATES            #############################
 
-        
+        # Get current node for special cases
+        current_node = self.localization.get_current_node()
+
         if self.state == autoFSMState.HIGHWAY:
             if self.traffic_signs.get_active() == "highway_exit" or stop_line_present:
                 print("Izlazak sa auto puta")
@@ -222,16 +270,31 @@ class autoFSM(ControlModeThread):
                 print("Parking sign detected but recently exited parking, ignoring sign")
                 self.traffic_signs.clear()
             
-            elif stop_line_present_close and (self.traffic_signs.get_active() in ["stop", "priority"]):
-                print(f"Intersection detected, sign: {self.traffic_signs.get_active()}")
-                
-                self.intersectionController.setCourse(
-                    sign=self.traffic_signs.get_active(), 
-                    direction=self.navigateCommand.pop(0),
-                    traffic_light_present=False
-                )
-                self.traffic_signs.clear()
-                self.state = autoFSMState.INTERSECTION
+
+            elif stop_line_present_close and (self.traffic_signs.get_active() in ["stop", "priority"] or traffic_light_present):
+                if current_node in self.intersection_crosswalk_nodes:
+                    if self.debugging:
+                        print("Intersection and crosswalk detected together")
+
+                    self.intersectionCrosswalkController.setCourse(
+                        sign=self.traffic_signs.get_active(), 
+                        direction=self.navigateCommand.pop(0),
+                        traffic_light_present=traffic_light_present
+                    )
+                    self.traffic_signs.clear()
+                    self.state = autoFSMState.INTERSECTION_CROSSWALK
+                else: 
+                    if self.debugging:
+                        print("Krecemo sa raskrsnicom")
+                    
+                    self.intersectionController.setCourse(
+                        sign=self.traffic_signs.get_active(), 
+                        direction=self.navigateCommand.pop(0),
+                        traffic_light_present=traffic_light_present
+                    )
+                    self.traffic_signs.clear()
+                    self.state = autoFSMState.INTERSECTION
+
 
             elif stop_line_present_semaphore and traffic_light_present:
                 print("Intersection with traffic light detected")
@@ -251,8 +314,21 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.ROUNDABOUT
 
             elif stop_line_present and self.traffic_signs.get_active() == "crosswalk":
-                self.crosswalkStart = time.time()
-                self.state = autoFSMState.CROSSWALK
+                if current_node in self.crosswalk_intersection_nodes:
+                    if self.debugging:
+                        print("Detected intersection after crosswalk")
+                    
+                    self.intersectionController.setCourse(
+                        sign="priority", 
+                        direction=self.navigateCommand.pop(0),
+                        traffic_light_present=False
+                    )
+                    self.traffic_signs.clear()
+                    self.state = autoFSMState.CROSSWALK_INTERSECTION
+                else:
+                    if self.debugging:
+                        print("Krecemo sa pesackim prelazom")
+                    self.state = autoFSMState.CROSSWALK
 
             elif stop_line_present_close:
                 print("Stop line detected, no sign, entering intersection")
@@ -272,13 +348,23 @@ class autoFSM(ControlModeThread):
                 self.laneFollowContrler.set_pid_highway(True)
             
             elif obstacle and self.oldSpeed == 0:
-                if self.obstacle_start_time is None:
-                    self.obstacle_start_time = time.time()
-                
-                if time.time() - self.obstacle_start_time >= 1:
-                    print("Pass static obstacle start")
-                    self.sign_car_position = None
-                    self.state = autoFSMState.OVERTAKE
+                # Check if vehicle is in overtake nodes and wheel angle is acceptable
+                current_node = self.localization.get_current_node()
+                if (current_node in self.overtake_nodes and 
+                    abs(angle) <= self.max_wheel_angle_for_overtake * 10):  # angle is in tenths of degrees
+                    if self.obstacle_start_time is None:
+                        self.obstacle_start_time = time.time()
+                    
+                    if time.time() - self.obstacle_start_time >= 1:
+                        print("Pass static obstacle start")
+                        self.sign_car_position = None
+                        self.state = autoFSMState.DRIVE_OVERTAKE
+                elif current_node not in self.overtake_nodes:
+                    if self.debugging:
+                        print(f"Overtaking not allowed at node {current_node} - not in overtake zone")
+                elif abs(angle) > self.max_wheel_angle_for_overtake * 10:
+                    if self.debugging:
+                        print(f"Overtaking not allowed - wheel angle too high: {abs(angle)/10}°")
 
         ##############################         FSM            #############################
 
@@ -309,8 +395,8 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
 
-        elif self.state == autoFSMState.OVERTAKE:
-            overtake_angle, speed, module_running = self.overtakeController.run(False, front_sensors, side_sensors)
+        elif self.state == autoFSMState.DRIVE_OVERTAKE:
+            overtake_angle, speed, module_running = self.overtakeController.run(False, front_sensors, side_sensors, angle)
             if overtake_angle is not None:
                 angle = overtake_angle
 
@@ -326,7 +412,6 @@ class autoFSM(ControlModeThread):
             if module_stoping:
                 self.state = autoFSMState.DRIVE
                 self.stephanie_position = None
-                self.crosswalkStart = None
                 self.laneFollowContrler.restartPid()
 
         elif self.state == autoFSMState.ROUNDABOUT:
@@ -340,9 +425,44 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
 
+        elif self.state == autoFSMState.INTERSECTION_CROSSWALK:
+            angle, speed, module_running = self.intersectionCrosswalkController.getControlData(
+                stop_line_present=stop_line_present_close,
+                stop_line_slope=stop_line_angle,
+                trafficLights=self.traffic_light_states,
+                stephanie_position=self.stephanie_position,
+                crosswalk_sign_present=self.traffic_signs.get_active() == "crosswalk"
+            )
+
+            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            
+            if not module_running:
+                self.traffic_light_states.clear()
+                self.stephanie_position = None
+                self.localization.start_new_segment()
+                self.state = autoFSMState.DRIVE
+                self.laneFollowContrler.restartPid()
+
+        elif self.state == autoFSMState.CROSSWALK_INTERSECTION:
+            angle, speed, module_running = self.crosswalkIntersectionController.getControlData(
+                stop_line_present=stop_line_present_close,
+                stop_line_slope=stop_line_angle,
+                trafficLights=self.traffic_light_states,
+                stephanie_position=self.stephanie_position
+            )
+
+            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            
+            if not module_running:
+                self.traffic_light_states.clear()
+                self.stephanie_position = None
+                self.localization.start_new_segment()
+                self.state = autoFSMState.DRIVE
+                self.laneFollowContrler.restartPid()
+
         elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
             no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
-            stephanie_crossing = self.stephanie_position and self.traffic_signs.get_active() != "crosswalk"
+            stephanie_crossing = self.stefanija_in_danger_zone and self.traffic_signs.get_active() != "crosswalk"
 
             speed = self.speedControler.getControlData(
                 angle=angle,
@@ -351,7 +471,7 @@ class autoFSM(ControlModeThread):
                 highway=self.state == autoFSMState.HIGHWAY,
                 frontDistance=front_sensors["distance"],
                 enable_emergency_stop=no_active_sign,
-                car_in_front=self.sign_car_position,
+                car_in_front=self.car_in_danger_zone,
                 stephanie_in_front=stephanie_crossing
             )
 
