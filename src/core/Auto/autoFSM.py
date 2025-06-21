@@ -103,9 +103,15 @@ class autoFSM(ControlModeThread):
             print("Predefined node is used, this should be removed later!")
             print("Make sure to set the best_node variable to None for automatic node detection!")
 
-        self.planer = PathPlanner(start=best_node, goal=10, mode="pacman")
+        # od start pointa do kruznog
+        self.planer = PathPlanner(start=192, goal=317, mode="pacman")
+        # kroz maglu
+        # self.planer = PathPlanner(start=97, goal=186, mode="pacman")
         self.navigateCommand, segments = self.planer.planPath()
-        self.localization = Localization(segments)
+        #self.navigateCommand.append("Left")
+        #self.navigateCommand.append("Left")
+        #self.navigateCommand.append("Straight")
+        # self.localization = Localization(segments)
 
         print(f'Navigation commands {self.navigateCommand}')
         self.traffic_signs = TrafficSignController([
@@ -125,7 +131,7 @@ class autoFSM(ControlModeThread):
         self.intersectionSign = "None"
 
         self.state = autoFSMState.DRIVE
-        self.localization.start_new_segment()
+        # self.localization.start_new_segment()
 
         self.last_parking_exit_time = 0  # Track last time parking state was exited
 
@@ -284,10 +290,10 @@ class autoFSM(ControlModeThread):
             if park_angle is not None:
                 angle = park_angle
 
-            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            # self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
 
             if not module_running:
-                self.localization.clamp_location_to_graph()
+                # self.localization.clamp_location_to_graph()
                 self.state = autoFSMState.DRIVE
                 self.last_parking_exit_time = time.time()  # Update parking exit time
         
@@ -298,11 +304,11 @@ class autoFSM(ControlModeThread):
                 trafficLights=self.traffic_light_states
             )
 
-            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            # self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
             
             if not module_running:
                 self.traffic_light_states.clear()
-                self.localization.start_new_segment()
+                # self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
 
@@ -311,15 +317,15 @@ class autoFSM(ControlModeThread):
             if overtake_angle is not None:
                 angle = overtake_angle
 
-            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            # self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
 
             if not module_running:
-                self.localization.clamp_location_to_graph()
+                # self.localization.clamp_location_to_graph()
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.CROSSWALK:
             angle, speed, module_stoping = self.crosswalkController.control(self.stephanie_position)
-            self.localization.update_position(speed / 10)
+            # self.localization.update_position(speed / 10)
             if module_stoping:
                 self.state = autoFSMState.DRIVE
                 self.stephanie_position = None
@@ -330,10 +336,10 @@ class autoFSM(ControlModeThread):
             angle, module_stoping = self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position, self.leftVisible, self.rightVisible)
             speed = 150
 
-            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            # self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
 
             if module_stoping:
-                self.localization.start_new_segment()
+                # self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
 
@@ -352,8 +358,8 @@ class autoFSM(ControlModeThread):
                 stephanie_in_front=stephanie_crossing
             )
 
-            self.localization.update_position(speed / 10)
-            self.localization.calibrate_heading(heading)
+            # self.localization.update_position(speed / 10)
+            # self.localization.calibrate_heading(heading)
 
         ############################ Sending data ##############################
 
@@ -374,23 +380,23 @@ class autoFSM(ControlModeThread):
         # Use TrafficSign enum from obstacles.py for identifying obstacle types
         # Send when traffic signs, pedestrians, or other obstacles are detected
 
-        # Send vehicle position and heading to VehicleToEverything
-        current_time = time.time()
-        if current_time - self.last_sent_time_v2x >= 1.0:  # Check if 1 second has passed
-            vehicle_position = self.localization.get_location()
-            self.vehicleToEverythingSender.send({
-                "type": "devicePos",
-                "values": [vehicle_position[0], vehicle_position[1]]
-            })
-            self.vehicleToEverythingSender.send({
-                "type": "deviceRot",
-                "values": [heading - self.localization.heading_error]
-            })
-            self.vehicleToEverythingSender.send({
-                "type": "deviceSpeed",
-                "values": [speed / 10]
-            })
-            self.last_sent_time_v2x = current_time
+        # # Send vehicle position and heading to VehicleToEverything
+        # current_time = time.time()
+        # if current_time - self.last_sent_time_v2x >= 1.0:  # Check if 1 second has passed
+        #     vehicle_position = self.localization.get_location()
+        #     self.vehicleToEverythingSender.send({
+        #         "type": "devicePos",
+        #         "values": [vehicle_position[0], vehicle_position[1]]
+        #     })
+        #     self.vehicleToEverythingSender.send({
+        #         "type": "deviceRot",
+        #         "values": [heading - self.localization.heading_error]
+        #     })
+        #     self.vehicleToEverythingSender.send({
+        #         "type": "deviceSpeed",
+        #         "values": [speed / 10]
+        #     })
+        #     self.last_sent_time_v2x = current_time
         
         # time.sleep(0.05)
 
