@@ -224,6 +224,7 @@ class autoFSM(ControlModeThread):
                     print("Entering roundabout")
                 isStarted = self.roundaboutController.start(self.navigateCommand.pop(0))
                 self.traffic_signs.clear()
+                self.roundaboutExit_position = None
                 self.state = autoFSMState.ROUNDABOUT
 
             elif stop_line_present and self.traffic_signs.get_active() == "crosswalk":
