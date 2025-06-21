@@ -12,6 +12,7 @@ from src.core.Auto.SpeedControl import SpeedControl
 from src.core.Auto.IntersectionControl import IntersectionControl
 from src.core.Auto.RoundaboutControl import RoundaboutController 
 from src.core.Auto.Crosswalk import CrosswalkController
+from src.core.Auto.MotionScheduler import MotionScheduler
 from src.utils.messages.allMessages import (
     LaneDetect,
     CoreSteerMotor,
@@ -46,6 +47,7 @@ class autoFSMState(Enum):
     ROUNDABOUT = auto()
     CROSSWALK = auto()
     HIGHWAY = auto()
+    HIGHWAY_LANE_CHANGE = auto()
 
 class autoFSM(ControlModeThread):
     def __init__(self, queueList, logging, debugging=False):
@@ -69,6 +71,14 @@ class autoFSM(ControlModeThread):
         self.overtakeController = Overtake(self.logging, self.debugging)
         self.roundaboutController = RoundaboutController(512, 270, self.logging, True)
         self.crosswalkController = CrosswalkController()
+
+        # Motion scheduler for highway lane changes
+        self.motionScheduler = MotionScheduler()
+        self.highway_lane_change_motions = {
+            "move_right": [
+                (230, 500, 0.3),  # Using highway speed parameters from Overtake
+            ]
+        }
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -231,7 +241,8 @@ class autoFSM(ControlModeThread):
                 if self.debugging:
                     print("Ulazak na autoput")
                 self.traffic_signs.clear()
-                self.state = autoFSMState.HIGHWAY
+                self.state = autoFSMState.HIGHWAY_LANE_CHANGE
+                self.motionScheduler.set_schedule(self.highway_lane_change_motions["move_right"])
                 self.laneFollowContrler.set_pid_highway(True)
             
             elif obstacle and self.oldSpeed == 0:
@@ -301,6 +312,18 @@ class autoFSM(ControlModeThread):
                 self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
+
+        elif self.state == autoFSMState.HIGHWAY_LANE_CHANGE:
+            lane_change_angle, speed, module_running = self.motionScheduler.run()
+            if lane_change_angle is not None:
+                angle = lane_change_angle
+
+            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+
+            if not module_running:
+                self.state = autoFSMState.HIGHWAY
+                if self.debugging:
+                    print("Prebačeno u desnu traku, prelazak na autoput vožnju")
 
         elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
             no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
