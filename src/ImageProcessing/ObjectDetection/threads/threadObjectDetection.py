@@ -58,7 +58,7 @@ class threadObjectDetection(ThreadWithStop):
         self.processing_height = 256
 
         self.lost_timeout = 0.6            # Timeout for lost objects
-   
+        
         # Initialize relevant_objects structure
         self.relevant_objects = {
             "car": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False},
@@ -80,7 +80,52 @@ class threadObjectDetection(ThreadWithStop):
     def subscribe(self):
         """Subscribes to required messages."""
         self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
+
+    def draw_fixed_box(self, frame):
+        # Calculate center and box coordinates in the "target" coordinate space
+        center_x_target = self.target_width / 2
+        center_y_target = self.target_height / 2
+
+        # These attributes store the box coordinates in the "target" space
+        self.fixed_x_min = center_x_target - 50   # Top-left x in target space
+        self.fixed_y_min = center_y_target - 50   # Top-left y in target space
+        self.fixed_x_max = center_x_target + 50   # Bottom-right x in target space
+        self.fixed_y_max = center_y_target + 50   # Bottom-right y in target space
         
+        # Target coordinates
+        tx1 = int(self.fixed_x_min)
+        ty1 = int(self.fixed_y_min)
+        tx2 = int(self.fixed_x_max)
+        ty2 = int(self.fixed_y_max)
+        
+        # Scale factors to convert from target dimensions to processing dimensions
+        # (dimensions of frame_to_draw_on)
+        scale_x_target_to_processing = self.processing_width / self.target_width
+        scale_y_target_to_processing = self.processing_height / self.target_height
+        
+        # Scale the coordinates to the processing frame dimensions
+        draw_x1 = int(tx1 * scale_x_target_to_processing)
+        draw_y1 = int(ty1 * scale_y_target_to_processing)
+        draw_x2 = int(tx2 * scale_x_target_to_processing)
+        draw_y2 = int(ty2 * scale_y_target_to_processing)
+        
+        # Create trapezoid points (wider at bottom, narrower at top)
+        center_x = (draw_x1 + draw_x2) // 2
+        width = draw_x2 - draw_x1
+        top_width = int(width * 0.6)  # Top is 60% of bottom width
+        
+        trapezoid_points = np.array([
+            [center_x - top_width//2 - 10, draw_y1 - 10],      # Top left
+            [center_x + top_width//2 + 10, draw_y1 - 10],      # Top right
+            [draw_x2 + 30, draw_y2 + 15],                      # Bottom right
+            [draw_x1 - 30, draw_y2 + 15]                       # Bottom left
+        ], np.int32)
+        
+        # Draw the trapezoid
+        cv2.polylines(frame, [trapezoid_points], True, (0, 255, 0), 2)
+        
+        return frame
+    
     def scale_coordinates(self, coords):
         """Scale coordinates from processing frame to target frame size."""
         if coords is None:
@@ -106,16 +151,18 @@ class threadObjectDetection(ThreadWithStop):
                 videoData = self.videoSubscriber.receiveWithBlock()
                 frame = decode_frame(videoData)
                 frame_cropped = self.crop_frame(frame)
-                frame_cropped = cv2.resize(frame_cropped, (self.processing_width, self.processing_height), interpolation=cv2.INTER_AREA)
+                frame_for_processing = cv2.resize(frame_cropped, (self.processing_width, self.processing_height), interpolation=cv2.INTER_AREA)
                 
-                # Process frame and get detections
-                processed_frame, best_sign, detected_objects = self.process_frame(frame_cropped)
+                processed_frame_detections, best_sign, detected_objects = self.process_frame(frame_for_processing)
+                
+                final_processed_frame = self.draw_fixed_box(processed_frame_detections)
                 
                 # Update state and send messages
                 self.update_state(best_sign, detected_objects)
                 
                 # Display frame on server
-                self.streamer.display(processed_frame)
+                self.streamer.display(final_processed_frame)
+
 
             except Exception as e:
                 print(e)
