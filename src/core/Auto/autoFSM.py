@@ -60,6 +60,8 @@ class autoFSM(ControlModeThread):
         self.subscribe()
         super().__init__()
 
+        self.stop_line_present_count = 0
+
     def start(self):
         self.positionFinder = PositionFinder("Small_map_roundabout.graphml")
         self.laneFollowContrler = LaneFollowController(512, 270, self.logging, False)
@@ -143,6 +145,10 @@ class autoFSM(ControlModeThread):
     def loop(self):
         self.leftX, self.rightX, self.leftVisible, self.rightVisible = self.laneDetectSubscriber.receiveWithBlock()
         stop_line_present, stop_line_distance, stop_line_angle = self.stopLineDetectionSubscriber.receiveWithBlock() # stopLine je sad tuple (intersection(bool), slope_degrees (float))
+        if stop_line_present:
+            self.stop_line_present_count += 1
+        else:
+            self.stop_line_present_count = 0
         stop_line_present_close = stop_line_present and stop_line_distance < 130
         stop_line_present_semaphore = stop_line_present and stop_line_distance < 110
 
@@ -254,11 +260,11 @@ class autoFSM(ControlModeThread):
                 self.crosswalkStart = time.time()
                 self.state = autoFSMState.CROSSWALK
 
-            elif stop_line_present_close:
+            elif stop_line_present_close and self.stop_line_present_count >= 10:
                 print("Stop line detected, no sign, entering intersection")
 
                 self.intersectionController.setCourse(
-                    sign="stop", 
+                    sign="stop",
                     direction=self.navigateCommand.pop(0),
                     traffic_light_present=False
                 )
@@ -293,6 +299,7 @@ class autoFSM(ControlModeThread):
                 # self.localization.clamp_location_to_graph()
                 self.state = autoFSMState.DRIVE
                 self.last_parking_exit_time = time.time()  # Update parking exit time
+                self.stop_line_present_count = 0
         
         elif self.state == autoFSMState.INTERSECTION:
             angle, speed, module_running = self.intersectionController.getControlData(
@@ -308,6 +315,7 @@ class autoFSM(ControlModeThread):
                 # self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
+                self.stop_line_present_count = 0
 
         elif self.state == autoFSMState.OVERTAKE:
             overtake_angle, speed, module_running = self.overtakeController.run(False, front_sensors, side_sensors)
@@ -319,6 +327,7 @@ class autoFSM(ControlModeThread):
             if not module_running:
                 # self.localization.clamp_location_to_graph()
                 self.state = autoFSMState.DRIVE
+                self.stop_line_present_count = 0
 
         elif self.state == autoFSMState.CROSSWALK:
             angle, speed, module_stoping = self.crosswalkController.control(self.stephanie_position)
@@ -328,6 +337,7 @@ class autoFSM(ControlModeThread):
                 self.stephanie_position = None
                 self.crosswalkStart = None
                 self.laneFollowContrler.restartPid()
+                self.stop_line_present_count = 0
 
         elif self.state == autoFSMState.ROUNDABOUT:
             angle, module_stoping = self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position, self.leftVisible, self.rightVisible)
@@ -339,6 +349,7 @@ class autoFSM(ControlModeThread):
                 # self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
+                self.stop_line_present_count = 0
 
         elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
             no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
