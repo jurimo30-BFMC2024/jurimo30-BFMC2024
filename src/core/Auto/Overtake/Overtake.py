@@ -21,6 +21,9 @@ class Overtake():
         self.passed_at_time = 0
         self.right_sensor_counter = 0
         
+        # Maximum wheel angle for allowing lane return (in degrees)
+        self.max_wheel_angle_for_return = 7
+        
         self.motionScheduler = MotionScheduler()
 
         self.motions = {
@@ -42,7 +45,7 @@ class Overtake():
             }
         }
 
-    def run(self, highway, front_sensors, side_sensors):
+    def run(self, highway, front_sensors, side_sensors, lane_follow_angle=0):
         # print(side_sensors["right"])
         if self.state == "finish":
             self.state = "close_distance"
@@ -97,9 +100,14 @@ class Overtake():
                 self.right_sensor_counter = 0
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
             elif time.time() - self.passed_at_time > (self.passed_at_time - self.caught_up_at_time) // 2:
-                self.state = "change_lane_right"
-                print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
-                self.motionScheduler.set_schedule(self.motions["overtake" if highway else "pass_obstacle"]["move_right"])
+                # Check if wheel angle is acceptable for lane return
+                if abs(lane_follow_angle) <= self.max_wheel_angle_for_return * 10:  # lane_follow_angle is in tenths of degrees
+                    self.state = "change_lane_right"
+                    print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
+                    self.motionScheduler.set_schedule(self.motions["overtake" if highway else "pass_obstacle"]["move_right"])
+                else:
+                    if self.debugging:
+                        print(f'Lane return delayed - wheel angle too high: {abs(lane_follow_angle)/10}°')
 
         elif self.state == "change_lane_right":
             self.angle, self.speed, finished = self.motionScheduler.run()

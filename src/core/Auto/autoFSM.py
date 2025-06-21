@@ -98,6 +98,9 @@ class autoFSM(ControlModeThread):
         self.parkingController = Parking(self.logging, self.debugging)
         self.overtakeController = Overtake(self.logging, self.debugging)
         self.roundaboutController = RoundaboutController(512, 270, self.logging, True)
+        
+        # Maximum wheel angle for allowing overtaking (in degrees)
+        self.max_wheel_angle_for_overtake = 7
         self.crosswalkController = CrosswalkController()
         self.intersectionCrosswalkController = IntersectionCrosswalkController(self.intersectionController, self.crosswalkController)
         self.crosswalkIntersectionController = CrosswalkIntersectionController(self.intersectionController, self.crosswalkController)
@@ -300,13 +303,23 @@ class autoFSM(ControlModeThread):
                 self.laneFollowContrler.set_pid_highway(True)
             
             elif obstacle and self.oldSpeed == 0:
-                if self.obstacle_start_time is None:
-                    self.obstacle_start_time = time.time()
-                
-                if time.time() - self.obstacle_start_time >= 1:
-                    print("Pass static obstacle start")
-                    self.sign_car_position = None
-                    self.state = autoFSMState.DRIVE_OVERTAKE
+                # Check if vehicle is in overtake nodes and wheel angle is acceptable
+                current_node = self.localization.get_current_node()
+                if (current_node in self.overtake_nodes and 
+                    abs(angle) <= self.max_wheel_angle_for_overtake * 10):  # angle is in tenths of degrees
+                    if self.obstacle_start_time is None:
+                        self.obstacle_start_time = time.time()
+                    
+                    if time.time() - self.obstacle_start_time >= 1:
+                        print("Pass static obstacle start")
+                        self.sign_car_position = None
+                        self.state = autoFSMState.DRIVE_OVERTAKE
+                elif current_node not in self.overtake_nodes:
+                    if self.debugging:
+                        print(f"Overtaking not allowed at node {current_node} - not in overtake zone")
+                elif abs(angle) > self.max_wheel_angle_for_overtake * 10:
+                    if self.debugging:
+                        print(f"Overtaking not allowed - wheel angle too high: {abs(angle)/10}°")
 
         ##############################         FSM            #############################
 
@@ -337,7 +350,7 @@ class autoFSM(ControlModeThread):
                 self.laneFollowContrler.restartPid()
 
         elif self.state == autoFSMState.DRIVE_OVERTAKE:
-            overtake_angle, speed, module_running = self.overtakeController.run(False, front_sensors, side_sensors)
+            overtake_angle, speed, module_running = self.overtakeController.run(False, front_sensors, side_sensors, angle)
             if overtake_angle is not None:
                 angle = overtake_angle
 
@@ -403,7 +416,7 @@ class autoFSM(ControlModeThread):
 
         elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
             no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
-            stephanie_crossing = self.stephanie_position and self.traffic_signs.get_active() != "crosswalk"
+            stephanie_crossing = self.stefanija_in_danger_zone and self.traffic_signs.get_active() != "crosswalk"
 
             speed = self.speedControler.getControlData(
                 angle=angle,
@@ -412,7 +425,7 @@ class autoFSM(ControlModeThread):
                 highway=self.state == autoFSMState.HIGHWAY,
                 frontDistance=front_sensors["distance"],
                 enable_emergency_stop=no_active_sign,
-                car_in_front=self.sign_car_position,
+                car_in_front=self.car_in_danger_zone,
                 stephanie_in_front=stephanie_crossing
             )
 
