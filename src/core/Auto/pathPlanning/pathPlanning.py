@@ -24,7 +24,7 @@ class PathPlanner:
             raise ValueError("PathPlanner: mode must be either \"p2p\" or \"pacman\"")
         else:
             self.mode = mode
-        self.file_path = "Small_map_roundabout.graphml" # change this to Competition_track_graph.graphml when in Romania
+        self.file_path = "Competition_track_graph.graphml" # change this to Competition_track_graph.graphml when in Romania
         if self.file_path == "Small_map_roundabout.graphml":
             self.roundabout_entries = ["14", "49", "22"]
             self.roundabout_exits = ["24", "34", "40", "48"]
