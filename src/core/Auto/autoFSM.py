@@ -204,8 +204,7 @@ class autoFSM(ControlModeThread):
         
         if self.state == autoFSMState.HIGHWAY:
             if self.traffic_signs.get_active() == "highway_exit" or stop_line_present:
-                if self.debugging:
-                    print("Izlazak sa auto puta")
+                print("Izlazak sa auto puta")
                 self.traffic_signs.clear()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.set_pid_highway(False)
@@ -223,8 +222,7 @@ class autoFSM(ControlModeThread):
                 self.traffic_signs.clear()
             
             elif stop_line_present_close and (self.traffic_signs.get_active() in ["stop", "priority"]):
-                if self.debugging:
-                    print(f"Intersection detected, sign: {self.traffic_signs.get_active()}")
+                print(f"Intersection detected, sign: {self.traffic_signs.get_active()}")
                 
                 self.intersectionController.setCourse(
                     sign=self.traffic_signs.get_active(), 
@@ -235,8 +233,7 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.INTERSECTION
 
             elif stop_line_present_semaphore and traffic_light_present:
-                if self.debugging:
-                    print("Intersection with traffic light detected")
+                print("Intersection with traffic light detected")
 
                 self.intersectionController.setCourse(
                     sign=self.traffic_light_states.get_active(), 
@@ -246,8 +243,7 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.INTERSECTION
 
             elif stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
-                if self.debugging:
-                    print("Entering roundabout")
+                print("Entering roundabout")
                 isStarted = self.roundaboutController.start(self.navigateCommand.pop(0))
                 self.traffic_signs.clear()
                 self.roundaboutExit_position = None
@@ -258,8 +254,7 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.CROSSWALK
 
             elif stop_line_present_close:
-                if self.debugging:
-                    print("Stop line detected, no sign, entering intersection")
+                print("Stop line detected, no sign, entering intersection")
 
                 self.intersectionController.setCourse(
                     sign="stop", 
@@ -268,8 +263,7 @@ class autoFSM(ControlModeThread):
                 )
                         
             elif self.traffic_signs.get_active() == "highway_entrance":
-                if self.debugging:
-                    print("Ulazak na autoput")
+                print("Ulazak na autoput")
                 self.traffic_signs.clear()
                 self.state = autoFSMState.HIGHWAY
                 self.laneFollowContrler.set_pid_highway(True)
