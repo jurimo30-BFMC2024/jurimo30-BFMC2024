@@ -22,8 +22,8 @@ class LaneDetector:
             (int(self.width * 0.73), self.height - int(self.height * 0.02)),  # donji desni prije ulegnuća
             (int(self.width * 0.98), self.height - int(self.height * 0.02)),  # donji desni ugao
             (int(self.width * 0.98), self.height - int(self.height * 0.2)),  
-            (int(self.width * 0.8), self.height // 2 - int(self.height * 0.05)), # gornji desni ugao
-            (int(self.width * 0.2), self.height // 2 - int(self.height * 0.05)),  # gornji lijevi ugao
+            (int(self.width * 0.8), self.height // 2 - int(self.height * 0.15)), # gornji desni ugao
+            (int(self.width * 0.2), self.height // 2 - int(self.height * 0.15)),  # gornji lijevi ugao
             (int(self.width * 0.02), int(self.height*0.7))  # gornji lijevi ugao
         ]], np.int32)
 

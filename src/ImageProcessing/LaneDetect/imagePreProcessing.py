@@ -19,17 +19,19 @@ class ImagePreProcessing:
         # ]], np.int32)
 
         self.roadReg = np.array([[
-                (int(self.width * 0.01), self.height - int(self.height * 0.05)),
-                (int(self.width * 0.25), self.height - int(self.height * 0.05)),
-                (int(self.width * 0.3), self.height - int(self.height * 0.2)),
-                (int(self.width * 0.7), self.height - int(self.height * 0.2)),
-                (int(self.width * 0.75), self.height - int(self.height * 0.05)),
-                (int(self.width * 0.99), self.height - int(self.height * 0.05)),
-                (int(self.width * 0.99), self.height * 0.45),
-                (int(self.width * 0.01), self.height * 0.45)
-            ]], np.int32)
+            (int(self.width * 0.02), self.height - int(self.height * 0.02)),   # donji lijevi ugao
+            (int(self.width * 0.22), self.height - int(self.height * 0.02)),  # donji lijevi prije ulegnuća
+            (int(self.width * 0.30), self.height - int(self.height * 0.35)), # donji lijevi ulegnuće
+            (int(self.width * 0.65), self.height - int(self.height * 0.35)), # donji desni ulegnuće
+            (int(self.width * 0.73), self.height - int(self.height * 0.02)),  # donji desni prije ulegnuća
+            (int(self.width * 0.98), self.height - int(self.height * 0.02)),  # donji desni ugao
+            (int(self.width * 0.98), self.height - int(self.height * 0.2)),  
+            (int(self.width * 0.8), self.height // 2 - int(self.height * 0.15)), # gornji desni ugao
+            (int(self.width * 0.2), self.height // 2 - int(self.height * 0.15)),  # gornji lijevi ugao
+            (int(self.width * 0.02), int(self.height*0.7))  # gornji lijevi ugao
+        ]], np.int32)
 
-        self.gamma_lut = self._create_gamma_lut(9)  # Precompute LUT for gamma correction
+        self.gamma_lut = self._create_gamma_lut(7)  # Precompute LUT for gamma correction
         self.mask = self._create_roi_mask()  # Precompute ROI mask
 
     def _create_gamma_lut(self, gamma: float):
@@ -104,10 +106,10 @@ class ImagePreProcessing:
         # use functions explicitly without making new variables
         cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY, dst=processed)
         cv2.bitwise_and(processed, self.mask, dst=processed) # roi cutoff first, then image processing
+        cv2.medianBlur(processed, 7, dst=processed)
         cv2.LUT(processed, self.gamma_lut, dst=processed)
-        cv2.medianBlur(processed, 5, dst=processed)
         processed = self.normalize_histogram(processed)
-        _, processed = cv2.threshold(processed, 230, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+        _, processed = cv2.threshold(processed, 200, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         # quicker than scikit
         edges = cv2.ximgproc.thinning(processed, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN)
         return edges
