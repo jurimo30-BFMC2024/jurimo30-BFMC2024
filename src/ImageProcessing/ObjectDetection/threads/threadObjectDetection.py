@@ -175,7 +175,13 @@ class threadObjectDetection(ThreadWithStop):
                 continue
             
             if label not in ("car", "exit", "stefanija"):
-                traffic_signs.append((conf, area, label, (x1, y1, x2, y2)))
+                # For traffic lights, only consider those on the right half of the image
+                if label in ("red", "green", "red_yellow", "yellow"):
+                    center_x = (x1 + x2) / 2
+                    if center_x > self.processing_width / 2:  # Right half only
+                        traffic_signs.append((conf, area, label, (x1, y1, x2, y2)))
+                else:
+                    continue
 
             # Update relevant_objects if label matches
             if label in self.relevant_objects:
