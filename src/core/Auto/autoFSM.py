@@ -25,6 +25,7 @@ from src.utils.messages.allMessages import (
     Location,
     Heading,
     VehicleToEverything,
+    ResetSignDetectionRequest,
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -56,6 +57,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
         self.vehicleToEverythingSender = messageHandlerSender(self.queuesList, VehicleToEverything)
+        self.resetRequestSender = messageHandlerSender(self.queuesList, ResetSignDetectionRequest)
 
         self.subscribe()
         super().__init__()
@@ -79,6 +81,8 @@ class autoFSM(ControlModeThread):
         self.parkingSpotDetectionSubscriber.empty()
         self.locationSubscriber.empty()
         self.headingSubscriber.empty()
+
+        self.resetRequestSender.send(True)  # Reset the system
 
         self.last_sent_time_v2x = 0
         self.oldAngle = 0
@@ -304,6 +308,7 @@ class autoFSM(ControlModeThread):
             
             if not module_running:
                 self.traffic_light_states.clear()
+                self.resetRequestSender.send(True)  # Reset the sign detection system
                 # self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()

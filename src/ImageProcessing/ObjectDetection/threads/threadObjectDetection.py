@@ -13,7 +13,8 @@ from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.allMessages import (
     serialCamera,
     ObjectDetection,
-    TrafficSignsDetection
+    TrafficSignsDetection,
+    ResetSignDetectionRequest,
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -42,6 +43,9 @@ class threadObjectDetection(ThreadWithStop):
         self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_cluj_1.0/detect/train/weights/best.pt')
         self.streamer = VideoStream(0, 0)
         
+        # Add ResetRequest subscriber
+        self.resetSubscriber = messageHandlerSubscriber(self.queuesList, ResetSignDetectionRequest, "LastOnly", True)
+
         # State management variables
         self.current_sign = None          # Currently active sign
         self.confirmation_counter = 0     # Frames with consistent new sign
@@ -103,6 +107,11 @@ class threadObjectDetection(ThreadWithStop):
     def run(self):
         while self._running:
             try:
+                # Check for reset request
+                if self.resetSubscriber.receive() is not None:
+                    print("[INFO]: Reset request received, resetting sign detection state.")
+                    self.reset_sign_detection()
+
                 videoData = self.videoSubscriber.receiveWithBlock()
                 frame = decode_frame(videoData)
                 frame_cropped = self.crop_frame(frame)
@@ -267,6 +276,12 @@ class threadObjectDetection(ThreadWithStop):
                         "name": name,
                         "position": None
                     })
+
+    def reset_sign_detection(self):
+        """Reset sign detection in order to send the data again."""
+        self.current_sign = None
+        self.confirmation_counter = 0
+        self.lost_sign_count = 0
 
     @staticmethod
     def crop_frame(frame):
