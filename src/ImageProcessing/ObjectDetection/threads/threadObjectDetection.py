@@ -180,9 +180,10 @@ class threadObjectDetection(ThreadWithStop):
                     center_x = (x1 + x2) / 2
                     if center_x > self.processing_width / 2:  # Right half only
                         traffic_signs.append((conf, area, label, (x1, y1, x2, y2)))
+                # Append other signs
                 else:
                     traffic_signs.append((conf, area, label, (x1, y1, x2, y2)))
-                    
+
             # Update relevant_objects if label matches
             if label in self.relevant_objects:
                 self.relevant_objects[label]["position"] = (x1, y1, x2, y2)
