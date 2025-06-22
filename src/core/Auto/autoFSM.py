@@ -8,6 +8,7 @@ from src.core.Auto.Localization.Localization import Localization
 from src.core.Auto.pathPlanning.PositionFinder import PositionFinder
 from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.core.Auto.LaneFollow.LaneFollow import LaneFollower as LaneFollowController
+from src.core.Auto.SpecialSituationControl import SpecialSituationControl
 from src.core.Auto.SpeedControl import SpeedControl
 from src.core.Auto.IntersectionControl import IntersectionControl
 from src.core.Auto.RoundaboutControl import RoundaboutController 
@@ -65,6 +66,7 @@ class autoFSM(ControlModeThread):
     def start(self):
         self.positionFinder = PositionFinder("Small_map_roundabout.graphml")
         self.laneFollowContrler = LaneFollowController(512, 270, self.logging, False)
+        self.specialSituationController = SpecialSituationControl(512, 270, self.logging, self.debugging)
         self.speedControler = SpeedControl(self.logging, False)
         self.intersectionController = IntersectionControl(self.logging, self.debugging)
         self.parkingController = Parking(self.logging, self.debugging)
@@ -138,6 +140,9 @@ class autoFSM(ControlModeThread):
         self.intersectionSign = "None"
 
         self.state = autoFSMState.DRIVE
+        
+        # Dodavanje trenutnog čvora za path planning (potrebno za SpecialSituationControl)
+        self.current_node = 43  # Početni čvor
         # self.localization.start_new_segment()
 
         self.last_parking_exit_time = 0  # Track last time parking state was exited
@@ -349,19 +354,32 @@ class autoFSM(ControlModeThread):
                 self.laneFollowContrler.restartPid()
 
         elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
-            no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
-            stephanie_crossing = self.stephanie_position and self.traffic_signs.get_active() != "crosswalk"
-
-            speed = self.speedControler.getControlData(
-                angle=angle,
-                stopLine=stop_line_present_close,
-                lowDistance=stop_line_present,
-                highway=self.state == autoFSMState.HIGHWAY,
-                frontDistance=front_sensors["distance"],
-                enable_emergency_stop=no_active_sign,
-                car_in_front=self.sign_car_position,
-                stephanie_in_front=stephanie_crossing
+            # Pokušava SpecialSituationControl - modul interno upravlja ulaskom u specijalne raskrsnice
+            special_angle, special_speed = self.specialSituatipnController.process_special_control(
+                self.leftX, self.rightX, self.leftVisible, self.rightVisible, self.current_node, self.navigateCommand
             )
+            
+            if self.specialSituationController.is_active():
+                # SpecialSituationControl preuzima kontrolu
+                angle = special_angle
+                speed = special_speed
+                if self.debugging:
+                    print(f"Special situation control active: angle={angle}, speed={speed}")
+            else:
+                # Standardno lane following upravljanje
+                no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
+                stephanie_crossing = self.stephanie_position and self.traffic_signs.get_active() != "crosswalk"
+
+                speed = self.speedControler.getControlData(
+                    angle=angle,
+                    stopLine=stop_line_present_close,
+                    lowDistance=stop_line_present,
+                    highway=self.state == autoFSMState.HIGHWAY,
+                    frontDistance=front_sensors["distance"],
+                    enable_emergency_stop=no_active_sign,
+                    car_in_front=self.sign_car_position,
+                    stephanie_in_front=stephanie_crossing
+                )
 
             # self.localization.update_position(speed / 10)
             # self.localization.calibrate_heading(heading)
