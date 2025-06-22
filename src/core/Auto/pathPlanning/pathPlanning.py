@@ -100,6 +100,8 @@ class PathPlanner:
         path = [start]
         current_node = start
 
+        if start not in graph:
+             raise ValueError(f"Start ({start}) not in graph.")
         if graph.nodes[goal]['intersection']:
             print("W: Your final point is inside an intersection (reconsider)")
         
