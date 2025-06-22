@@ -35,6 +35,7 @@ from src.core.Auto.TrafficSignController import TrafficSignController
 import time
 from enum import Enum, auto
 from src.data.TrafficCommunication.useful.Obstacles import Obstacles
+import statistics
 
 """
     - stopline staviti u jedan stopline subscriber
@@ -98,11 +99,22 @@ class autoFSM(ControlModeThread):
             print("No predefined node, using localization system to find best node")
             heading = self.headingSubscriber.receiveWithBlock()
             print(f'Current heading: {heading}')
-            location = self.locationSubscriber.receiveWithBlock()
-            print(f'Current location: {location}')
+            # --- Median filter for location ---
+            location_x_buffer = []
+            location_y_buffer = []
+            for _ in range(5):
+                location = self.locationSubscriber.receiveWithBlock()
+                location_x_buffer.append(float(location['x']))
+                location_y_buffer.append(float(location['y']))
+
+            print(f'Raw location data: x={location_x_buffer}, y={location_y_buffer}')
+
+            median_x = statistics.median(location_x_buffer)
+            median_y = statistics.median(location_y_buffer)
+            print(f'Median filtered location: x={median_x}, y={median_y}')
 
             # Initialize localization systems
-            best_node, best_node_offset = self.positionFinder.find_best_node(float(location['x']) / 10, float(location['y']) / 10, heading)
+            best_node, best_node_offset = self.positionFinder.find_best_node(median_x / 10, median_y / 10, heading)
             print(f'Current node: {best_node} with offset: {best_node_offset}cm ')
         else:
             print(f'Using predefined node: {best_node}')
