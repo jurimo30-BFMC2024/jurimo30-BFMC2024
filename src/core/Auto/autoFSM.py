@@ -144,7 +144,7 @@ class autoFSM(ControlModeThread):
         self.leftX, self.rightX, self.leftVisible, self.rightVisible = self.laneDetectSubscriber.receiveWithBlock()
         stop_line_present, stop_line_distance, stop_line_angle = self.stopLineDetectionSubscriber.receiveWithBlock() # stopLine je sad tuple (intersection(bool), slope_degrees (float))
         stop_line_present_close = stop_line_present and stop_line_distance < 130
-        stop_line_present_semaphore = stop_line_present and stop_line_distance < 110
+        stop_line_present_semaphore = stop_line_present and stop_line_distance < 160
 
         while self.objectDetectionSubscriber.isDataInPipe():
             detected_objects_dict = self.objectDetectionSubscriber.receive() # This is now a dict
