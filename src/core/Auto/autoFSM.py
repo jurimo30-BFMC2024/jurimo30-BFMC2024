@@ -100,7 +100,7 @@ class autoFSM(ControlModeThread):
             print(f'Current location: {location}')
 
             # Initialize localization systems
-            best_node, best_node_offset = self.positionFinder.find_best_node(float(location['x']), float(location['y']), heading)
+            best_node, best_node_offset = self.positionFinder.find_best_node(float(location['x']) / 10, float(location['y']) / 10, heading)
             print(f'Current node: {best_node} with offset: {best_node_offset}cm ')
         else:
             print(f'Using predefined node: {best_node}')
@@ -111,7 +111,10 @@ class autoFSM(ControlModeThread):
         self.planer = PathPlanner(start=192, goal=317, mode="pacman")
         # kroz maglu
         # self.planer = PathPlanner(start=97, goal=186, mode="pacman")
-        self.navigateCommand, segments = self.planer.planPath()
+        # self.navigateCommand, segments = self.planer.planPath()
+        # self.navigateCommand = ["Left", "Right", "Left", "Left", "Left", "Left"]
+        # self.navigateCommand = ["Straight", "Right", "Exit 3"]
+        self.navigateCommand = ["Exit 3", "Straight"]
         #self.navigateCommand.append("Left")
         #self.navigateCommand.append("Left")
         #self.navigateCommand.append("Straight")

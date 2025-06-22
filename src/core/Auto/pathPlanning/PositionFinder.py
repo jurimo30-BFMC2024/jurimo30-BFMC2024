@@ -14,7 +14,7 @@ class PositionFinder:
 
         ns = {'graphml': 'http://graphml.graphdrawing.org/xmlns'}
         graph = nx.DiGraph()
-        scaling_factor = 13
+        scaling_factor = 100
 
         for node in root.findall(".//graphml:node", ns):
             node_id = node.get("id")

@@ -50,7 +50,7 @@ class processTrafficCommunication(WorkerProcess):
     def __init__(self, queueList, logging, deviceID, debugging, frequency=1):
         self.queuesList = queueList
         self.logging = logging
-        self.filename = "src/data/TrafficCommunication/useful/publickey_server_test.pem"
+        self.filename = "src/data/TrafficCommunication/useful/publickey_server.pem"
         self.deviceID = deviceID
         self.frequency = frequency
         self.debugging = debugging

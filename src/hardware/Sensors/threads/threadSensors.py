@@ -26,7 +26,7 @@ class threadSensors(ThreadWithStop):
         self.sideSensorSender = messageHandlerSender(self.queuesList, SideSensors)
         self.headingSender = messageHandlerSender(self.queuesList, Heading)
 
-        self.heading_error = 288.0  # Change this to match location error value
+        self.heading_error = 23.0  # Change this to match location error value
 
         super(threadSensors, self).__init__()
 
