@@ -64,7 +64,7 @@ class autoFSM(ControlModeThread):
         super().__init__()
 
     def start(self):
-        self.positionFinder = PositionFinder("Small_map_roundabout.graphml")
+        self.positionFinder = PositionFinder("Competition_track_graph.graphml")
         self.laneFollowContrler = LaneFollowController(512, 270, self.logging, False)
         self.specialSituationController = SpecialSituationControl(512, 270, self.logging, self.debugging)
         self.speedControler = SpeedControl(self.logging, False)

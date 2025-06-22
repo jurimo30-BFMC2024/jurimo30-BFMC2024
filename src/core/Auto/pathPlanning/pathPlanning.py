@@ -62,7 +62,7 @@ class PathPlanner:
 
 
     def parse_graphml(self, file_path):
-        tree = ET.parse(file_path)
+        tree = ET.parse("src/core/Auto/pathPlanning/" + file_path)
         root = tree.getroot()
         
         ns = {'graphml': 'http://graphml.graphdrawing.org/xmlns'}
