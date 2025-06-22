@@ -97,8 +97,8 @@ class autoFSM(ControlModeThread):
 
         if best_node is None:
             print("No predefined node, using localization system to find best node")
-            heading = self.headingSubscriber.receiveWithBlock()
-            print(f'Current heading: {heading}')
+            # heading = self.headingSubscriber.receiveWithBlock()
+            # print(f'Current heading: {heading}')
             # --- Median filter for location ---
             location_x_buffer = []
             location_y_buffer = []
@@ -114,7 +114,7 @@ class autoFSM(ControlModeThread):
             print(f'Median filtered location: x={median_x}, y={median_y}')
 
             # Initialize localization systems
-            best_node, best_node_offset = self.positionFinder.find_best_node(median_x / 10, median_y / 10, heading)
+            best_node, best_node_offset = self.positionFinder.find_best_node(median_x / 10, median_y / 10)
             print(f'Current node: {best_node} with offset: {best_node_offset}cm ')
         else:
             print(f'Using predefined node: {best_node}')
