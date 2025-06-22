@@ -19,7 +19,7 @@ class SpecialSituationControl:
         self.tracked_line_side = None  # 'left' ili 'right'
         
         # Rastojanje od linije koje treba održavati
-        self.target_distance_from_line = 80  # pikseli
+        self.target_distance_from_line = 100  # pikseli
         
         # PID kontroler za praćenje jedne linije (kopirani parametri iz LaneFollow)
         self.pid = PIDController(kp=0.35, ki=0.01, kd=0.01, kaw=3, output_limits=(-25, 25))
@@ -32,7 +32,7 @@ class SpecialSituationControl:
         # Ovi čvorovi predstavljaju zone gde vozilo treba specijalno upravljanje
         self.intersection_nodes = {
             # Primer za malu mapu - prilagoditi stvarnoj mapi
-            'intersection_main': [32, 22, 14, 38, 7],  # Glavni čvorovi raskrsnica
+            'intersection_main': [190, 191, 192, 193, 194, 223],  # Glavni čvorovi raskrsnica
             # Dodajte ostale raskrsnice na osnovu graphml fajla...
         }
         
@@ -72,6 +72,7 @@ class SpecialSituationControl:
         error = self.center_x - target_x
         return error
         
+ # Provjeriti funkciju naknadno
     def process_special_control(self, left_x: int | None, right_x: int | None, 
                               left_visible: bool, right_visible: bool, current_node: int, navigate_command=None):
         """
@@ -154,7 +155,7 @@ class SpecialSituationControl:
             print(f"Intersection control: Direction={self.intersection_direction}, "
                   f"Tracking={tracking_side}, Angle={angle:.1f}°")
         
-        return int(angle * 10), speed
+        return -int(angle * 10), speed
     
     def _handle_single_line_control(self, left_x, right_x, left_visible, right_visible, dt):
         """Upravljanje kada je vidljiva samo jedna linija"""
@@ -192,7 +193,7 @@ class SpecialSituationControl:
                 print(f"Single line control: Side={self.tracked_line_side}, "
                       f"Error={error:.1f}px, Angle={angle:.1f}°")
             
-            return int(angle * 10), speed
+            return -int(angle * 10), speed
         
         return None, None
     
