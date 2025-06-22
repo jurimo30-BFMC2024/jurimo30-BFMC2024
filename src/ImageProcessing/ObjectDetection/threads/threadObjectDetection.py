@@ -270,9 +270,10 @@ class threadObjectDetection(ThreadWithStop):
                        should_send = True
                        if self.previous_exit_center is not None:
                            distance = self.calculate_distance(current_center, self.previous_exit_center)
-                           if distance <= 100:
+                           if distance <= 150:
                                should_send = False
-                       
+                           print(f"Distanca: {distance}")
+
                        if should_send:
                            if self.debugging:
                                print(f"[DETEKCIJA] Objekat '{name}' detektovan na {scaled_position}")
@@ -284,8 +285,9 @@ class threadObjectDetection(ThreadWithStop):
                                 "position": scaled_position
                             })
                            
-                           # Update previous exit center
-                           self.previous_exit_center = current_center
+                       # Update previous exit center
+                       self.previous_exit_center = current_center
+                       
                    else:
                        # Existing logic for car and stefanija
                        if self.debugging:
