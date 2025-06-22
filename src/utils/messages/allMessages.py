@@ -60,6 +60,12 @@ class VehicleToEverything(Enum):
     msgID = 5
     msgType = "dict"
 
+class ResetSignDetectionRequest(Enum):
+    Queue = "General"
+    Owner = "threadCore"
+    msgID = 6
+    msgType = "bool"
+
 ####################################### processCamera #######################################
 class mainCamera(Enum):
     Queue = "General"
