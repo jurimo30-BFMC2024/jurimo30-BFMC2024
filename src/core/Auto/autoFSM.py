@@ -251,6 +251,7 @@ class autoFSM(ControlModeThread):
 
             elif stop_line_present and self.traffic_signs.get_active() == "crosswalk":
                 self.crosswalkStart = time.time()
+                print("Transitioning to CROSSWALK state")
                 self.state = autoFSMState.CROSSWALK
 
             elif stop_line_present_close:
@@ -261,6 +262,7 @@ class autoFSM(ControlModeThread):
                     direction=self.navigateCommand.pop(0),
                     traffic_light_present=False
                 )
+                self.state = autoFSMState.INTERSECTION
                         
             elif self.traffic_signs.get_active() == "highway_entrance":
                 print("Ulazak na autoput")
