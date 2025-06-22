@@ -1,6 +1,8 @@
 from src.core.Auto.LaneFollow.MovingAverage import MovingAverage
 from src.core.Auto.PIDController import PIDController
 
+import time
+
 class SpeedControl():
     def __init__(self, logging, debugging=False):
         self.logging = logging
@@ -12,6 +14,8 @@ class SpeedControl():
         self.emergency_stop_threshold = 3  # Consecutive readings required
         self.consecutive_emergency = 0
         self.stop = False
+        self.waiting_time = 2.0
+        self.entered_highway_time = None
 
     def filter(self, angle, alpha=0.3):
         self.oldAngle = angle * alpha + self.oldAngle * (1 - alpha)
@@ -26,6 +30,11 @@ class SpeedControl():
         if stopLine:
             return 65
 
+        if highway and self.entered_highway_time is None:
+            self.entered_highway_time = time.time()
+        elif not highway:
+            self.entered_highway_time = None
+
         # Speed calculation based on highway mode and angle
         if not highway:
             if abs(angle) < 30:
@@ -35,12 +44,20 @@ class SpeedControl():
             else:
                 speed = self.map_value(angle, 30, 145, 280, 350)
         else:
-            if abs(angle) < 30:
-                speed = 480
-            elif abs(angle) > 100:
-                speed = 400
+            if self.entered_highway_time is not None and time.time() - self.entered_highway_time < self.waiting_time:
+                if abs(angle) < 30:
+                    speed = 350
+                elif abs(angle) > 145:
+                    speed = 220
+                else:
+                    speed = self.map_value(angle, 30, 145, 280, 350)
             else:
-                speed = self.map_value(angle, 30, 100, 400, 480)
+                if abs(angle) < 30:
+                    speed = 480
+                elif abs(angle) > 100:
+                    speed = 400
+                else:
+                    speed = self.map_value(angle, 30, 100, 400, 480)
 
         # Low distance override
         if lowDistance:
