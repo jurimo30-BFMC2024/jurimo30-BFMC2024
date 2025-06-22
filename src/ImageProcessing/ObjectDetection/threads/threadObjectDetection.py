@@ -181,8 +181,8 @@ class threadObjectDetection(ThreadWithStop):
                     if center_x > self.processing_width / 2:  # Right half only
                         traffic_signs.append((conf, area, label, (x1, y1, x2, y2)))
                 else:
-                    continue
-
+                    traffic_signs.append((conf, area, label, (x1, y1, x2, y2)))
+                    
             # Update relevant_objects if label matches
             if label in self.relevant_objects:
                 self.relevant_objects[label]["position"] = (x1, y1, x2, y2)
@@ -272,7 +272,7 @@ class threadObjectDetection(ThreadWithStop):
                            distance = self.calculate_distance(current_center, self.previous_exit_center)
                            if distance <= 150:
                                should_send = False
-                           print(f"Distanca: {distance}")
+                          # print(f"Distanca: {distance}")
 
                        if should_send:
                            if self.debugging:
