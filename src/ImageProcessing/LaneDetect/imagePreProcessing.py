@@ -107,8 +107,8 @@ class ImagePreProcessing:
         cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY, dst=processed)
         cv2.bitwise_and(processed, self.mask, dst=processed) # roi cutoff first, then image processing
         cv2.medianBlur(processed, 7, dst=processed)
-        cv2.LUT(processed, self.gamma_lut, dst=processed)
         processed = self.normalize_histogram(processed)
+        cv2.LUT(processed, self.gamma_lut, dst=processed)
         _, processed = cv2.threshold(processed, 200, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         # quicker than scikit
         edges = cv2.ximgproc.thinning(processed, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN)
