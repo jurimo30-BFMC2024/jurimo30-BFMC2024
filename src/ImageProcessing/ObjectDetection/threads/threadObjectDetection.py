@@ -13,11 +13,13 @@ from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.allMessages import (
     serialCamera,
     ObjectDetection,
-    TrafficSignsDetection
+    TrafficSignsDetection,
+    ResetSignDetectionRequest,
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream
+from src.hardware.camera.encoder import decode_frame
 
 class threadObjectDetection(ThreadWithStop):
     """This thread handles ObjectDetection.
@@ -38,9 +40,12 @@ class threadObjectDetection(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_2.9/detect/train/weights/best.pt')
+        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_cluj_1.0/detect/train/weights/best.pt')
         self.streamer = VideoStream(0, 0)
         
+        # Add ResetRequest subscriber
+        self.resetSubscriber = messageHandlerSubscriber(self.queuesList, ResetSignDetectionRequest, "LastOnly", True)
+
         # State management variables
         self.current_sign = None          # Currently active sign
         self.confirmation_counter = 0     # Frames with consistent new sign
@@ -64,6 +69,9 @@ class threadObjectDetection(ThreadWithStop):
             "exit": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False},
             "stefanija": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False}
         }
+        
+        # Exit center tracking for distance-based detection
+        self.previous_exit_center = None
         
         super(threadObjectDetection, self).__init__()
         self.subscribe() # Subscribe on serialCamera topic
@@ -102,8 +110,13 @@ class threadObjectDetection(ThreadWithStop):
     def run(self):
         while self._running:
             try:
+                # Check for reset request
+                if self.resetSubscriber.receive() is not None:
+                    print("[INFO]: Reset request received, resetting sign detection state.")
+                    self.reset_sign_detection()
+
                 videoData = self.videoSubscriber.receiveWithBlock()
-                frame = self.decode_frame(videoData)
+                frame = decode_frame(videoData)
                 frame_cropped = self.crop_frame(frame)
                 frame_cropped = cv2.resize(frame_cropped, (self.processing_width, self.processing_height), interpolation=cv2.INTER_AREA)
                 
@@ -244,15 +257,40 @@ class threadObjectDetection(ThreadWithStop):
                self.relevant_objects[name]["last_seen_time"] = current_time
 
                if self.relevant_objects[name]["present"]:
-                   if self.debugging:
-                        print(f"[DETEKCIJA] Objekat '{name}' detektovan na {scaled_position}")
+                   if name == "exit":
+                       # Special logic for exit object - check distance from previous center
+                       current_center = self.calculate_bounding_box_center(current_position)
+                       
+                       should_send = True
+                       if self.previous_exit_center is not None:
+                           distance = self.calculate_distance(current_center, self.previous_exit_center)
+                           if distance <= 100:
+                               should_send = False
+                       
+                       if should_send:
+                           if self.debugging:
+                               print(f"[DETEKCIJA] Objekat '{name}' detektovan na {scaled_position}")
+                           
+                           self.relevant_objects[name]["position"] = current_position
+                           self.relevant_objects[name]["sent_lost_message"] = False
+                           self.objectDetectionSender.send({
+                                "name": name,
+                                "position": scaled_position
+                            })
+                           
+                           # Update previous exit center
+                           self.previous_exit_center = current_center
+                   else:
+                       # Existing logic for car and stefanija
+                       if self.debugging:
+                            print(f"[DETEKCIJA] Objekat '{name}' detektovan na {scaled_position}")
 
-                   self.relevant_objects[name]["position"] = current_position
-                   self.relevant_objects[name]["sent_lost_message"] = False
-                   self.objectDetectionSender.send({
-                        "name": name,
-                        "position": scaled_position
-                    })
+                       self.relevant_objects[name]["position"] = current_position
+                       self.relevant_objects[name]["sent_lost_message"] = False
+                       self.objectDetectionSender.send({
+                            "name": name,
+                            "position": scaled_position
+                        })
             else:
                 if self.relevant_objects[name]["last_seen_time"] is not None:
                     time_since_seen = current_time - self.relevant_objects[name]["last_seen_time"]
@@ -262,20 +300,37 @@ class threadObjectDetection(ThreadWithStop):
                         self.relevant_objects[name]["present"] = False
                         self.relevant_objects[name]["position"] = None
                         self.relevant_objects[name]["sent_lost_message"] = True
+                        
                         self.objectDetectionSender.send({
                         "name": name,
                         "position": None
                     })
 
-    @staticmethod
-    def decode_frame(encoded_data):
-        """Decode base64 encoded frame to OpenCV image."""
-        frame_data = base64.b64decode(encoded_data)
-        np_array = np.frombuffer(frame_data, np.uint8)
-        return cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+    def reset_sign_detection(self):
+        """Reset sign detection in order to send the data again."""
+        self.current_sign = None
+        self.confirmation_counter = 0
+        self.lost_sign_count = 0
 
     @staticmethod
     def crop_frame(frame):
         """Crop top-right quadrant of frame."""
         h, _ = frame.shape[:2]
         return frame[0:h-63, :]
+    
+    def calculate_bounding_box_center(self, position):
+        """Calculate center coordinates of bounding box."""
+        if position is None:
+            return None
+        x1, y1, x2, y2 = position
+        center_x = (x1 + x2) / 2
+        center_y = (y1 + y2) / 2
+        return (center_x, center_y)
+
+    def calculate_distance(self, point1, point2):
+        """Calculate Euclidean distance between two points."""
+        if point1 is None or point2 is None:
+            return float('inf')
+        x1, y1 = point1
+        x2, y2 = point2
+        return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5

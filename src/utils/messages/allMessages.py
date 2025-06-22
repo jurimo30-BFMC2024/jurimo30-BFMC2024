@@ -54,6 +54,18 @@ class CoreBrake(Enum):
     msgID = 4
     msgType = "float"
 
+class VehicleToEverything(Enum):
+    Queue = "General"
+    Owner = "threadCore"
+    msgID = 5
+    msgType = "dict"
+
+class ResetSignDetectionRequest(Enum):
+    Queue = "General"
+    Owner = "threadCore"
+    msgID = 6
+    msgType = "bool"
+
 ####################################### processCamera #######################################
 class mainCamera(Enum):
     Queue = "General"
@@ -65,7 +77,7 @@ class serialCamera(Enum):
     Queue = "General"
     Owner = "threadCamera"
     msgID = 2
-    msgType = "str"
+    msgType = "bytes"
 
 class Recording(Enum):
     Queue = "General"
@@ -142,6 +154,12 @@ class SideSensors(Enum):
     Owner = "threadSensors"
     msgID = 2
     msgType = "dict"
+
+class Heading(Enum):
+    Queue = "General"
+    Owner = "threadSensors"
+    msgID = 3
+    msgType = "float"
 
 ################################# From Dashboard ##################################
 class SpeedMotor(Enum):

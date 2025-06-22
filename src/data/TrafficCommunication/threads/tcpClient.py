@@ -70,6 +70,9 @@ class tcpClient(protocol.ClientFactory):
 
     def send_data_to_server(self, message):
         self.connection.send_data(message)
+        
+    def isConnected(self):
+        return self.connection is not None and self.connectiondata is not None
 
 
 # One class is generated for each new connection

@@ -41,12 +41,13 @@ class PathPlanner:
             turns = self.determine_turns(graph, best_path)
             for node, direction in turns:
                 instructionQueue.append(direction)
+            segments = self.calculate_path_segments(graph, best_path)
 
-        return instructionQueue
+        return instructionQueue, segments
 
 
     def parse_graphml(self, file_path, mode):
-        tree = ET.parse(file_path)
+        tree = ET.parse("src/core/Auto/pathPlanning/" + file_path)
         root = tree.getroot()
         
         ns = {'graphml': 'http://graphml.graphdrawing.org/xmlns'}
@@ -120,6 +121,61 @@ class PathPlanner:
             path.extend(final_segment[1:])
         
         return path
+    
+    def calculate_path_segments(self, graph, path):
+        def calculate_segment_metrics(start_idx, end_idx):
+            waypoints = []
+            segment_lengths = []
+
+            for i in range(start_idx, end_idx + 1):
+                current_node = path[i]
+                waypoints.append({
+                    "idx": current_node,
+                    "pos": graph.nodes[current_node]['pos']
+                })
+                if i > start_idx:
+                    previous_pos = np.array(graph.nodes[path[i - 1]]['pos'])
+                    current_pos = np.array(graph.nodes[current_node]['pos'])
+                    segment_lengths.append(np.linalg.norm(current_pos - previous_pos))
+
+            return {
+                "nodes": waypoints,
+                "distances": segment_lengths,
+                "length": sum(segment_lengths)
+            }
+
+        path_segments = []
+        intersection_points = [
+            (i, node) for i, node in enumerate(path)
+            if graph.nodes[node].get('intersection', False)
+        ]
+
+        # Start to first intersection
+        if intersection_points:
+            first_idx = intersection_points[0][0] - 1
+            if first_idx > 0 and path[first_idx - 1] in self.roundabout_entries:
+                first_idx -= 1
+            if first_idx > 0:
+                path_segments.append(calculate_segment_metrics(0, first_idx))
+
+        # Between intersections
+        for i in range(len(intersection_points) - 1):
+            start_idx = intersection_points[i][0] + 1
+            end_idx = intersection_points[i + 1][0] - 1
+
+            if end_idx > 0 and path[end_idx - 1] in self.roundabout_entries:
+                end_idx -= 1
+
+            if end_idx > start_idx:
+                path_segments.append(calculate_segment_metrics(start_idx, end_idx))
+
+        # Last intersection to end
+        if intersection_points:
+            last_idx = intersection_points[-1][0] + 1
+            if last_idx < len(path) - 1:
+                path_segments.append(calculate_segment_metrics(last_idx, len(path) - 1))
+
+        return path_segments
 
     def determine_turns(self, graph, path):
         directions = []
@@ -194,4 +250,11 @@ class PathPlanner:
             
             directions.append((current_node, turn))
             i += 1
+            
         return directions
+    
+if __name__ == "__main__":
+    pathPlanner = PathPlanner(52, 43, "pacman")
+    instructions, segments = pathPlanner.planPath()
+    for segment in segments:
+        print(segment)

@@ -44,6 +44,7 @@ from src.templates.workerprocess import WorkerProcess
 from src.dashboard.threads.threadStartFrontend import ThreadStartFrontend  
 from src.utils.messages.allMessages import Semaphores
 import src.utils.messages.allMessages as allMessages
+from src.hardware.camera.encoder import decode_frame_to_base64
 
 class processDashboard(WorkerProcess):
     """This process handles the dashboard interactions, updating the UI based on the system's state.
@@ -179,6 +180,8 @@ class processDashboard(WorkerProcess):
                 if resp is not None:
                     if msg == "FrontSensors" or msg == "SideSensors":
                         resp = str(resp)
+                    elif msg == "serialCamera":
+                        resp = decode_frame_to_base64(resp)
                         
                     self.socketio.emit(msg, {"value": resp})
                     if self.debugging:
