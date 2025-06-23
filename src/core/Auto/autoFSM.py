@@ -10,6 +10,7 @@ from src.core.Auto.pathPlanning.PositionFinder import PositionFinder
 from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.core.Auto.LaneFollow.LaneFollow import LaneFollower as LaneFollowController
 from src.core.Auto.SpecialSituationControl import SpecialSituationControl
+from src.core.Auto.Highway import Highway
 from src.core.Auto.SpeedControl import SpeedControl
 from src.core.Auto.IntersectionControl import IntersectionControl
 from src.core.Auto.RoundaboutControl import RoundaboutController 
@@ -75,6 +76,7 @@ class autoFSM(ControlModeThread):
         self.overtakeController = Overtake(self.logging, self.debugging)
         self.roundaboutController = RoundaboutController(512, 270, self.logging, True)
         self.crosswalkController = CrosswalkController()
+        self.highwayController = Highway(512, 270, self.logging, self.debugging)
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -232,6 +234,7 @@ class autoFSM(ControlModeThread):
             if self.traffic_signs.get_active() == "highway_exit" or stop_line_present:
                 print("Izlazak sa auto puta")
                 self.traffic_signs.clear()
+                self.highwayController.deactivate_highway_mode()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.set_pid_highway(False)
 
@@ -293,6 +296,7 @@ class autoFSM(ControlModeThread):
             elif self.traffic_signs.get_active() == "highway_entrance":
                 print("Ulazak na autoput")
                 self.traffic_signs.clear()
+                self.highwayController.activate_highway_mode()
                 self.state = autoFSMState.HIGHWAY
                 self.laneFollowContrler.set_pid_highway(True)
             
@@ -372,12 +376,37 @@ class autoFSM(ControlModeThread):
                 self.leftX, self.rightX, self.leftVisible, self.rightVisible, self.current_node, self.navigateCommand
             )
             
+            # Proverava da li je highway mod aktivan za kontrolu ugla
+            highway_angle = None
+            if self.state == autoFSMState.HIGHWAY:
+                highway_angle = self.highwayController.process_highway_control(
+                    self.leftX, self.rightX, self.leftVisible, self.rightVisible
+                )
+            
             if self.specialSituationController.is_active():
                 # SpecialSituationControl preuzima kontrolu
                 angle = special_angle
                 speed = special_speed
                 if self.debugging:
                     print(f"Special situation control active: angle={angle}, speed={speed}")
+            elif self.state == autoFSMState.HIGHWAY and highway_angle is not None:
+                # Highway kontroler preuzima kontrolu ugla, brzinu kontroliše SpeedControl
+                angle = highway_angle
+                no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
+                stephanie_crossing = self.stephanie_position and self.traffic_signs.get_active() != "crosswalk"
+
+                speed = self.speedControler.getControlData(
+                    angle=angle,
+                    stopLine=stop_line_present_close,
+                    lowDistance=stop_line_present,
+                    highway=True,
+                    frontDistance=front_sensors["distance"],
+                    enable_emergency_stop=no_active_sign,
+                    car_in_front=self.sign_car_position,
+                    stephanie_in_front=stephanie_crossing
+                )
+                if self.debugging:
+                    print(f"Highway control active: angle={angle}, speed={speed}")
             else:
                 # Standardno lane following upravljanje
                 no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
