@@ -250,14 +250,14 @@ class autoFSM(ControlModeThread):
                 self.laneFollowContrler.restartPid()
         
         if self.state == autoFSMState.DRIVE:
+            # Ignore parking sign if detected within 30 seconds after exiting parking
+            parking_sign_detected = self.traffic_signs.get_active() == "parking"
+            recently_exited_parking = (time.time() - self.last_parking_exit_time) < 30
             # Check for tunnel entry
             if self.tunnelController.is_in_tunnel_zone(self.current_node):
                 print("Ulazak u tunel")
                 self.state = autoFSMState.TUNNEL
-            # Ignore parking sign if detected within 30 seconds after exiting parking
-            parking_sign_detected = self.traffic_signs.get_active() == "parking"
-            recently_exited_parking = (time.time() - self.last_parking_exit_time) < 30
-            if parking_sign_detected and not recently_exited_parking:
+            elif parking_sign_detected and not recently_exited_parking:
                 self.traffic_signs.clear()
                 self.state = autoFSMState.PARKING
                 print("Parking sign detected, transitioning to PARKING state")
