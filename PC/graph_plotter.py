@@ -63,7 +63,7 @@ def main():
     global graph, pos, node_colors
 
     # Path to your GraphML file
-    graphml_file = "../src/core/Auto/pathPlanning/Small_map.graphml"  # Replace with your file path
+    graphml_file = "../src/core/Auto/pathPlanning/Competition_track_graph.graphml"  # Replace with your file path
 
     # Load the graph
     graph = load_graphml(graphml_file)
