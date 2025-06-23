@@ -36,7 +36,7 @@ class IntersectionControl():
         
         # Traffic light timeout handling
         self.traffic_light_wait_start = None
-        self.traffic_light_timeout = 5.0  # 5 seconds timeout
+        self.traffic_light_timeout = 3.0  # 3 seconds timeout
     
     def calculate_distance_to_straighten(self, alpha_deg, wheelbase=26, max_steering_angle=25):
         """
@@ -143,8 +143,7 @@ class IntersectionControl():
             # Check if green light or timeout exceeded
             if trafficLights.get_active() == "green" or wait_duration >= self.traffic_light_timeout:
                 if wait_duration >= self.traffic_light_timeout:
-                    if self.debugging:
-                        self.logging.info(f"Traffic light timeout reached ({self.traffic_light_timeout}s), proceeding as green")
+                    print(f"Traffic light timeout reached ({self.traffic_light_timeout}s), proceeding as green")
                 
                 self.state = "approach_stop_line"
                 self.approach_counter = 0
