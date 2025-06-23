@@ -565,7 +565,7 @@ class autoFSM(ControlModeThread):
             vehicle_position = self.localization.get_location()
             self.vehicleToEverythingSender.send({
                 "type": "devicePos",
-                "values": [vehicle_position[0], vehicle_position[1]]
+                "values": [vehicle_position[0] / 100, vehicle_position[1] / 100]
             })
             self.vehicleToEverythingSender.send({
                 "type": "deviceRot",
