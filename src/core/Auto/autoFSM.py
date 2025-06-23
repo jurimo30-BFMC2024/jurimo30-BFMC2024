@@ -5,6 +5,7 @@ if __name__ == "__main__":
 from src.core.Auto.Parking.Parking import Parking
 from src.core.Auto.Overtake.Overtake import Overtake
 from src.core.Auto.Localization.Localization import Localization
+from src.core.Auto.Localization.Median_2D import median_2d_point
 from src.core.Auto.pathPlanning.PositionFinder import PositionFinder
 from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.core.Auto.LaneFollow.LaneFollow import LaneFollower as LaneFollowController
@@ -100,21 +101,19 @@ class autoFSM(ControlModeThread):
             # heading = self.headingSubscriber.receiveWithBlock()
             # print(f'Current heading: {heading}')
             # --- Median filter for location ---
-            location_x_buffer = []
-            location_y_buffer = []
-            for _ in range(5):
+            location_buffer = []
+            for _ in range(3):
                 location = self.locationSubscriber.receiveWithBlock()
-                location_x_buffer.append(float(location['x']))
-                location_y_buffer.append(float(location['y']))
+                print(f'Location received: {location}')
+                location_buffer.append((float(location['x']), float(location['y'])))
 
-            print(f'Raw location data: x={location_x_buffer}, y={location_y_buffer}')
+            print(f'Raw location data: location_buffer={location_buffer}')
 
-            median_x = statistics.median(location_x_buffer)
-            median_y = statistics.median(location_y_buffer)
-            print(f'Median filtered location: x={median_x}, y={median_y}')
+            median_point = median_2d_point(location_buffer)
+            print(f'Median point: {median_point}')
 
             # Initialize localization systems
-            best_node, best_node_offset = self.positionFinder.find_best_node(median_x / 10, median_y / 10)
+            best_node, best_node_offset = self.positionFinder.find_best_node(median_point[0] / 10, median_point[1] / 10)
             print(f'Current node: {best_node} with offset: {best_node_offset}cm ')
         else:
             print(f'Using predefined node: {best_node}')
