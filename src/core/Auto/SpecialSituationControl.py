@@ -18,11 +18,12 @@ class SpecialSituationControl:
         self.single_line_active = False
         self.tracked_line_side = None  # 'left' ili 'right'
         
-        # Rastojanje od linije koje treba održavati
-        self.target_distance_from_line = 100  # pikseli
+        # Rastojanje od linije koje treba održavati - odvojeno za levu i desnu
+        self.target_distance_right = 100   # pikseli za desnu liniju
+        self.target_distance_left = 123   # pikseli za levu liniju
         
         # PID kontroler za praćenje jedne linije (kopirani parametri iz LaneFollow)
-        self.pid = PIDController(kp=0.35, ki=0.01, kd=0.01, kaw=3, output_limits=(-25, 25))
+        self.pid = PIDController(kp=0.35, ki=0.01, kd=0, kaw=0, output_limits=(-25, 25))
         
         # Referentna tačka u slici
         self.center_x = self.width * 0.47
@@ -63,11 +64,11 @@ class SpecialSituationControl:
     def calculate_single_line_error(self, line_x: int, side: str):
         """Izračunava grešku za praćenje jedne linije"""
         if side == "left":
-            # Za levu liniju, želimo da budemo na target_distance_from_line desno od nje
-            target_x = line_x + self.target_distance_from_line
+            # Za levu liniju, želimo da budemo na target_distance_left desno od nje
+            target_x = line_x + self.target_distance_left
         else:  # right
-            # Za desnu liniju, želimo da budemo na target_distance_from_line levo od nje
-            target_x = line_x - self.target_distance_from_line
+            # Za desnu liniju, želimo da budemo na target_distance_right levo od nje
+            target_x = line_x - self.target_distance_right
             
         error = self.center_x - target_x
         return error
@@ -133,11 +134,11 @@ class SpecialSituationControl:
             
         elif tracking_side == "left" and not left_visible:
             # Ide levo ali ne vidi levu liniju - skreće levo pod zadatim uglom
-            angle = -self.intersection_angle_degrees
+            angle = self.intersection_angle_degrees
             
         elif tracking_side == "right" and not right_visible:
             # Ide desno ali ne vidi desnu liniju - skreće desno pod zadatim uglom
-            angle = self.intersection_angle_degrees
+            angle = -self.intersection_angle_degrees
             
         else:
             # Za pravo ili neočekivano stanje
@@ -149,7 +150,7 @@ class SpecialSituationControl:
             else:
                 angle = 0
         
-        speed = 150  # Smanjena brzina na raskrsnici
+        speed = 250  # Smanjena brzina na raskrsnici
         
         if self.debugging:
             print(f"Intersection control: Direction={self.intersection_direction}, "
@@ -187,7 +188,7 @@ class SpecialSituationControl:
                 error = 0
                 
             angle = self.pid.compute(error, dt=dt)
-            speed = 150  # Smanjena brzina pri praćenju jedne linije
+            speed = 220  # Smanjena brzina pri praćenju jedne linije
             
             if self.debugging:
                 print(f"Single line control: Side={self.tracked_line_side}, "
