@@ -15,6 +15,7 @@ from src.core.Auto.SpeedControl import SpeedControl
 from src.core.Auto.IntersectionControl import IntersectionControl
 from src.core.Auto.RoundaboutControl import RoundaboutController 
 from src.core.Auto.Crosswalk import CrosswalkController
+from src.core.Auto.tunel import TunnelControl
 from src.utils.messages.allMessages import (
     LaneDetect,
     CoreSteerMotor,
@@ -51,6 +52,7 @@ class autoFSMState(Enum):
     ROUNDABOUT = auto()
     CROSSWALK = auto()
     HIGHWAY = auto()
+    TUNNEL = auto()
 
 class autoFSM(ControlModeThread):
     def __init__(self, queueList, logging, debugging=False):
@@ -77,6 +79,7 @@ class autoFSM(ControlModeThread):
         self.roundaboutController = RoundaboutController(512, 270, self.logging, True)
         self.crosswalkController = CrosswalkController()
         self.highwayController = Highway(512, 270, self.logging, self.debugging)
+        self.tunnelController = TunnelControl(512, 270, self.logging, self.debugging)
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -238,7 +241,19 @@ class autoFSM(ControlModeThread):
                 self.laneFollowContrler.set_pid_highway(False)
 
         
+        if self.state == autoFSMState.TUNNEL:
+            # Exit tunnel when no longer in tunnel nodes
+            if not self.tunnelController.is_in_tunnel_zone(self.current_node):
+                print("Izlazak iz tunela")
+                self.tunnelController.reset()
+                self.state = autoFSMState.DRIVE
+                self.laneFollowContrler.restartPid()
+        
         if self.state == autoFSMState.DRIVE:
+            # Check for tunnel entry
+            if self.tunnelController.is_in_tunnel_zone(self.current_node):
+                print("Ulazak u tunel")
+                self.state = autoFSMState.TUNNEL
             # Ignore parking sign if detected within 30 seconds after exiting parking
             parking_sign_detected = self.traffic_signs.get_active() == "parking"
             recently_exited_parking = (time.time() - self.last_parking_exit_time) < 30
@@ -379,6 +394,33 @@ class autoFSM(ControlModeThread):
                 self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
+
+
+        elif self.state == autoFSMState.TUNNEL:
+            tunnel_angle, tunnel_speed = self.tunnelController.process_tunnel_control(
+                self.leftX, self.rightX, self.leftVisible, self.rightVisible, self.current_node
+            )
+            
+            if tunnel_angle is not None and tunnel_speed is not None:
+                angle = tunnel_angle
+                speed = tunnel_speed
+                if self.debugging:
+                    print(f"Tunnel control active: angle={angle}, speed={speed}")
+            else:
+                # Fallback to standard lane following if tunnel control returns None
+                speed = self.speedControler.getControlData(
+                    angle=angle,
+                    stopLine=stop_line_present_close,
+                    lowDistance=stop_line_present,
+                    highway=False,
+                    frontDistance=front_sensors["distance"],
+                    enable_emergency_stop=True,
+                    car_in_front=self.sign_car_position,
+                    stephanie_in_front=False
+                )
+
+            self.current_node = self.localization.update_position(speed / 10)
+            self.localization.calibrate_heading(heading)
 
         elif self.state == autoFSMState.DRIVE:
             # Pokušava SpecialSituationControl - modul interno upravlja ulaskom u specijalne raskrsnice
