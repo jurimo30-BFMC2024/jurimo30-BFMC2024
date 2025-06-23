@@ -285,6 +285,11 @@ class threadObjectDetection(ThreadWithStop):
                                 "name": name,
                                 "position": scaled_position
                             })
+                       else:
+                            self.objectDetectionSender.send({
+                                "name": "exit",
+                                "position": None
+                            })
                            
                        # Update previous exit center
                        self.previous_exit_center = current_center
