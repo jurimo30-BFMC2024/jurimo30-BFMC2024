@@ -268,11 +268,11 @@ class threadObjectDetection(ThreadWithStop):
                        # Special logic for exit object - check distance from previous center
                        current_center = self.calculate_bounding_box_center(current_position)
                        
-                       should_send = True
+                       should_send = False
                        if self.previous_exit_center is not None:
                            distance = self.calculate_distance(current_center, self.previous_exit_center)
                            if distance <= 150:
-                               should_send = False
+                               should_send = True
                           # print(f"Distanca: {distance}")
 
                        if should_send:
