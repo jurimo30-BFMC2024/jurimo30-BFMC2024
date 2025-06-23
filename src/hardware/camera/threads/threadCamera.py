@@ -149,7 +149,8 @@ class threadCamera(ThreadWithStop):
             serialRequest = self.camera.capture_array("lores")
 
             if self.recording:
-                self.video_writer.write(serialRequest)
+                serialRequestForRecording = cv2.cvtColor(serialRequest, cv2.COLOR_YUV2BGR_I420)
+                self.video_writer.write(serialRequestForRecording)
 
             serialEncodedImageData = encode_frame(serialRequest)
             self.serialCameraSender.send(serialEncodedImageData)

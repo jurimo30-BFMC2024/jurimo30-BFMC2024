@@ -49,6 +49,8 @@ import logging
 
 logging.basicConfig(level=logging.INFO)
 
+UWB_DEVICE_ID = 9
+
 # ===================================== PROCESS IMPORTS ==================================
 
 from src.gateway.processGateway import processGateway
@@ -123,7 +125,7 @@ if Semaphores:
 
 # Initializing GPS
 if TrafficCommunication:
-    processTrafficCommunication = processTrafficCommunication(queueList, logging, 3, debugging = False)
+    processTrafficCommunication = processTrafficCommunication(queueList, logging, UWB_DEVICE_ID, debugging = False)
     allProcesses.append(processTrafficCommunication)
 
 # Initializing serial connection NUCLEO - > PI

@@ -5,13 +5,17 @@ if __name__ == "__main__":
 from src.core.Auto.Parking.Parking import Parking
 from src.core.Auto.Overtake.Overtake import Overtake
 from src.core.Auto.Localization.Localization import Localization
+from src.core.Auto.Localization.Median_2D import median_2d_point
 from src.core.Auto.pathPlanning.PositionFinder import PositionFinder
 from src.core.Core.ControlModeThread.ControlModeThread import ControlModeThread
 from src.core.Auto.LaneFollow.LaneFollow import LaneFollower as LaneFollowController
+from src.core.Auto.SpecialSituationControl import SpecialSituationControl
+from src.core.Auto.Highway import Highway
 from src.core.Auto.SpeedControl import SpeedControl
 from src.core.Auto.IntersectionControl import IntersectionControl
 from src.core.Auto.RoundaboutControl import RoundaboutController 
 from src.core.Auto.Crosswalk import CrosswalkController
+from src.core.Auto.tunel import TunnelControl
 from src.utils.messages.allMessages import (
     LaneDetect,
     CoreSteerMotor,
@@ -25,6 +29,7 @@ from src.utils.messages.allMessages import (
     Location,
     Heading,
     VehicleToEverything,
+    ResetSignDetectionRequest,
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
@@ -37,6 +42,7 @@ from enum import Enum, auto
 from src.data.TrafficCommunication.useful.Obstacles import Obstacles
 from src.core.Auto.SpecialReactions.IntersectionCrosswalk import IntersectionCrosswalkController
 from src.core.Auto.SpecialReactions.CrosswalkIntersection import CrosswalkIntersectionController
+import statistics
 
 """
     - stopline staviti u jedan stopline subscriber
@@ -52,6 +58,7 @@ class autoFSMState(Enum):
     HIGHWAY = auto()
     INTERSECTION_CROSSWALK = auto()
     CROSSWALK_INTERSECTION = auto()
+    TUNNEL = auto()
 
 class autoFSM(ControlModeThread):
     def __init__(self, queueList, logging, debugging=False):
@@ -62,6 +69,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender = messageHandlerSender(self.queuesList, CoreSteerMotor)
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
         self.vehicleToEverythingSender = messageHandlerSender(self.queuesList, VehicleToEverything)
+        self.resetRequestSender = messageHandlerSender(self.queuesList, ResetSignDetectionRequest)
 
         # Define special node lists with descriptive names
         self.tunnel_nodes = [
@@ -90,9 +98,10 @@ class autoFSM(ControlModeThread):
         super().__init__()
 
     def start(self):
-        self.positionFinder = PositionFinder("Small_map_roundabout.graphml")
+        self.positionFinder = PositionFinder("Competition_track_graph.graphml")
         self.laneFollowContrler = LaneFollowController(512, 270, self.logging, False)
         self.collisionDetector = CollisionDetector(512, 270, 50, 50, self.logging, True)
+        self.specialSituationController = SpecialSituationControl(512, 270, self.logging, self.debugging)
         self.speedControler = SpeedControl(self.logging, False)
         self.intersectionController = IntersectionControl(self.logging, self.debugging)
         self.parkingController = Parking(self.logging, self.debugging)
@@ -104,6 +113,8 @@ class autoFSM(ControlModeThread):
         self.crosswalkController = CrosswalkController()
         self.intersectionCrosswalkController = IntersectionCrosswalkController(self.intersectionController, self.crosswalkController)
         self.crosswalkIntersectionController = CrosswalkIntersectionController(self.intersectionController, self.crosswalkController)
+        self.highwayController = Highway(512, 270, self.logging, self.debugging)
+        self.tunnelController = TunnelControl(512, 270, self.logging, self.debugging)
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -115,38 +126,54 @@ class autoFSM(ControlModeThread):
         self.locationSubscriber.empty()
         self.headingSubscriber.empty()
 
+        self.resetRequestSender.send(True)  # Reset the system
+
         self.last_sent_time_v2x = 0
         self.oldAngle = 0
         self.oldSpeed = 0
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
 
-        best_node = 52  # Starting node, for testing purposes, remove later
+        best_node = None  # Starting node, for testing purposes, remove later
 
         if best_node is None:
             print("No predefined node, using localization system to find best node")
-            heading = self.headingSubscriber.receiveWithBlock()
-            print(f'Current heading: {heading}')
-            location = self.locationSubscriber.receiveWithBlock()
-            print(f'Current location: {location}')
+            # heading = self.headingSubscriber.receiveWithBlock()
+            # print(f'Current heading: {heading}')
+            # --- Median filter for location ---
+            location_buffer = []
+            for _ in range(3):
+                location = self.locationSubscriber.receiveWithBlock()
+                print(f'Location received: {location}')
+                location_buffer.append((float(location['x']), float(location['y'])))
+
+            print(f'Raw location data: location_buffer={location_buffer}')
+
+            median_point = median_2d_point(location_buffer)
+            print(f'Median point: {median_point}')
 
             # Initialize localization systems
-            best_node, best_node_offset = self.positionFinder.find_best_node(float(location['x']), float(location['y']), heading)
+            best_node, best_node_offset = self.positionFinder.find_best_node(median_point[0] / 10, median_point[1] / 10)
             print(f'Current node: {best_node} with offset: {best_node_offset}cm ')
         else:
             print(f'Using predefined node: {best_node}')
             print("Predefined node is used, this should be removed later!")
             print("Make sure to set the best_node variable to None for automatic node detection!")
 
+        
+
         # od start pointa do kruznog
-        self.planer = PathPlanner(start=192, goal=317, mode="pacman")
+        # self.planer = PathPlanner(start=192, goal=317, mode="pacman")
         # kroz maglu
-        # self.planer = PathPlanner(start=97, goal=186, mode="pacman")
+        self.planer = PathPlanner(start=best_node)
         self.navigateCommand, segments = self.planer.planPath()
+        # self.navigateCommand = ["Left", "Right", "Left", "Left", "Left", "Left"]
+        # self.navigateCommand = ["Straight", "Right", "Exit 3"]
+        # self.navigateCommand = ["Exit 3", "Straight"]
         #self.navigateCommand.append("Left")
         #self.navigateCommand.append("Left")
         #self.navigateCommand.append("Straight")
-        # self.localization = Localization(segments)
+        self.localization = Localization(segments)
 
         print(f'Navigation commands {self.navigateCommand}')
         self.traffic_signs = TrafficSignController([
@@ -170,7 +197,10 @@ class autoFSM(ControlModeThread):
         self.car_in_danger_zone = False
 
         self.state = autoFSMState.DRIVE
-        # self.localization.start_new_segment()
+        
+        # Dodavanje trenutnog čvora za path planning (potrebno za SpecialSituationControl)
+        self.current_node = best_node  # Početni čvor
+        self.localization.start_new_segment()
 
         self.last_parking_exit_time = 0  # Track last time parking state was exited
 
@@ -183,7 +213,8 @@ class autoFSM(ControlModeThread):
         self.leftX, self.rightX, self.leftVisible, self.rightVisible = self.laneDetectSubscriber.receiveWithBlock()
         stop_line_present, stop_line_distance, stop_line_angle = self.stopLineDetectionSubscriber.receiveWithBlock() # stopLine je sad tuple (intersection(bool), slope_degrees (float))
         stop_line_present_close = stop_line_present and stop_line_distance < 130
-        stop_line_present_semaphore = stop_line_present and stop_line_distance < 110
+        stop_line_present_semaphore = stop_line_present and stop_line_distance < 180
+
 
         while self.objectDetectionSubscriber.isDataInPipe():
             detected_objects_dict = self.objectDetectionSubscriber.receive() # This is now a dict
@@ -258,13 +289,26 @@ class autoFSM(ControlModeThread):
                 self.laneFollowContrler.set_pid_highway(False)
 
         
+        if self.state == autoFSMState.TUNNEL:
+            # Exit tunnel when no longer in tunnel nodes
+            if not self.tunnelController.is_in_tunnel_zone(self.current_node):
+                print("Izlazak iz tunela")
+                self.tunnelController.reset()
+                self.state = autoFSMState.DRIVE
+                self.laneFollowContrler.restartPid()
+        
         if self.state == autoFSMState.DRIVE:
             # Ignore parking sign if detected within 30 seconds after exiting parking
             parking_sign_detected = self.traffic_signs.get_active() == "parking"
             recently_exited_parking = (time.time() - self.last_parking_exit_time) < 30
-            if parking_sign_detected and not recently_exited_parking:
+            # Check for tunnel entry
+            if self.tunnelController.is_in_tunnel_zone(self.current_node):
+                print("Ulazak u tunel")
+                self.state = autoFSMState.TUNNEL
+            elif parking_sign_detected and not recently_exited_parking:
                 self.traffic_signs.clear()
                 self.state = autoFSMState.PARKING
+                print("Parking sign detected, transitioning to PARKING state")
             elif parking_sign_detected and recently_exited_parking:
                 # Ignore this parking sign
                 print("Parking sign detected but recently exited parking, ignoring sign")
@@ -338,12 +382,12 @@ class autoFSM(ControlModeThread):
                     direction=self.navigateCommand.pop(0),
                     traffic_light_present=False
                 )
-
                 self.state = autoFSMState.INTERSECTION
                         
             elif self.traffic_signs.get_active() == "highway_entrance":
                 print("Ulazak na autoput")
                 self.traffic_signs.clear()
+                self.highwayController.reset()
                 self.state = autoFSMState.HIGHWAY
                 self.laneFollowContrler.set_pid_highway(True)
             
@@ -372,11 +416,18 @@ class autoFSM(ControlModeThread):
             park_angle, speed, module_running = self.parkingController.run(parking_spot_detected, side_sensors)
             if park_angle is not None:
                 angle = park_angle
+                self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            else:
+                self.localization.update_position(speed / 10)
 
-            # self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            if self.traffic_signs.get_active() == "parking":
+                print("Parking sign detected, exiting PARKING state")
+                self.traffic_signs.clear()
+                self.state = autoFSMState.DRIVE
+                self.last_parking_exit_time = time.time()  # Update parking exit time
 
             if not module_running:
-                # self.localization.clamp_location_to_graph()
+                self.localization.clamp_location_to_graph()
                 self.state = autoFSMState.DRIVE
                 self.last_parking_exit_time = time.time()  # Update parking exit time
         
@@ -387,11 +438,12 @@ class autoFSM(ControlModeThread):
                 trafficLights=self.traffic_light_states
             )
 
-            # self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
             
             if not module_running:
                 self.traffic_light_states.clear()
-                # self.localization.start_new_segment()
+                self.resetRequestSender.send(True)  # Reset the sign detection system
+                self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
 
@@ -400,16 +452,19 @@ class autoFSM(ControlModeThread):
             if overtake_angle is not None:
                 angle = overtake_angle
 
-            # self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
 
             if not module_running:
-                # self.localization.clamp_location_to_graph()
+                self.localization.clamp_location_to_graph()
                 self.state = autoFSMState.DRIVE
 
         elif self.state == autoFSMState.CROSSWALK:
             angle, speed, module_stoping = self.crosswalkController.control(self.stephanie_position)
-            # self.localization.update_position(speed / 10)
+            self.current_node = self.localization.update_position(speed / 10)
+
             if module_stoping:
+                if self.traffic_signs.get_active() == "crosswalk":
+                    self.traffic_signs.clear()
                 self.state = autoFSMState.DRIVE
                 self.stephanie_position = None
                 self.laneFollowContrler.restartPid()
@@ -418,10 +473,10 @@ class autoFSM(ControlModeThread):
             angle, module_stoping = self.roundaboutController.process_frame(self.leftX, self.rightX, self.roundaboutExit_position, self.leftVisible, self.rightVisible)
             speed = 150
 
-            # self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
 
             if module_stoping:
-                # self.localization.start_new_segment()
+                self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
 
@@ -460,7 +515,75 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
 
-        elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
+        elif self.state == autoFSMState.TUNNEL:
+            tunnel_angle, tunnel_speed = self.tunnelController.process_tunnel_control(
+                self.leftX, self.rightX, self.leftVisible, self.rightVisible, self.current_node
+            )
+            
+            if tunnel_angle is not None and tunnel_speed is not None:
+                angle = tunnel_angle
+                speed = tunnel_speed
+                if self.debugging:
+                    print(f"Tunnel control active: angle={angle}, speed={speed}")
+            else:
+                # Fallback to standard lane following if tunnel control returns None
+                speed = self.speedControler.getControlData(
+                    angle=angle,
+                    stopLine=stop_line_present_close,
+                    lowDistance=stop_line_present,
+                    highway=False,
+                    frontDistance=front_sensors["distance"],
+                    enable_emergency_stop=True,
+                    car_in_front=self.sign_car_position,
+                    stephanie_in_front=False,
+                    current_node=self.current_node
+                )
+
+            self.current_node = self.localization.update_position(speed / 10)
+            self.localization.calibrate_heading(heading)
+
+        elif self.state == autoFSMState.DRIVE:
+            # Pokušava SpecialSituationControl - modul interno upravlja ulaskom u specijalne raskrsnice
+            special_angle, special_speed = self.specialSituationController.process_special_control(
+                self.leftX, self.rightX, self.leftVisible, self.rightVisible, self.current_node, self.navigateCommand
+            )
+            
+            if self.specialSituationController.is_active():
+                # SpecialSituationControl preuzima kontrolu
+                angle = special_angle
+                speed = special_speed
+                if self.debugging:
+                    print(f"Special situation control active: angle={angle}, speed={speed}")
+            else:
+                # Standardno lane following upravljanje
+                no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
+                stephanie_crossing = self.stephanie_position and self.traffic_signs.get_active() != "crosswalk"
+
+                speed = self.speedControler.getControlData(
+                    angle=angle,
+                    stopLine=stop_line_present_close,
+                    lowDistance=stop_line_present,
+                    highway=False,
+                    frontDistance=front_sensors["distance"],
+                    enable_emergency_stop=no_active_sign,
+                    car_in_front=self.sign_car_position,
+                    stephanie_in_front=stephanie_crossing,
+                    current_node=self.current_node
+                )
+
+            self.current_node = self.localization.update_position(speed / 10)
+            self.localization.calibrate_heading(heading)
+
+        elif self.state == autoFSMState.HIGHWAY:
+            # Get highway angle control
+            highway_angle = self.highwayController.process_highway_control(
+                self.leftX, self.rightX, self.leftVisible, self.rightVisible, self.current_node
+            )
+            
+            if highway_angle is not None:
+                # Highway kontroler preuzima kontrolu ugla
+                angle = highway_angle
+
             no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
             stephanie_crossing = self.stefanija_in_danger_zone and self.traffic_signs.get_active() != "crosswalk"
 
@@ -468,15 +591,18 @@ class autoFSM(ControlModeThread):
                 angle=angle,
                 stopLine=stop_line_present_close,
                 lowDistance=stop_line_present,
-                highway=self.state == autoFSMState.HIGHWAY,
+                highway=True,
                 frontDistance=front_sensors["distance"],
                 enable_emergency_stop=no_active_sign,
                 car_in_front=self.car_in_danger_zone,
-                stephanie_in_front=stephanie_crossing
+                stephanie_in_front=stephanie_crossing,
+                current_node=self.current_node
             )
+            if self.debugging:
+                print(f"Highway control active: angle={angle}, speed={speed}")
 
-            # self.localization.update_position(speed / 10)
-            # self.localization.calibrate_heading(heading)
+            self.current_node = self.localization.update_position(speed / 10)
+            self.localization.calibrate_heading(heading)
 
         ############################ Sending data ##############################
 
@@ -497,23 +623,23 @@ class autoFSM(ControlModeThread):
         # Use TrafficSign enum from obstacles.py for identifying obstacle types
         # Send when traffic signs, pedestrians, or other obstacles are detected
 
-        # # Send vehicle position and heading to VehicleToEverything
-        # current_time = time.time()
-        # if current_time - self.last_sent_time_v2x >= 1.0:  # Check if 1 second has passed
-        #     vehicle_position = self.localization.get_location()
-        #     self.vehicleToEverythingSender.send({
-        #         "type": "devicePos",
-        #         "values": [vehicle_position[0], vehicle_position[1]]
-        #     })
-        #     self.vehicleToEverythingSender.send({
-        #         "type": "deviceRot",
-        #         "values": [heading - self.localization.heading_error]
-        #     })
-        #     self.vehicleToEverythingSender.send({
-        #         "type": "deviceSpeed",
-        #         "values": [speed / 10]
-        #     })
-        #     self.last_sent_time_v2x = current_time
+        # Send vehicle position and heading to VehicleToEverything
+        current_time = time.time()
+        if current_time - self.last_sent_time_v2x >= 1.0:  # Check if 1 second has passed
+            vehicle_position = self.localization.get_location()
+            self.vehicleToEverythingSender.send({
+                "type": "devicePos",
+                "values": [vehicle_position[0] / 100, vehicle_position[1] / 100]
+            })
+            self.vehicleToEverythingSender.send({
+                "type": "deviceRot",
+                "values": [heading - self.localization.heading_error]
+            })
+            self.vehicleToEverythingSender.send({
+                "type": "deviceSpeed",
+                "values": [speed / 10]
+            })
+            self.last_sent_time_v2x = current_time
         
         # time.sleep(0.05)
 
