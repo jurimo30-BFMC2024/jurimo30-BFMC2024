@@ -25,7 +25,8 @@ class TunnelControl:
         self.tunnel_nodes = {
             # Dodaj specifične nodove gde vozilo prolazi kroz tunel
             # Primer:
-            "166", "167", "168", "169", "170", "171",
+            "166", "167", "168", "169", "170", "171", "172", "173", "174", "175",
+            "152", "153", "154", "155", "156", "157", "158", "159", "160", "161", "162"
             # Dodaj ostale čvorove tunela...
         }
         
