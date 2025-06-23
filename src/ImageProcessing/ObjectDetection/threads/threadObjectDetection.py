@@ -40,7 +40,7 @@ class threadObjectDetection(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_cluj_1.0/detect/train/weights/best.pt')
+        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo-fog/detect/train/weights/best.pt')
         self.streamer = VideoStream(0, 0)
         
         # Add ResetRequest subscriber
@@ -67,7 +67,8 @@ class threadObjectDetection(ThreadWithStop):
         self.relevant_objects = {
             "car": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False},
             "exit": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False},
-            "stefanija": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False}
+            "stefanija": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False},
+            "fog": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False}
         }
         
         # Exit center tracking for distance-based detection
@@ -161,6 +162,10 @@ class threadObjectDetection(ThreadWithStop):
                 if not (conf > 0.75):
                     continue
                 color = (0, 0, 255)
+            elif label == "fog":
+                if not (conf > 0.75):
+                    continue
+                color = (0, 0, 255)
             elif label == "exit":
                 if not (conf > 0.15):
                     continue
@@ -174,7 +179,7 @@ class threadObjectDetection(ThreadWithStop):
             else:
                 continue
             
-            if label not in ("car", "exit", "stefanija"):
+            if label not in ("car", "exit", "stefanija", "fog"):
                 # For traffic lights, only consider those on the right half of the image
                 if label in ("red", "green", "red_yellow", "yellow"):
                     center_x = (x1 + x2) / 2
@@ -295,7 +300,7 @@ class threadObjectDetection(ThreadWithStop):
                        self.previous_exit_center = current_center
                        
                    else:
-                       # Existing logic for car and stefanija
+                       # Existing logic for car, stefanija and fog
                        if self.debugging:
                             print(f"[DETEKCIJA] Objekat '{name}' detektovan na {scaled_position}")
 
