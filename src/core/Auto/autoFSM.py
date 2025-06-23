@@ -353,7 +353,10 @@ class autoFSM(ControlModeThread):
         elif self.state == autoFSMState.CROSSWALK:
             angle, speed, module_stoping = self.crosswalkController.control(self.stephanie_position)
             self.current_node = self.localization.update_position(speed / 10)
+
             if module_stoping:
+                if self.traffic_signs.get_active() == "crosswalk":
+                    self.traffic_signs.clear()
                 self.state = autoFSMState.DRIVE
                 self.stephanie_position = None
                 self.crosswalkStart = None
