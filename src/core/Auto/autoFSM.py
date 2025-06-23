@@ -315,8 +315,15 @@ class autoFSM(ControlModeThread):
             park_angle, speed, module_running = self.parkingController.run(parking_spot_detected, side_sensors)
             if park_angle is not None:
                 angle = park_angle
+                self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            else:
+                self.localization.update_position(speed / 10)
 
-            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            if self.traffic_signs.get_active() == "parking":
+                print("Parking sign detected, exiting PARKING state")
+                self.traffic_signs.clear()
+                self.state = autoFSMState.DRIVE
+                self.last_parking_exit_time = time.time()  # Update parking exit time
 
             if not module_running:
                 self.localization.clamp_location_to_graph()
