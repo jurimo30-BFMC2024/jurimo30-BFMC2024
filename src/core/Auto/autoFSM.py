@@ -237,7 +237,6 @@ class autoFSM(ControlModeThread):
             if self.traffic_signs.get_active() == "highway_exit" or stop_line_present:
                 print("Izlazak sa auto puta")
                 self.traffic_signs.clear()
-                self.highwayController.deactivate_highway_mode()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.set_pid_highway(False)
 
@@ -261,6 +260,7 @@ class autoFSM(ControlModeThread):
             if parking_sign_detected and not recently_exited_parking:
                 self.traffic_signs.clear()
                 self.state = autoFSMState.PARKING
+                print("Parking sign detected, transitioning to PARKING state")
             elif parking_sign_detected and recently_exited_parking:
                 # Ignore this parking sign
                 self.traffic_signs.clear()
@@ -311,7 +311,7 @@ class autoFSM(ControlModeThread):
             elif self.traffic_signs.get_active() == "highway_entrance":
                 print("Ulazak na autoput")
                 self.traffic_signs.clear()
-                self.highwayController.activate_highway_mode()
+                self.highwayController.reset()
                 self.state = autoFSMState.HIGHWAY
                 self.laneFollowContrler.set_pid_highway(True)
             
@@ -330,8 +330,15 @@ class autoFSM(ControlModeThread):
             park_angle, speed, module_running = self.parkingController.run(parking_spot_detected, side_sensors)
             if park_angle is not None:
                 angle = park_angle
+                self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            else:
+                self.localization.update_position(speed / 10)
 
-            self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
+            if self.traffic_signs.get_active() == "parking":
+                print("Parking sign detected, exiting PARKING state")
+                self.traffic_signs.clear()
+                self.state = autoFSMState.DRIVE
+                self.last_parking_exit_time = time.time()  # Update parking exit time
 
             if not module_running:
                 self.localization.clamp_location_to_graph()
@@ -368,7 +375,10 @@ class autoFSM(ControlModeThread):
         elif self.state == autoFSMState.CROSSWALK:
             angle, speed, module_stoping = self.crosswalkController.control(self.stephanie_position)
             self.current_node = self.localization.update_position(speed / 10)
+
             if module_stoping:
+                if self.traffic_signs.get_active() == "crosswalk":
+                    self.traffic_signs.clear()
                 self.state = autoFSMState.DRIVE
                 self.stephanie_position = None
                 self.crosswalkStart = None
@@ -384,6 +394,7 @@ class autoFSM(ControlModeThread):
                 self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
+
 
         elif self.state == autoFSMState.TUNNEL:
             tunnel_angle, tunnel_speed = self.tunnelController.process_tunnel_control(
@@ -411,18 +422,11 @@ class autoFSM(ControlModeThread):
             self.current_node = self.localization.update_position(speed / 10)
             self.localization.calibrate_heading(heading)
 
-        elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
+        elif self.state == autoFSMState.DRIVE:
             # Pokušava SpecialSituationControl - modul interno upravlja ulaskom u specijalne raskrsnice
             special_angle, special_speed = self.specialSituationController.process_special_control(
                 self.leftX, self.rightX, self.leftVisible, self.rightVisible, self.current_node, self.navigateCommand
             )
-            
-            # Proverava da li je highway mod aktivan za kontrolu ugla
-            highway_angle = None
-            if self.state == autoFSMState.HIGHWAY:
-                highway_angle = self.highwayController.process_highway_control(
-                    self.leftX, self.rightX, self.leftVisible, self.rightVisible, self.current_node, angle
-                )
             
             if self.specialSituationController.is_active():
                 # SpecialSituationControl preuzima kontrolu
@@ -430,24 +434,6 @@ class autoFSM(ControlModeThread):
                 speed = special_speed
                 if self.debugging:
                     print(f"Special situation control active: angle={angle}, speed={speed}")
-            elif self.state == autoFSMState.HIGHWAY and highway_angle is not None:
-                # Highway kontroler preuzima kontrolu ugla, brzinu kontroliše SpeedControl
-                angle = highway_angle
-                no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
-                stephanie_crossing = self.stephanie_position and self.traffic_signs.get_active() != "crosswalk"
-
-                speed = self.speedControler.getControlData(
-                    angle=angle,
-                    stopLine=stop_line_present_close,
-                    lowDistance=stop_line_present,
-                    highway=True,
-                    frontDistance=front_sensors["distance"],
-                    enable_emergency_stop=no_active_sign,
-                    car_in_front=self.sign_car_position,
-                    stephanie_in_front=stephanie_crossing
-                )
-                if self.debugging:
-                    print(f"Highway control active: angle={angle}, speed={speed}")
             else:
                 # Standardno lane following upravljanje
                 no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
@@ -457,12 +443,43 @@ class autoFSM(ControlModeThread):
                     angle=angle,
                     stopLine=stop_line_present_close,
                     lowDistance=stop_line_present,
-                    highway=self.state == autoFSMState.HIGHWAY,
+                    highway=False,
                     frontDistance=front_sensors["distance"],
                     enable_emergency_stop=no_active_sign,
                     car_in_front=self.sign_car_position,
-                    stephanie_in_front=stephanie_crossing
+                    stephanie_in_front=stephanie_crossing,
+                    current_node=self.current_node
                 )
+
+            self.current_node = self.localization.update_position(speed / 10)
+            self.localization.calibrate_heading(heading)
+
+        elif self.state == autoFSMState.HIGHWAY:
+            # Get highway angle control
+            highway_angle = self.highwayController.process_highway_control(
+                self.leftX, self.rightX, self.leftVisible, self.rightVisible, self.current_node
+            )
+            
+            if highway_angle is not None:
+                # Highway kontroler preuzima kontrolu ugla
+                angle = highway_angle
+
+            no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
+            stephanie_crossing = self.stephanie_position and self.traffic_signs.get_active() != "crosswalk"
+
+            speed = self.speedControler.getControlData(
+                angle=angle,
+                stopLine=stop_line_present_close,
+                lowDistance=stop_line_present,
+                highway=True,
+                frontDistance=front_sensors["distance"],
+                enable_emergency_stop=no_active_sign,
+                car_in_front=self.sign_car_position,
+                stephanie_in_front=stephanie_crossing,
+                current_node=self.current_node
+            )
+            if self.debugging:
+                print(f"Highway control active: angle={angle}, speed={speed}")
 
             self.current_node = self.localization.update_position(speed / 10)
             self.localization.calibrate_heading(heading)
