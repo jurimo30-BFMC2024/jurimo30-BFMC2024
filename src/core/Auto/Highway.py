@@ -30,21 +30,6 @@ class Highway:
         
         # Stanje modula
         self.last_frame_time = time.time()
-        self.highway_active = False
-        
-    def activate_highway_mode(self):
-        """Aktivira highway mod"""
-        self.highway_active = True
-        self.pid.reset()
-        if self.debugging:
-            print("Highway mode activated - tracking right line only")
-            
-    def deactivate_highway_mode(self):
-        """Deaktivira highway mod"""
-        self.highway_active = False
-        self.pid.reset()
-        if self.debugging:
-            print("Highway mode deactivated")
     
     def calculate_right_line_error(self, right_x: int):
         """Izračunava grešku za praćenje desne linije na autoputu"""
@@ -54,12 +39,9 @@ class Highway:
         return error
         
     def process_highway_control(self, left_x: int | None, right_x: int | None, 
-                              left_visible: bool, right_visible: bool, current_node: str, angle: int = 0):
+                              left_visible: bool, right_visible: bool, current_node: str):
 
-        if current_node in self.right_line_only_nodes:
-            if not self.highway_active:
-                return None
-                
+        if current_node in self.right_line_only_nodes:    
             current_time = time.time()
             dt = current_time - self.last_frame_time
             self.last_frame_time = current_time
@@ -75,17 +57,11 @@ class Highway:
             
             return -int(angle * 10)
         else:
-            if not self.highway_active:
-                return None
-            return angle
+            return None
     
-    def is_active(self):
-        """Proverava da li je highway mod aktivan"""
-        return self.highway_active
-        
     def reset(self):
         """Reset modula u početno stanje"""
-        self.highway_active = False
+        # self.highway_active = False
         self.pid.reset()
         self.last_frame_time = time.time()
         if self.debugging:
