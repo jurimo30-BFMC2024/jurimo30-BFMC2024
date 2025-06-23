@@ -39,6 +39,8 @@ class Localization:
         self.heading_error = 0.0  # Difference between IMU and calculated heading
         self.orientation = 0.0  # Current calculated orientation in degrees
 
+        self._current_node = None  # Add this line before the last line
+
     def start_new_segment(self):
         """
         Begin a new segment:
@@ -92,10 +94,9 @@ class Localization:
         self.total_distance += estimated_speed * dt
 
         # update position on current segment
-        current_node = self._update_location()
+        self._update_location()
 
         self.last_update_time = current_time
-        return current_node
 
     def _update_location(self):
         """
@@ -108,13 +109,12 @@ class Localization:
 
         # clamp to [0, total_len]
         d = min(max(self.total_distance, 0.0), total_len)
-        # print(f"d: {d}")
 
-        # find index i so that cum[i] <= d < cum[i+1]
         # if at very end, snap to last node
         if d >= self._cum_dists[-1]:
             self.location = nodes[-1]["pos"]
-            return nodes[-1]["idx"]
+            self._current_node = nodes[-1]["idx"]
+            return
 
         # binary or linear search
         for i in range(len(self._cum_dists)-1):
@@ -132,8 +132,9 @@ class Localization:
                 x = x0 + t * (x1 - x0)
                 y = y0 + t * (y1 - y0)
                 self.location = (x, y)
-                return nodes[i]["idx"]
-        return None
+                self._current_node = nodes[i]["idx"]
+                return
+        self._current_node = None
 
     def update_speed_error(self):
         """
@@ -288,6 +289,12 @@ class Localization:
         # Update the location to the closest point
         self.location = closest_point
         # print(f"Clamped location to: {self.location}")
+
+    def get_current_node(self):
+        """
+        Returns the current node index that the car is at or has most recently passed.
+        """
+        return self._current_node
 
 if __name__ == "__main__":
     def plot_track_and_position(segments, positions=None):
