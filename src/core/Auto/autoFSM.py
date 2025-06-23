@@ -51,6 +51,7 @@ class autoFSMState(Enum):
     ROUNDABOUT = auto()
     CROSSWALK = auto()
     HIGHWAY = auto()
+    FOG = auto()
 
 class autoFSM(ControlModeThread):
     def __init__(self, queueList, logging, debugging=False):
@@ -77,6 +78,13 @@ class autoFSM(ControlModeThread):
         self.roundaboutController = RoundaboutController(512, 270, self.logging, True)
         self.crosswalkController = CrosswalkController()
         self.highwayController = Highway(512, 270, self.logging, self.debugging)
+        
+        # Define fog zone nodes
+        self.fog_nodes = {
+            "166", "167", "168", "169", "170", "171", "172", "173", "174", "175",
+            "152", "153", "154", "155", "156", "157", "158", "159", "160", "161", "162",
+            # Add other fog zone nodes based on your map
+        }
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -89,6 +97,8 @@ class autoFSM(ControlModeThread):
         self.headingSubscriber.empty()
 
         self.resetRequestSender.send(True)  # Reset the system
+
+        self.fog = False
 
         self.last_sent_time_v2x = 0
         self.oldAngle = 0
@@ -179,6 +189,10 @@ class autoFSM(ControlModeThread):
             object_name = detected_objects_dict.get("name")
             object_position = detected_objects_dict.get("position")
 
+            if object_name == "fog" and object_position is not None:
+                self.fog = True
+            elif object_position is None:
+                self.fog = False
             if object_name == "stefanija":
                 self.stephanie_position = object_position
                 if self.debugging: print(f"Stephanie present: {self.stephanie_position}")
@@ -229,7 +243,13 @@ class autoFSM(ControlModeThread):
         
         ##############################         SET STATES            #############################
 
-        
+        if self.state == autoFSMState.FOG:
+            # Exit fog state if vehicle is no longer in fog nodes OR fog is not detected
+            if self.current_node not in self.fog_nodes or not self.fog:
+                print("Izlazak iz magle")
+                self.state = autoFSMState.DRIVE
+                self.laneFollowContrler.restartPid()
+
         if self.state == autoFSMState.HIGHWAY:
             if self.traffic_signs.get_active() == "highway_exit" or stop_line_present:
                 print("Izlazak sa auto puta")
@@ -240,6 +260,10 @@ class autoFSM(ControlModeThread):
 
         
         if self.state == autoFSMState.DRIVE:
+            # Check for fog entry - both conditions must be met
+            if self.current_node in self.fog_nodes and self.fog:
+                print("Ulazak u maglu")
+                self.state = autoFSMState.FOG
             # Ignore parking sign if detected within 30 seconds after exiting parking
             parking_sign_detected = self.traffic_signs.get_active() == "parking"
             recently_exited_parking = (time.time() - self.last_parking_exit_time) < 30
@@ -369,6 +393,36 @@ class autoFSM(ControlModeThread):
                 self.localization.start_new_segment()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
+
+        elif self.state == autoFSMState.FOG:
+            special_angle, special_speed = self.specialSituationController.process_special_control(
+                self.leftX, self.rightX, self.leftVisible, self.rightVisible, self.current_node, self.navigateCommand
+            )
+            
+            if self.specialSituationController.is_active():
+                # SpecialSituationControl preuzima kontrolu
+                angle = special_angle
+                speed = special_speed
+                if self.debugging:
+                    print(f"Special situation control active: angle={angle}, speed={speed}")
+            else:
+                # Standardno lane following upravljanje
+                no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
+                stephanie_crossing = self.stephanie_position and self.traffic_signs.get_active() != "crosswalk"
+
+                speed = self.speedControler.getControlData(
+                    angle=angle,
+                    stopLine=False,
+                    lowDistance=False,
+                    highway=self.state == autoFSMState.HIGHWAY,
+                    frontDistance=front_sensors["distance"],
+                    enable_emergency_stop=no_active_sign,
+                    car_in_front=self.sign_car_position,
+                    stephanie_in_front=stephanie_crossing
+                )
+
+            self.current_node = self.localization.update_position(speed / 10)
+            self.localization.calibrate_heading(heading)
 
         elif self.state == autoFSMState.DRIVE or self.state == autoFSMState.HIGHWAY:
             # Pokušava SpecialSituationControl - modul interno upravlja ulaskom u specijalne raskrsnice
