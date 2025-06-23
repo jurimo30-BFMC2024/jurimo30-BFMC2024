@@ -14,6 +14,13 @@ class Highway:
         # Rastojanje od desne linije koje treba održavati na autoputu
         self.target_distance_right = 100   # pikseli za desnu liniju
         
+        # Nodovi na kojima se prati samo desna linija
+        self.right_line_only_nodes = {
+            "399", "400", "401", "444", "445", "446",
+            "421", "422", "423", "463", "464", "465",
+            # Dodaj specifične nodove gde treba pratiti samo desnu liniju
+        }
+        
         # PID kontroler za praćenje desne linije (parametri iz SpecialSituationControl)
         self.pid = PIDController(kp=0.35, ki=0.01, kd=0, kaw=0, output_limits=(-25, 25))
         
@@ -47,52 +54,30 @@ class Highway:
         return error
         
     def process_highway_control(self, left_x: int | None, right_x: int | None, 
-                              left_visible: bool, right_visible: bool):
-        """
-        Glavna metoda za obradu upravljanja na autoputu
-        
-        Args:
-            left_x: X koordinata leve linije
-            right_x: X koordinata desne linije  
-            left_visible: Da li je leva linija vidljiva
-            right_visible: Da li je desna linija vidljiva
-            
-        Returns:
-            int: steering angle ili None ako modul nije aktivan
-        """
-        if not self.highway_active:
-            return None
-            
-        current_time = time.time()
-        dt = current_time - self.last_frame_time
-        self.last_frame_time = current_time
-        
-        # Na autoputu pratimo samo desnu liniju
-        if right_visible and right_x is not None:
-            error = self.calculate_right_line_error(right_x)
-            angle = self.pid.compute(error, dt=dt)
-            
-            if self.debugging:
-                print(f"Highway control: RightX={right_x}, Error={error:.1f}px, Angle={angle:.1f}°")
+                              left_visible: bool, right_visible: bool, current_node: str, angle: int = 0):
+
+        if current_node in self.right_line_only_nodes:
+            if not self.highway_active:
+                return None
                 
-        else:
-            # Ako desna linija nije vidljiva, pokušaj sa levom linijom
-            if left_visible and left_x is not None:
-                # Proceni poziciju desne linije na osnovu leve
-                estimated_right_x = left_x + 200  # Pretpostavka o širini trake
-                error = self.calculate_right_line_error(estimated_right_x)
+            current_time = time.time()
+            dt = current_time - self.last_frame_time
+            self.last_frame_time = current_time
+            
+            # Na autoputu pratimo samo desnu liniju
+            if right_visible and right_x is not None:
+                error = self.calculate_right_line_error(right_x)
                 angle = self.pid.compute(error, dt=dt)
                 
                 if self.debugging:
-                    print(f"Highway control (estimated): EstimatedRightX={estimated_right_x}, Error={error:.1f}px, Angle={angle:.1f}°")
-            else:
-                # Ni jedna linija nije vidljiva - drži pravi kurs
-                angle = 0
-                
-                if self.debugging:
-                    print("Highway control: No lines visible, maintaining straight course")
-        
-        return -int(angle * 10)
+                    print(f"Highway control: RightX={right_x}, Error={error:.1f}px, Angle={angle:.1f}°")
+                    
+            
+            return -int(angle * 10)
+        else:
+            if not self.highway_active:
+                return None
+            return angle
     
     def is_active(self):
         """Proverava da li je highway mod aktivan"""

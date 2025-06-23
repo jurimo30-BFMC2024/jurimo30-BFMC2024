@@ -14,8 +14,14 @@ class SpeedControl():
         self.emergency_stop_threshold = 3  # Consecutive readings required
         self.consecutive_emergency = 0
         self.stop = False
-        self.waiting_time = 2.0
+        self.waiting_time = 6.0
         self.entered_highway_time = None
+
+        self.right_line_only_nodes = {
+            "399", "400", "401", "444", "445", "446",
+            "421", "422", "423", "463", "464", "465",
+            # Dodaj specifične nodove gde treba pratiti samo desnu liniju
+        }
 
     def filter(self, angle, alpha=0.3):
         self.oldAngle = angle * alpha + self.oldAngle * (1 - alpha)
@@ -26,14 +32,10 @@ class SpeedControl():
         return out_min + (out_max - out_min) * (value - in_min) / (in_max - in_min)
 
     def getControlData(self, angle, stopLine, lowDistance, highway, frontDistance,
-                   enable_emergency_stop, car_in_front, stephanie_in_front):
+                   enable_emergency_stop, car_in_front, stephanie_in_front, current_node: str | None):
         if stopLine:
             return 65
 
-        if highway and self.entered_highway_time is None:
-            self.entered_highway_time = time.time()
-        elif not highway:
-            self.entered_highway_time = None
 
         # Speed calculation based on highway mode and angle
         if not highway:
@@ -44,13 +46,8 @@ class SpeedControl():
             else:
                 speed = self.map_value(angle, 30, 145, 280, 350)
         else:
-            if self.entered_highway_time is not None and time.time() - self.entered_highway_time < self.waiting_time:
-                if abs(angle) < 30:
-                    speed = 350
-                elif abs(angle) > 145:
-                    speed = 220
-                else:
-                    speed = self.map_value(angle, 30, 145, 280, 350)
+            if current_node in self.right_line_only_nodes:
+                speed = 280
             else:
                 if abs(angle) < 30:
                     speed = 480

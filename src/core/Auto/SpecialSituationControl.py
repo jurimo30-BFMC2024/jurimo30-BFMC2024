@@ -33,7 +33,7 @@ class SpecialSituationControl:
         # Ovi čvorovi predstavljaju zone gde vozilo treba specijalno upravljanje
         self.intersection_nodes = {
             # Primer za malu mapu - prilagoditi stvarnoj mapi
-            'intersection_main': [190, 191, 192, 193, 194, 223],  # Glavni čvorovi raskrsnica
+            'intersection_main': ['190', '191', '192', '193', '194', '223'],  # Glavni čvorovi raskrsnica
             # Dodajte ostale raskrsnice na osnovu graphml fajla...
         }
         
@@ -45,7 +45,7 @@ class SpecialSituationControl:
         self.last_frame_time = time.time()
         self.current_intersection = None  # Trenutna aktivna raskrsnica
         
-    def is_in_intersection_zone(self, current_node: int):
+    def is_in_intersection_zone(self, current_node: str):
         """Proverava da li je vozilo u zoni raskrsnice"""
         for intersection_name, nodes in self.intersection_nodes.items():
             if current_node in nodes:
@@ -75,7 +75,7 @@ class SpecialSituationControl:
         
  # Provjeriti funkciju naknadno
     def process_special_control(self, left_x: int | None, right_x: int | None, 
-                              left_visible: bool, right_visible: bool, current_node: int, navigate_command=None):
+                              left_visible: bool, right_visible: bool, current_node: str, navigate_command=None):
         """
         Glavna metoda za obradu specijalnih situacija
         

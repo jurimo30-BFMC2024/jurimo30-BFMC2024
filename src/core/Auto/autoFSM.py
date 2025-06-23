@@ -380,7 +380,7 @@ class autoFSM(ControlModeThread):
             highway_angle = None
             if self.state == autoFSMState.HIGHWAY:
                 highway_angle = self.highwayController.process_highway_control(
-                    self.leftX, self.rightX, self.leftVisible, self.rightVisible
+                    self.leftX, self.rightX, self.leftVisible, self.rightVisible, self.current_node, angle
                 )
             
             if self.specialSituationController.is_active():
