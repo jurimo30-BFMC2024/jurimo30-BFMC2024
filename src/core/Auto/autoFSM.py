@@ -444,7 +444,8 @@ class autoFSM(ControlModeThread):
                     frontDistance=front_sensors["distance"],
                     enable_emergency_stop=no_active_sign,
                     car_in_front=self.sign_car_position,
-                    stephanie_in_front=stephanie_crossing
+                    stephanie_in_front=stephanie_crossing,
+                    current_node=self.current_node
                 )
 
             self.current_node = self.localization.update_position(speed / 10)
@@ -470,7 +471,8 @@ class autoFSM(ControlModeThread):
                     frontDistance=front_sensors["distance"],
                     enable_emergency_stop=True,
                     car_in_front=self.sign_car_position,
-                    stephanie_in_front=False
+                    stephanie_in_front=False,
+                    current_node=self.current_node
                 )
 
             self.current_node = self.localization.update_position(speed / 10)
