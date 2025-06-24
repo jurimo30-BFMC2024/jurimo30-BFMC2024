@@ -72,6 +72,14 @@ class autoFSM(ControlModeThread):
         self.vehicleToEverythingSender = messageHandlerSender(self.queuesList, VehicleToEverything)
         self.resetRequestSender = messageHandlerSender(self.queuesList, ResetSignDetectionRequest)
 
+        self.roundaboutNodes = [
+            "357", "358", "359", "360", "361", "362", "363", "364", "365", "366", "367",
+            "388", "389", "390", "391", "392", "393", "394", "395", "396", "397",
+            "307", "308", "309", "310", "311", "312", "313", "314", "315", "316", "317",
+            "475", "476", "477", "478", "479", "480", "481", "482", "402", "403", "404", "405",
+            "340", "341", "331", "333", "334", "335", "337", "338"
+        ]
+
         # Define special node lists
         self.overtake_nodes = [
             "55", "305", "306", "307", "308", "309", "318", "319", "320", "321",
@@ -242,6 +250,9 @@ class autoFSM(ControlModeThread):
 
         while self.trafficSignsSubscriber.isDataInPipe():
             sign = self.trafficSignsSubscriber.receive() # This is a string (sign name)
+
+            if (sign == "round_about" or sign == "round_about2") and current_node not in self.roundaboutNodes:
+                sign = "hercegovac"
             if sign in self.traffic_light_states:
                 self.traffic_light_states.set_active(sign)
                 if self.debugging: print(f"Traffic light detected: {sign}")
