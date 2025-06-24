@@ -263,5 +263,5 @@ class PathPlanner:
 if __name__ == "__main__":
     pathPlanner = PathPlanner(1)
     instructions, segments = pathPlanner.planPath()
-    for segment in segments:
-        print(segment)
+    print(len(instructions))
+    print(len(segments))

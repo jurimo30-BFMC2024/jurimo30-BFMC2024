@@ -59,9 +59,14 @@ class autoFSM(ControlModeThread):
         self.speedMotorSender = messageHandlerSender(self.queuesList, CoreSpeedMotor)
         self.vehicleToEverythingSender = messageHandlerSender(self.queuesList, VehicleToEverything)
         self.resetRequestSender = messageHandlerSender(self.queuesList, ResetSignDetectionRequest)
+        self.intersection_counter = 0
 
         self.subscribe()
         super().__init__()
+
+    def _get_next_intersection_reaction(self):
+        self.intersection_counter += 1
+        return self.navigateCommand.pop(0)
 
     def start(self):
         self.positionFinder = PositionFinder("Small_map_roundabout.graphml")
@@ -93,37 +98,30 @@ class autoFSM(ControlModeThread):
         self.speedMotorSender.send("0")
 
         best_node = None  # Starting node, for testing purposes, remove later
+        if self.intersection_counter == 0:
 
-        if best_node is None:
-            print("No predefined node, using localization system to find best node")
-            heading = self.headingSubscriber.receiveWithBlock()
-            print(f'Current heading: {heading}')
-            location = self.locationSubscriber.receiveWithBlock()
-            print(f'Current location: {location}')
+            if best_node is None:
+                print("No predefined node, using localization system to find best node")
+                heading = self.headingSubscriber.receiveWithBlock()
+                print(f'Current heading: {heading}')
+                location = self.locationSubscriber.receiveWithBlock()
+                print(f'Current location: {location}')
 
-            # Initialize localization systems
-            best_node, best_node_offset = self.positionFinder.find_best_node(float(location['x']) / 10, float(location['y']) / 10, heading)
-            print(f'Current node: {best_node} with offset: {best_node_offset}cm ')
-        else:
-            print(f'Using predefined node: {best_node}')
-            print("Predefined node is used, this should be removed later!")
-            print("Make sure to set the best_node variable to None for automatic node detection!")
+                # Initialize localization systems
+                best_node, best_node_offset = self.positionFinder.find_best_node(float(location['x']) / 10, float(location['y']) / 10, heading)
+                print(f'Current node: {best_node} with offset: {best_node_offset}cm ')
+            else:
+                print(f'Using predefined node: {best_node}')
+                print("Predefined node is used, this should be removed later!")
+                print("Make sure to set the best_node variable to None for automatic node detection!")
 
-        
-
-        # od start pointa do kruznog
-        # self.planer = PathPlanner(start=192, goal=317, mode="pacman")
-        # kroz maglu
         self.planer = PathPlanner(start=best_node)
         self.navigateCommand, segments = self.planer.planPath()
-        # self.navigateCommand = ["Left", "Right", "Left", "Left", "Left", "Left"]
-        # self.navigateCommand = ["Straight", "Right", "Exit 3"]
-        # self.navigateCommand = ["Exit 3", "Straight"]
-        #self.navigateCommand.append("Left")
-        #self.navigateCommand.append("Left")
-        #self.navigateCommand.append("Straight")
         self.localization = Localization(segments)
 
+        if self.intersection_counter != 0:
+            self.navigateCommand = self.navigateCommand[self.intersection_counter:]
+            segments = segments[self.intersection_counter + 1:]
         print(f'Navigation commands {self.navigateCommand}')
         self.traffic_signs = TrafficSignController([
             "stop", "crosswalk", "highway_entrance", "highway_exit",
@@ -231,7 +229,7 @@ class autoFSM(ControlModeThread):
                 print("Route has been completed")
                 angle = 0
                 speed = 0
-                
+
             # Ignore parking sign if detected within 30 seconds after exiting parking
             parking_sign_detected = self.traffic_signs.get_active() == "parking"
             recently_exited_parking = (time.time() - self.last_parking_exit_time) < 30
@@ -247,7 +245,7 @@ class autoFSM(ControlModeThread):
                 
                 self.intersectionController.setCourse(
                     sign=self.traffic_signs.get_active(), 
-                    direction=self.navigateCommand.pop(0),
+                    direction=self._get_next_intersection_reaction(),
                     traffic_light_present=False
                 )
                 self.traffic_signs.clear()
@@ -258,14 +256,14 @@ class autoFSM(ControlModeThread):
 
                 self.intersectionController.setCourse(
                     sign=self.traffic_light_states.get_active(), 
-                    direction=self.navigateCommand.pop(0),
+                    direction=self._get_next_intersection_reaction(),
                     traffic_light_present=True
                 )
                 self.state = autoFSMState.INTERSECTION
 
             elif stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
                 print("Entering roundabout")
-                isStarted = self.roundaboutController.start(self.navigateCommand.pop(0))
+                isStarted = self.roundaboutController.start(self._get_next_intersection_reaction())
                 self.traffic_signs.clear()
                 self.roundaboutExit_position = None
                 self.state = autoFSMState.ROUNDABOUT
@@ -280,7 +278,7 @@ class autoFSM(ControlModeThread):
 
                 self.intersectionController.setCourse(
                     sign="stop", 
-                    direction=self.navigateCommand.pop(0),
+                    direction=self._get_next_intersection_reaction(),
                     traffic_light_present=False
                 )
                 self.state = autoFSMState.INTERSECTION
