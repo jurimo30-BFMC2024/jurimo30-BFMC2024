@@ -36,7 +36,7 @@ class CrosswalkIntersectionController:
         """
         
         if self.state == "crosswalk":
-            angle, speed, finished = self.crosswalk.control(stephanie_position, forward_enabled=False)
+            angle, speed, finished = self.crosswalk.control(stephanie_position, forward_enabled=True)
             
             if finished:
                 self.state = "intersection"
