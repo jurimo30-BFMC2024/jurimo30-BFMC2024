@@ -83,12 +83,23 @@ class autoFSM(ControlModeThread):
         ]
 
         # Nodes where intersection and crosswalk appear together
-        self.intersection_crosswalk_nodes = ["149", "2", "219", "4", "301", "6", "443", "34", "180", "80"]  # Example nodes, adjust based on your map
-        self.crosswalk_intersection_nodes = ["175", "176", "177", "8", "162", "163", "164", "82"]  # Example nodes, adjust based on your map
+        self.intersection_crosswalk_nodes = [
+            "17", "149", "2", 
+            "218", "219", "4", 
+            "298", "299", "300", "301", "6", 
+            "435", "436", "437", "438", "439", "440", "441", "442", "443", "84", 
+            "178", "179", "180", "80"
+        ]
+        self.crosswalk_intersection_nodes = [
+            "174", "175", "176", "177", "8", 
+            "161", "162", "163", "164", "82"
+        ]
 
         # Nodes where fog appears
-        self.fog_nodes = ["114", "115", "116", "117", "118", "119", 
-                          "122", "123", "124", "125", "126", "127", "128"]
+        self.fog_nodes = [
+            "114", "115", "116", "117", "118", "119", 
+            "122", "123", "124", "125", "126", "127", "128"
+        ]
 
         self.subscribe()
         super().__init__()
