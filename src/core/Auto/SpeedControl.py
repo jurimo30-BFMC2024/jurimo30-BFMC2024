@@ -91,28 +91,34 @@ class SpeedControl:
                 n += 1
 
         # Emergency stop logic (only if Stephanie or car is in front)
-        if enable_emergency_stop and (stephanie_in_front or car_in_front):
-            if frontDistance >= 10:
-                if not self.stop:
-                    if frontDistance < self.EMERGENCY_STOP_DISTANCE:
-                        self.consecutive_emergency += 1
-                        if self.consecutive_emergency >= self.EMERGENCY_STOP_THRESHOLD:
-                            print(f"EMERGENCY STOP [{frontDistance}cm] Triggered after {self.consecutive_emergency} readings")
-                            self.stop = True
+        if enable_emergency_stop:
+            if car_in_front:
+                if frontDistance >= 10:
+                    if not self.stop:
+                        if frontDistance < self.EMERGENCY_STOP_DISTANCE:
+                            self.consecutive_emergency += 1
+                            if self.consecutive_emergency >= self.EMERGENCY_STOP_THRESHOLD:
+                                print(f"EMERGENCY STOP [{frontDistance}cm] Triggered after {self.consecutive_emergency} readings")
+                                self.stop = True
+                                self.consecutive_emergency = 0
+                                self.avgSpeed.add(0)
+                                return 0
+                        else:
                             self.consecutive_emergency = 0
+                    else:
+                        if frontDistance > self.EMERGENCY_STOP_DISTANCE + 10:
+                            print(f"EMERGENCY CLEAR [{frontDistance}cm]")
+                            self.stop = False
+                        else:
                             self.avgSpeed.add(0)
                             return 0
-                    else:
-                        self.consecutive_emergency = 0
-                else:
-                    if frontDistance > self.EMERGENCY_STOP_DISTANCE + 10:
-                        print(f"EMERGENCY CLEAR [{frontDistance}cm]")
-                        self.stop = False
-                    else:
-                        self.avgSpeed.add(0)
-                        return 0
-            elif self.debugging:
-                print(f"Ignoring low measurement: {frontDistance}cm")
+                elif self.debugging:
+                    print(f"Ignoring low measurement: {frontDistance}cm")
+
+            elif stephanie_in_front:
+                print(f"Stephanie in front, emergency stop triggered")
+                self.avgSpeed.add(0)
+                return 0
 
         # PID speed adjustment (only if car in front)
         pid_adjustment = 0
