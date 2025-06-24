@@ -36,6 +36,7 @@ class SpeedControl:
         self.pid = PIDController(self.PID_KP, self.PID_KI, self.PID_KD)
         self.consecutive_emergency = 0
         self.stop = False
+        self._last_time = time.time()  # For dt calculation
 
     def map_value(self, value, in_min=30, in_max=170, out_min=150, out_max=300):
         value = max(min(value, in_max), in_min)
@@ -93,27 +94,24 @@ class SpeedControl:
         # Emergency stop logic (only if Stephanie or car is in front)
         if enable_emergency_stop:
             if car_in_front:
-                if frontDistance >= 10:
-                    if not self.stop:
-                        if frontDistance < self.EMERGENCY_STOP_DISTANCE:
-                            self.consecutive_emergency += 1
-                            if self.consecutive_emergency >= self.EMERGENCY_STOP_THRESHOLD:
-                                print(f"EMERGENCY STOP [{frontDistance}cm] Triggered after {self.consecutive_emergency} readings")
-                                self.stop = True
-                                self.consecutive_emergency = 0
-                                self.avgSpeed.add(0)
-                                return 0
-                        else:
+                if not self.stop:
+                    if frontDistance < self.EMERGENCY_STOP_DISTANCE:
+                        self.consecutive_emergency += 1
+                        if self.consecutive_emergency >= self.EMERGENCY_STOP_THRESHOLD:
+                            print(f"EMERGENCY STOP [{frontDistance}cm] Triggered after {self.consecutive_emergency} readings")
+                            self.stop = True
                             self.consecutive_emergency = 0
-                    else:
-                        if frontDistance > self.EMERGENCY_STOP_DISTANCE + 10:
-                            print(f"EMERGENCY CLEAR [{frontDistance}cm]")
-                            self.stop = False
-                        else:
                             self.avgSpeed.add(0)
                             return 0
-                elif self.debugging:
-                    print(f"Ignoring low measurement: {frontDistance}cm")
+                    else:
+                        self.consecutive_emergency = 0
+                else:
+                    if frontDistance > self.EMERGENCY_STOP_DISTANCE + 10:
+                        print(f"EMERGENCY CLEAR [{frontDistance}cm]")
+                        self.stop = False
+                    else:
+                        self.avgSpeed.add(0)
+                        return 0
 
             elif stephanie_in_front:
                 print(f"Stephanie in front, emergency stop triggered")
@@ -122,9 +120,12 @@ class SpeedControl:
 
         # PID speed adjustment (only if car in front)
         pid_adjustment = 0
+        current_time = time.time()
+        dt = current_time - self._last_time
+        self._last_time = current_time
         if car_in_front and frontDistance <= 80:
             distanceError = self.FOLLOW_DISTANCE - frontDistance
-            pid_adjustment = self.pid.compute(distanceError)
+            pid_adjustment = self.pid.compute(distanceError, dt)
         else:
             self.pid.reset()
 

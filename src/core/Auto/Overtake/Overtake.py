@@ -51,7 +51,7 @@ class Overtake():
             self.state = "close_distance"
 
         if self.state == "close_distance":
-            if front_sensors["distance"] <= 60:
+            if front_sensors["distance"] <= 30:
                 self.state = "change_lane_left"
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
                 self.motionScheduler.set_schedule(self.motions["overtake" if highway else "pass_obstacle"]["move_left"])
@@ -83,7 +83,7 @@ class Overtake():
             else:
                 self.right_sensor_counter = 0
 
-            if self.right_sensor_counter >= 3:
+            if self.right_sensor_counter >= 5:
                 self.passed_at_time = time.time()
                 self.state = "get_distance"
                 self.right_sensor_counter = 0
@@ -101,13 +101,9 @@ class Overtake():
                 print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
             elif time.time() - self.passed_at_time > (self.passed_at_time - self.caught_up_at_time) // 2:
                 # Check if wheel angle is acceptable for lane return
-                if abs(lane_follow_angle) <= self.max_wheel_angle_for_return * 10:  # lane_follow_angle is in tenths of degrees
-                    self.state = "change_lane_right"
-                    print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
-                    self.motionScheduler.set_schedule(self.motions["overtake" if highway else "pass_obstacle"]["move_right"])
-                else:
-                    if self.debugging:
-                        print(f'Lane return delayed - wheel angle too high: {abs(lane_follow_angle)/10}°')
+                print(f'Overtake [{"overtake" if highway else "pass"}]{self.state}')
+                self.motionScheduler.set_schedule(self.motions["overtake" if highway else "pass_obstacle"]["move_right"])
+                self.state = "change_lane_right"
 
         elif self.state == "change_lane_right":
             self.angle, self.speed, finished = self.motionScheduler.run()

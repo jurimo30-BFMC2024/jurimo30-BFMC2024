@@ -266,9 +266,8 @@ class autoFSM(ControlModeThread):
 
         angle = self.laneFollowContrler.process_following(self.leftX, self.rightX) # calculate steering angle from lane follow data
 
-        obstacle = front_sensors["distance"] <= 80 and self.car_in_danger_zone
-        if not obstacle:
-            self.obstacle_start_time = None  # Reset if obstacle is not present
+        if not self.car_in_danger_zone:
+            self.obstacle_start_time = None  # Reset if car is not in front
 
         if not self._running.is_set():
             return
@@ -406,22 +405,17 @@ class autoFSM(ControlModeThread):
                 self.highwayController.reset()
                 self.state = autoFSMState.HIGHWAY
                 self.laneFollowContrler.set_pid_highway(True)
-            
-            elif obstacle and self.oldSpeed == 0:
+
+            elif self.car_in_danger_zone and self.oldSpeed == 0 and current_node in self.overtake_nodes:
                 # Check if vehicle is in overtake nodes and wheel angle is acceptable
-                if (current_node in self.overtake_nodes and 
-                    abs(angle) <= self.max_wheel_angle_for_overtake * 10):  # angle is in tenths of degrees
-                    if self.obstacle_start_time is None:
-                        self.obstacle_start_time = time.time()
-                    
-                    if time.time() - self.obstacle_start_time >= 1:
-                        print("Pass static obstacle start")
-                        self.sign_car_position = None
-                        self.state = autoFSMState.DRIVE_OVERTAKE
-                elif current_node not in self.overtake_nodes:
-                    print(f"Overtaking not allowed at node {current_node} - not in overtake zone")
-                elif abs(angle) > self.max_wheel_angle_for_overtake * 10:
-                    print(f"Overtaking not allowed - wheel angle too high: {abs(angle)/10}°")
+                if self.obstacle_start_time is None:
+                    self.obstacle_start_time = time.time()
+                    print(f"Car in danger zone detected at node {current_node}, waiting 2 seconds for overtake")
+
+                if time.time() - self.obstacle_start_time >= 2:
+                    print("Car in danger zone detected for 2 seconds, starting overtake")
+                    self.sign_car_position = None
+                    self.state = autoFSMState.DRIVE_OVERTAKE
 
         ##############################         FSM            #############################
 
@@ -552,9 +546,9 @@ class autoFSM(ControlModeThread):
                     stopLine=stop_line_present_close,
                     lowDistance=stop_line_present,
                     highway=False,
-                    frontDistance=front_sensors["distance"],
-                    enable_emergency_stop=True,
-                    car_in_front=self.car_in_danger_zone,
+                    frontDistance=10000,
+                    enable_emergency_stop=False,
+                    car_in_front=False,
                     stephanie_in_front=False,
                     current_node=current_node
                 )
