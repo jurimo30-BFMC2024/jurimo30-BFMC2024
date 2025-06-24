@@ -50,18 +50,18 @@ class IntersectionCrosswalkController:
                 self.state = "finish"
 
         elif self.state == "crosswalk":
-            angle, speed, finished = self.crosswalk.control(stephanie_position, forward_enabled=False)
+            angle, speed, finished = self.crosswalk.control(stephanie_position, forward_enabled=True)
             
             if finished:
-                self.state = "intersection_finish"
-
-        elif self.state == "intersection_finish":
-            angle, speed, running = self.intersection.getControlData(
-                stop_line_present, stop_line_slope, trafficLights
-            )
-            
-            if not running:
                 self.state = "finish"
+
+        # elif self.state == "intersection_finish":
+        #     angle, speed, running = self.intersection.getControlData(
+        #         stop_line_present, stop_line_slope, trafficLights
+        #     )
+            
+        #     if not running:
+        #         self.state = "finish"
 
         elif self.state == "finish":
             raise RuntimeError("Cannot get control data in finish state")

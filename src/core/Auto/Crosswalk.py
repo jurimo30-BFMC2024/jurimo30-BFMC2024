@@ -16,7 +16,7 @@ class CrosswalkController:
         x1, y1, x2, y2 = stephanie_position
         x = (x1 + x2) / 2
 
-        print(f"x1: {x1}, y1: {y1}, x2: {x2}, y2: {y2} x: {x}")
+        # print(f"x1: {x1}, y1: {y1}, x2: {x2}, y2: {y2} x: {x}")
 
         if x < 200:
             return "left"

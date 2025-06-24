@@ -167,20 +167,10 @@ class autoFSM(ControlModeThread):
             print("Predefined node is used, this should be removed later!")
             print("Make sure to set the best_node variable to None for automatic node detection!")
 
-        
-
-        # od start pointa do kruznog
-        # self.planer = PathPlanner(start=192, goal=317, mode="pacman")
-        # kroz maglu
+        # Initialize localization with the best node found
         self.planer = PathPlanner(start=best_node)
         self.navigateCommand, segments = self.planer.planPath()
-        # self.navigateCommand = ["Left", "Right", "Left", "Left", "Left", "Left"]
-        # self.navigateCommand = ["Straight", "Right", "Exit 3"]
-        # self.navigateCommand = ["Exit 3", "Straight"]
-        #self.navigateCommand.append("Left")
-        #self.navigateCommand.append("Left")
-        #self.navigateCommand.append("Straight")
-        self.localization = Localization(segments)
+        self.localization = Localization(segments, best_node)
 
         print(f'Navigation commands {self.navigateCommand}')
         self.traffic_signs = TrafficSignController([
@@ -208,6 +198,8 @@ class autoFSM(ControlModeThread):
         self.last_parking_exit_time = 0  # Track last time parking state was exited
 
         super().start()
+
+        print("[autoFSM] Started")
     
     def stop(self):
         super().stop()
@@ -334,7 +326,7 @@ class autoFSM(ControlModeThread):
 
             elif stop_line_present_close and (self.traffic_signs.get_active() in ["stop", "priority"]):
                 if current_node in self.intersection_crosswalk_nodes:
-                    print("Intersection and crosswalk detected together")
+                    print("Detected crosswalk after intersection")
 
                     self.intersectionCrosswalkController.setCourse(
                         sign=self.traffic_signs.get_active(), 
@@ -344,7 +336,7 @@ class autoFSM(ControlModeThread):
                     self.traffic_signs.clear()
                     self.state = autoFSMState.INTERSECTION_CROSSWALK
                 else:
-                    print("Krecemo sa raskrsnicom")
+                    print(f"Intersection with sign deteceted: {self.traffic_signs.get_active()}")
                     
                     self.intersectionController.setCourse(
                         sign=self.traffic_signs.get_active(),
@@ -375,7 +367,7 @@ class autoFSM(ControlModeThread):
                 if current_node in self.crosswalk_intersection_nodes:
                     print("Detected intersection after crosswalk")
                     
-                    self.intersectionController.setCourse(
+                    self.crosswalkIntersectionController.setCourse(
                         sign="stop",
                         direction=self.navigateCommand.pop(0),
                         traffic_light_present=False
@@ -388,7 +380,7 @@ class autoFSM(ControlModeThread):
 
             elif stop_line_present_close:
                 if current_node in self.intersection_crosswalk_nodes:
-                    print("Intersection and crosswalk detected together, no traffic sign")
+                    print("Detected crosswalk after intersection, no traffic sign")
 
                     self.intersectionCrosswalkController.setCourse(
                         sign="stop", 
@@ -398,7 +390,7 @@ class autoFSM(ControlModeThread):
                     self.traffic_signs.clear()
                     self.state = autoFSMState.INTERSECTION_CROSSWALK
                 else:
-                    print("Krecemo sa raskrsnicom")
+                    print("Intersection without traffic sign detected, stopping  for 3 seconds")
                     
                     self.intersectionController.setCourse(
                         sign="stop",
@@ -514,6 +506,8 @@ class autoFSM(ControlModeThread):
             self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
             
             if not module_running:
+                if self.traffic_signs.get_active() == "crosswalk":
+                    self.traffic_signs.clear()
                 self.traffic_light_states.clear()
                 self.stephanie_position = None
                 self.resetRequestSender.send(True)  # Reset the sign detection system
@@ -532,6 +526,8 @@ class autoFSM(ControlModeThread):
             self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
             
             if not module_running:
+                if self.traffic_signs.get_active() == "crosswalk":
+                    self.traffic_signs.clear()
                 self.traffic_light_states.clear()
                 self.stephanie_position = None
                 self.resetRequestSender.send(True)  # Reset the sign detection system

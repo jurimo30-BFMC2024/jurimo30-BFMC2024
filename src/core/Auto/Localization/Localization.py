@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 class Localization:
-    def __init__(self, segments_data):
+    def __init__(self, segments_data, best_node):
         self.total_target_speed = 0.0
         self.num_speed_samples = 0
         self.start_time = time.time()
@@ -39,7 +39,7 @@ class Localization:
         self.heading_error = 0.0  # Difference between IMU and calculated heading
         self.orientation = 0.0  # Current calculated orientation in degrees
 
-        self._current_node = None  # Add this line before the last line
+        self._current_node = best_node  # Add this line before the last line
 
     def start_new_segment(self):
         """
