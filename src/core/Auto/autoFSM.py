@@ -226,6 +226,12 @@ class autoFSM(ControlModeThread):
 
         
         if self.state == autoFSMState.DRIVE:
+
+            if (stop_line_present or stop_line_present_close) and not self.navigateCommand:
+                print("Route has been completed")
+                angle = 0
+                speed = 0
+                
             # Ignore parking sign if detected within 30 seconds after exiting parking
             parking_sign_detected = self.traffic_signs.get_active() == "parking"
             recently_exited_parking = (time.time() - self.last_parking_exit_time) < 30
