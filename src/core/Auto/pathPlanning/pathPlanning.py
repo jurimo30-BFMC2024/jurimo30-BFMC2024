@@ -23,14 +23,15 @@ class PathPlanner:
            
         self.roundabout_entries = ["317", "367", "397", "405"]
         self.roundabout_exits = ["368", "342", "398", "318"]
-        self.hardInstructionQueue =  ["Right", "Straight", "Right", "Exit 1", "Exit 4", "Exit 3", "Right",
-                                  "Right","Straight", "Straight", "Left", "Straight", "Straight","Straight",
-                                  "Left","Left", "Left", "Right", "Straight", "Right", "Left", "Left",
-                                  "Right", "Straight", "Exit 4", "Straight"]
+        self.hardInstructionQueue = ["Right", "Straight", "Right", "Exit 1", "Exit 4", "Exit 3", "Right", "Right",
+                            "Straight", "Straight", "Left", "Straight", "Straight", "Straight", "Left",
+                            "Left", "Left", "Right", "Straight", "Right", "Straight", "Left", "Straight", "Right",
+                            "Exit 4", "Straight", "Straight", "Left", "Left", "Left", "Right"]
         
         self.localizationPath = [("223", "243"), ("246","54"), ("55", "317"), ("368", "397"), ("343", "367"), ("318", "56"), ("49", "288"), ("302", "6"),
                                       ("1", "18"), ("13", "91"), ("88", "102"), ("97", "75"), ("70", "185"), ("188", "191"), ("193", "198"), ("201", "42"), ("39", "206"),
-                                      ("208", "71"), ("74", "98"), ("99", "26"), ("31", "16"), ("13", "91"), ("92", "80"), ("83", "404"), ("399", "84"), ("79", "93")]
+                                      ("208", "71"), ("74", "98"), ("99", "26"), ("29", "38"), ("43", "4"), ("7", "82"), ("83", "404"), ("399", "84"), ("79", "93"), 
+                                      ("88", "102"), ("99", "26"), ("31", "16"), ("13", "91"), ("92", "80")]
 
     def planPath(self):
         '''Generates a queue of instructions'''
@@ -100,6 +101,8 @@ class PathPlanner:
         path = [start]
         current_node = start
 
+        if start not in graph:
+             raise ValueError(f"Start ({start}) not in graph.")
         if graph.nodes[goal]['intersection']:
             print("W: Your final point is inside an intersection (reconsider)")
         
@@ -240,6 +243,18 @@ class PathPlanner:
             else:
                 turn = "Straight"
             
+            if current_node == "210":
+                if turn == "Right":
+                    turn = "Straight"
+                elif turn == "Straight":
+                    turn = "Left"
+            if current_node == "207":
+                if turn == "Straight":
+                    turn = "Left"
+            if current_node == "192":
+                if turn == "Straight":
+                    turn = "Left"
+                    
             directions.append((current_node, turn))
             i += 1
             
@@ -248,5 +263,5 @@ class PathPlanner:
 if __name__ == "__main__":
     pathPlanner = PathPlanner(1)
     instructions, segments = pathPlanner.planPath()
-    for segment in segments:
-        print(segment)
+    print(len(instructions))
+    print(len(segments))
