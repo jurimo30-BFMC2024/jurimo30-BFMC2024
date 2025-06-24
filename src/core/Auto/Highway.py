@@ -16,8 +16,10 @@ class Highway:
         
         # Nodovi na kojima se prati samo desna linija
         self.right_line_only_nodes = {
-            "399", "400", "401", "444", "445", "446",
-            "421", "422", "423", "463", "464", "465",
+            "398", "399", "400", "401", "444", "445", "446", "447",
+            "421", "422", "423", "463", "464", "465", "466",
+            "426", "425", "424", "462", "461", "460",
+            "479", "480", "481", "482", "402", "403", "404"
             # Dodaj specifične nodove gde treba pratiti samo desnu liniju
         }
         
