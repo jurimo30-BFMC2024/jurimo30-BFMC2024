@@ -388,7 +388,7 @@ class autoFSM(ControlModeThread):
                 )
                 self.state = autoFSMState.INTERSECTION
 
-            elif stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
+            elif (stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]) and not (self.navigateCommand[0] in ["Left", "Right", "Straight"]):
                 print("Entering roundabout")
                 isStarted = self.roundaboutController.start(self._get_next_intersection_command())
                 self.traffic_signs.clear()
@@ -483,6 +483,8 @@ class autoFSM(ControlModeThread):
                 trafficLights=self.traffic_light_states
             )
 
+            angle = angle - 6 
+
             self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
             
             if not module_running:
@@ -535,6 +537,8 @@ class autoFSM(ControlModeThread):
                 crosswalk_sign_present=self.traffic_signs.get_active() == "crosswalk"
             )
 
+            angle = angle - 6
+
             self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
             
             if not module_running:
@@ -554,6 +558,8 @@ class autoFSM(ControlModeThread):
                 trafficLights=self.traffic_light_states,
                 stephanie_position=self.stephanie_position
             )
+
+            angle = angle - 6
 
             self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
             
