@@ -357,11 +357,14 @@ class autoFSM(ControlModeThread):
                 self.state = autoFSMState.INTERSECTION
 
             elif stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
-                print("Entering roundabout")
-                isStarted = self.roundaboutController.start(self.navigateCommand.pop(0))
-                self.traffic_signs.clear()
-                self.roundaboutExit_position = None
-                self.state = autoFSMState.ROUNDABOUT
+                if (self.navigateCommand[0] == "Left" or self.navigateCommand[0] == "Right" or self.navigateCommand[0] == "Straight"):
+                    self.state = autoFSMState.INTERSECTION
+                else:
+                    print("Entering roundabout")
+                    isStarted = self.roundaboutController.start(self.navigateCommand.pop(0))
+                    self.traffic_signs.clear()
+                    self.roundaboutExit_position = None
+                    self.state = autoFSMState.ROUNDABOUT
 
             elif stop_line_present and self.traffic_signs.get_active() == "crosswalk" and current_node not in self.intersection_crosswalk_nodes:
                 if current_node in self.crosswalk_intersection_nodes:
@@ -451,6 +454,8 @@ class autoFSM(ControlModeThread):
                 trafficLights=self.traffic_light_states
             )
 
+            angle = angle - 6 
+
             self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
             
             if not module_running:
@@ -503,6 +508,8 @@ class autoFSM(ControlModeThread):
                 crosswalk_sign_present=self.traffic_signs.get_active() == "crosswalk"
             )
 
+            angle = angle - 6
+
             self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
             
             if not module_running:
@@ -522,6 +529,8 @@ class autoFSM(ControlModeThread):
                 trafficLights=self.traffic_light_states,
                 stephanie_position=self.stephanie_position
             )
+
+            angle = angle - 6
 
             self.localization.update_position_with_steering(speed / 10, angle / 10, heading)
             
