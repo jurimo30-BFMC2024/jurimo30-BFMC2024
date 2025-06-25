@@ -145,7 +145,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
 
-        best_node = None  # Starting node, for testing purposes, remove later
+        best_node = "183"  # Starting node, for testing purposes, remove later
 
         if self.initial_navigate_command is None:
             print("Finding best node for starting position and initializing path planning")
@@ -171,8 +171,8 @@ class autoFSM(ControlModeThread):
                 print(f'Current node: {best_node} with offset: {best_node_offset}cm ')
             else:
                 print(f'Using predefined node: {best_node}')
-                print("Predefined node is used, this should be removed later!")
-                print("Make sure to set the best_node variable to None for automatic node detection!")
+                # print("Predefined node is used, this should be removed later!")
+                # print("Make sure to set the best_node variable to None for automatic node detection!")
 
             # Initialize localization with the best node found
             self.planer = PathPlanner(start=best_node)
