@@ -23,20 +23,20 @@ class PathPlanner:
            
         self.roundabout_entries = ["317", "367", "397", "405"]
         self.roundabout_exits = ["368", "342", "398", "318"]
-        self.hardInstructionQueue =  ["Right", "Straight", "Right", "Exit 1", "Exit 4", "Exit 3", "Right",
-                                  "Right","Straight", "Straight", "Left", "Straight", "Straight","Straight",
-                                  "Left","Left", "Left", "Right", "Straight", "Right", "Left", "Left",
-                                  "Right", "Straight", "Exit 4", "Straight"]
+        # self.hardInstructionQueue =  ["Right", "Straight", "Right", "Exit 1", "Exit 4", "Exit 3", "Right",
+        #                           "Right","Straight", "Straight", "Left", "Straight", "Straight","Straight",
+        #                           "Left","Left", "Left", "Right", "Straight", "Right", "Left", "Left",
+        #                           "Right", "Straight", "Exit 4", "Straight"]
 
-        self.localizationPath = [("223", "243"), ("246","54"), ("55", "317"), ("368", "397"), ("343", "367"), ("318", "56"), ("49", "288"), ("302", "6"),
-                                 ("1", "18"), ("13", "91"), ("88", "102"), ("97", "75"), ("70", "185"), ("188", "191"), ("193", "198"), ("201", "42"), ("39", "206"),
-                                 ("208", "71"), ("74", "98"), ("99", "26"), ("31", "16"), ("13", "91"), ("92", "80"), ("83", "404"), ("399", "84"), ("79", "93")]
+        # self.localizationPath = [("223", "243"), ("246","54"), ("55", "317"), ("368", "397"), ("343", "367"), ("318", "56"), ("49", "288"), ("302", "6"),
+        #                          ("1", "18"), ("13", "91"), ("88", "102"), ("97", "75"), ("70", "185"), ("188", "191"), ("193", "198"), ("201", "42"), ("39", "206"),
+        #                          ("208", "71"), ("74", "98"), ("99", "26"), ("31", "16"), ("13", "91"), ("92", "80"), ("83", "404"), ("399", "84"), ("79", "93")]
         
         # for arena
-        # self.hardInstructionQueue = ["Left", "Right", "Right", "Left", "Straight", "Straight", "Right", "Straight", "Right", "Exit 1", "Exit 1"]
+        self.hardInstructionQueue = ["Left", "Right", "Right", "Left", "Straight", "Straight", "Right", "Straight", "Right", "Exit 1", "Exit 1"]
         
-        # self.localizationPath = [("183", "93"), ("90", "14"), ("15", "32"), ("25", "100"), ("97", "75"), ("70", "185"), ("188", "191"), ("223", "243"), 
-        #                          ("246","54"), ("55", "317"),  ("368", "397"), ("399", "400")]
+        self.localizationPath = [("183", "93"), ("90", "14"), ("15", "32"), ("25", "100"), ("97", "75"), ("70", "185"), ("188", "191"), ("223", "243"), 
+                                 ("246","54"), ("55", "317"),  ("368", "397"), ("399", "400")]
         
 
 
@@ -47,25 +47,25 @@ class PathPlanner:
         segments = []
         # OVO ZAKOMENTARISATI KAD SE BUDE RADILA ARENA
         ###########################################################
-        best_path = self.find_greedy_path(graph, self.start, "191")
-        if best_path:
-            turns = self.determine_turns(graph, best_path)
-            for node, direction in turns:
-                instructionQueue.append(direction)
-            split_paths = self.split_path_by_intersections(graph, best_path)
-            for segment_path in split_paths:
-                segment = self.calculate_path_segments(graph, segment_path)
-                if segment:
-                    segments.append(segment)
+        # best_path = self.find_greedy_path(graph, self.start, "191")
+        # if best_path:
+        #     turns = self.determine_turns(graph, best_path)
+        #     for node, direction in turns:
+        #         instructionQueue.append(direction)
+        #     split_paths = self.split_path_by_intersections(graph, best_path)
+        #     for segment_path in split_paths:
+        #         segment = self.calculate_path_segments(graph, segment_path)
+        #         if segment:
+        #             segments.append(segment)
         ###########################################################    
-            # add hardcoded path
-            instructionQueue.extend(self.hardInstructionQueue)
+        # add hardcoded path
+        instructionQueue.extend(self.hardInstructionQueue)
 
-            for start, end in self.localizationPath:
-                sub_path = self.find_greedy_path(graph, start, end)
-                if sub_path:
-                    segment = self.calculate_path_segments(graph, sub_path)
-                    segments.append(segment)
+        for start, end in self.localizationPath:
+            sub_path = self.find_greedy_path(graph, start, end)
+            if sub_path:
+                segment = self.calculate_path_segments(graph, sub_path)
+                segments.append(segment)
 
 
         return instructionQueue, segments
