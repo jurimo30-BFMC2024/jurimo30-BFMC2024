@@ -75,7 +75,7 @@ class SpecialSituationControl:
         
  # Provjeriti funkciju naknadno
     def process_special_control(self, left_x: int | None, right_x: int | None, 
-                              left_visible: bool, right_visible: bool, current_node: str, navigate_command=None):
+                              left_visible: bool, right_visible: bool, current_node: str, navigate_command_getter_method):
         """
         Glavna metoda za obradu specijalnih situacija
         
@@ -101,8 +101,8 @@ class SpecialSituationControl:
         if intersection_zone and not self.current_intersection:
             # Vozilo prvi put ulazi u raskrsnicu
             self.current_intersection = intersection_zone
-            if navigate_command and len(navigate_command) > 0:
-                direction = navigate_command.pop(0)
+            if navigate_command_getter_method:
+                direction = navigate_command_getter_method()
                 self.intersection_direction = direction
                 self.pid.reset()
                 if self.debugging:

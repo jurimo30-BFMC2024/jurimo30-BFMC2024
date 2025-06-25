@@ -101,6 +101,10 @@ class autoFSM(ControlModeThread):
             "122", "123", "124", "125", "126", "127", "128"
         ]
 
+        self.initial_navigate_command = None
+        self.initial_segments = None
+        self.navigation_counter = 0
+
         self.subscribe()
         super().__init__()
 
@@ -141,38 +145,54 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
 
-        best_node = None  # Starting node, for testing purposes, remove later
+        best_node = "18"  # Starting node, for testing purposes, remove later
 
-        if best_node is None:
-            print("No predefined node, using localization system to find best node")
-            # heading = self.headingSubscriber.receiveWithBlock()
-            # print(f'Current heading: {heading}')
-            # --- Median filter for location ---
-            location_buffer = []
-            for _ in range(3):
-                location = self.locationSubscriber.receiveWithBlock()
-                print(f'Location received: {location}')
-                location_buffer.append((float(location['x']), float(location['y'])))
+        if self.initial_navigate_command is None:
+            print("Finding best node for starting position and initializing path planning")
+            
+            if best_node is None:
+                print("No predefined node, using localization system to find best node")
+                # heading = self.headingSubscriber.receiveWithBlock()
+                # print(f'Current heading: {heading}')
+                # --- Median filter for location ---
+                location_buffer = []
+                for _ in range(3):
+                    location = self.locationSubscriber.receiveWithBlock()
+                    print(f'Location received: {location}')
+                    location_buffer.append((float(location['x']), float(location['y'])))
 
-            print(f'Raw location data: location_buffer={location_buffer}')
+                print(f'Raw location data: location_buffer={location_buffer}')
 
-            median_point = median_2d_point(location_buffer)
-            print(f'Median point: {median_point}')
+                median_point = median_2d_point(location_buffer)
+                print(f'Median point: {median_point}')
 
-            # Initialize localization systems
-            best_node, best_node_offset = self.positionFinder.find_best_node(median_point[0] / 10, median_point[1] / 10)
-            print(f'Current node: {best_node} with offset: {best_node_offset}cm ')
+                # Initialize localization systems
+                best_node, best_node_offset = self.positionFinder.find_best_node(median_point[0] / 10, median_point[1] / 10)
+                print(f'Current node: {best_node} with offset: {best_node_offset}cm ')
+            else:
+                print(f'Using predefined node: {best_node}')
+                print("Predefined node is used, this should be removed later!")
+                print("Make sure to set the best_node variable to None for automatic node detection!")
+
+            # Initialize localization with the best node found
+            self.planer = PathPlanner(start=best_node)
+            self.navigateCommand, segments = self.planer.planPath()
+            
+            # initialize localization with the segments
+            self.initial_navigate_command = self.navigateCommand.copy()
+            self.initial_segments = segments.copy()
+            
+            self.localization = Localization(segments, best_node)
+            print(f'Navigation commands {self.navigateCommand}')
+        
         else:
-            print(f'Using predefined node: {best_node}')
-            print("Predefined node is used, this should be removed later!")
-            print("Make sure to set the best_node variable to None for automatic node detection!")
+            self.navigateCommand = self.initial_navigate_command[self.navigation_counter:]
+            segments = self.initial_segments[self.navigation_counter:]
+            self.localization = Localization(segments, best_node)
+            print("Using predefined navigation command and segments")
+            print(f'Commands executed: {self.initial_navigate_command[:self.navigation_counter]}')
+            print(f'Navigation commands left: {self.navigateCommand}')
 
-        # Initialize localization with the best node found
-        self.planer = PathPlanner(start=best_node)
-        self.navigateCommand, segments = self.planer.planPath()
-        self.localization = Localization(segments, best_node)
-
-        print(f'Navigation commands {self.navigateCommand}')
         self.traffic_signs = TrafficSignController([
             "stop", "crosswalk", "highway_entrance", "highway_exit",
             "one_way", "no_entry", "parking", "priority",
@@ -203,6 +223,18 @@ class autoFSM(ControlModeThread):
     
     def stop(self):
         super().stop()
+
+    def _get_next_intersection_command(self):
+        """Get the next intersection command from the navigation command list."""
+        try:
+            self.navigation_counter += 1
+            next_command = self.navigateCommand.pop(0)
+            print(f"Navigation counter: {self.navigation_counter}, Commands left: {len(self.navigateCommand)}")
+            print(f"Next intersection command: {next_command}")
+            return next_command
+        except IndexError:
+            print("No more intersection commands available.")
+            return None
 
     def loop(self):
         ###############################         RECEIVE AND PREPARE DATA            #############################
@@ -330,7 +362,7 @@ class autoFSM(ControlModeThread):
 
                     self.intersectionCrosswalkController.setCourse(
                         sign=self.traffic_signs.get_active(), 
-                        direction=self.navigateCommand.pop(0),
+                        direction=self._get_next_intersection_command(),
                         traffic_light_present=False
                     )
                     self.traffic_signs.clear()
@@ -340,7 +372,7 @@ class autoFSM(ControlModeThread):
                     
                     self.intersectionController.setCourse(
                         sign=self.traffic_signs.get_active(),
-                        direction=self.navigateCommand.pop(0),
+                        direction=self._get_next_intersection_command(),
                         traffic_light_present=False
                     )
                     self.traffic_signs.clear()
@@ -351,17 +383,17 @@ class autoFSM(ControlModeThread):
 
                 self.intersectionController.setCourse(
                     sign=self.traffic_light_states.get_active(), 
-                    direction=self.navigateCommand.pop(0),
+                    direction=self._get_next_intersection_command(),
                     traffic_light_present=True
                 )
                 self.state = autoFSMState.INTERSECTION
 
             elif (stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]) and not (self.navigateCommand[0] in ["Left", "Right", "Straight"]):
-                    print("Entering roundabout")
-                    isStarted = self.roundaboutController.start(self.navigateCommand.pop(0))
-                    self.traffic_signs.clear()
-                    self.roundaboutExit_position = None
-                    self.state = autoFSMState.ROUNDABOUT
+                print("Entering roundabout")
+                isStarted = self.roundaboutController.start(self._get_next_intersection_command())
+                self.traffic_signs.clear()
+                self.roundaboutExit_position = None
+                self.state = autoFSMState.ROUNDABOUT
 
             elif stop_line_present and self.traffic_signs.get_active() == "crosswalk" and current_node not in self.intersection_crosswalk_nodes:
                 if current_node in self.crosswalk_intersection_nodes:
@@ -369,7 +401,7 @@ class autoFSM(ControlModeThread):
                     
                     self.crosswalkIntersectionController.setCourse(
                         sign="stop",
-                        direction=self.navigateCommand.pop(0),
+                        direction=self._get_next_intersection_command(),
                         traffic_light_present=False
                     )
                     self.traffic_signs.clear()
@@ -384,7 +416,7 @@ class autoFSM(ControlModeThread):
 
                     self.intersectionCrosswalkController.setCourse(
                         sign="stop", 
-                        direction=self.navigateCommand.pop(0),
+                        direction=self._get_next_intersection_command(),
                         traffic_light_present=False
                     )
                     self.traffic_signs.clear()
@@ -394,7 +426,7 @@ class autoFSM(ControlModeThread):
                     
                     self.intersectionController.setCourse(
                         sign="stop",
-                        direction=self.navigateCommand.pop(0),
+                        direction=self._get_next_intersection_command(),
                         traffic_light_present=False
                     )
                     self.traffic_signs.clear()
@@ -590,7 +622,7 @@ class autoFSM(ControlModeThread):
         elif self.state == autoFSMState.DRIVE:
             # Pokušava SpecialSituationControl - modul interno upravlja ulaskom u specijalne raskrsnice
             special_angle, special_speed = self.specialSituationController.process_special_control(
-                self.leftX, self.rightX, self.leftVisible, self.rightVisible, current_node, self.navigateCommand
+                self.leftX, self.rightX, self.leftVisible, self.rightVisible, current_node, self._get_next_intersection_command
             )
             
             if self.specialSituationController.is_active():
