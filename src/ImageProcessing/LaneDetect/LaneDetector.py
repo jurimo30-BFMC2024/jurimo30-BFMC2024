@@ -63,11 +63,6 @@ class LaneDetector:
         # Boja za tačke pozicije linija
         self.color_lane_point = (0, 255, 255)  # Žuta
         self.lane_point_radius = 6
-        
-        # Parametri za težinski sistem
-        self.distance_threshold = 40.0  # Smanjena maksimalna udaljenost za punu težinu
-        self.weight_decay = 0.05  # Pojačan faktor opadanja težine sa udaljenošću
-        self.noise_penalty_distance = 120.0  # Udaljenost posle koje se primenjuje jaka penalizacija za šum
 
     def region_of_interest(self, img):
         """Apply a region of interest mask to focus only on the road area"""
@@ -91,60 +86,6 @@ class LaneDetector:
             maxLineGap=self.max_line_gap
         )
 
-    def calculate_line_weight(self, midpoint_x, midpoint_y, length, is_left_lane):
-        """Računa težinu linije na osnovu udaljenosti od starih pozicija"""
-        base_weight = 1.0
-        
-        # Koristi zadnje poznate pozicije za računanje udaljenosti
-        reference_x = None
-        if is_left_lane and self.last_left_x is not None:
-            reference_x = self.last_left_x
-        elif not is_left_lane and self.last_right_x is not None:
-            reference_x = self.last_right_x
-        
-        if reference_x is not None:
-            # Računaj horizontalnu udaljenost od referentne pozicije
-            distance = abs(midpoint_x - reference_x)
-            
-            # Progresivno smanjenje težine na osnovu udaljenosti
-            if distance > self.distance_threshold:
-                excess_distance = distance - self.distance_threshold
-                weight_reduction = np.exp(-self.weight_decay * excess_distance)
-                base_weight *= weight_reduction
-                
-                # Jaka penalizacija za linije vrlo daleko (šum)
-                if distance > self.noise_penalty_distance:
-                    base_weight *= 0.1  # Drastično smanjenje
-                
-                # Dodatno penalizuj kratke linije koje su daleko
-                if length < 30:  # Kratke linije
-                    base_weight *= 0.3  # Pojačana penalizacija
-                elif length < 50:  # Srednje kratke linije
-                    base_weight *= 0.6
-        else:
-            # Ako nema referentnu poziciju, proveri da li je linija na očekivanoj strani
-            image_center_x = self.width // 2
-            
-            # Za leve linije - penalizuj ako su previše desno
-            if is_left_lane and midpoint_x > image_center_x + (self.width * 0.1):
-                base_weight *= 0.2  # Jaka penalizacija za leve linije desno od centra
-            
-            # Za desne linije - penalizuj ako su previše levo
-            elif not is_left_lane and midpoint_x < image_center_x - (self.width * 0.1):
-                base_weight *= 0.2  # Jaka penalizacija za desne linije levo od centra
-        
-        # Dodatni faktor za poziciju - penalizuj ekstremne pozicije
-        if is_left_lane:
-            # Leva linija ne sme biti u desnoj polovini
-            if midpoint_x > self.width * 0.6:
-                base_weight *= 0.05  # Skoro potpuna eliminacija
-        else:
-            # Desna linija ne sme biti u levoj polovini
-            if midpoint_x < self.width * 0.4:
-                base_weight *= 0.05  # Skoro potpuna eliminacija
-        
-        return max(base_weight, 0.01)  # Minimalna težina
-
     def filter_lines(self, lines):
         """Filter lines based on size, angle, and position to separate left and right lanes"""
         if lines is None:
@@ -152,7 +93,7 @@ class LaneDetector:
 
         image_center_x = self.width // 2
 
-        # Potential line containers with weights
+        # Potential line containers
         potential_left_lines = []
         potential_right_lines = []
 
@@ -189,48 +130,45 @@ class LaneDetector:
                 # Instead of strictly classifying by slope sign, use a combination of position and slope
                 # This allows detecting lines that might bend or have unusual angles in curves
                 
-                # Strože granice za klasifikaciju - smanjuje šum
-                is_left_side = midpoint_x < image_center_x - (image_center_x * 0.05)  # Leva 45% slike
-                is_far_left = midpoint_x < image_center_x * 0.25  # Leva 25% slike
+                # Left side of the image with predominantly negative slope OR
+                # Far left side with any significant slope - could be part of a sharp curve
+                is_left_side = midpoint_x < image_center_x - (image_center_x * 0.1)  # Left 40% of image
+                is_far_left = midpoint_x < image_center_x * 0.3  # Left 30% of image
                 
-                is_right_side = midpoint_x > image_center_x + (image_center_x * 0.05)  # Desna 45% slike
-                is_far_right = midpoint_x > image_center_x * 1.75  # Desna 25% slike
+                # Right side of the image with predominantly positive slope OR
+                # Far right side with any significant slope - could be part of a sharp curve
+                is_right_side = midpoint_x > image_center_x + (image_center_x * 0.1)  # Right 40% of image
+                is_far_right = midpoint_x > image_center_x * 1.7  # Right 30% of image
                 
                 # Lane line classification using both position and slope
                 if (slope < 0 and is_left_side) or (is_far_left and abs(slope) > min_slope_threshold):
-                    # Računaj težinu za levu liniju
-                    weight = self.calculate_line_weight(midpoint_x, midpoint_y, length, True)
-                    # Dodatna provera - odbaci linije sa vrlo malom težinom
-                    if weight > 0.1:
-                        potential_left_lines.append((line, midpoint_x, length, abs(slope), weight))
+                    # Left lane candidate - negative slope on left side or any significant slope on far left
+                    potential_left_lines.append((line, midpoint_x, length, abs(slope)))
                 elif (slope > 0 and is_right_side) or (is_far_right and abs(slope) > min_slope_threshold):
-                    # Računaj težinu za desnu liniju
-                    weight = self.calculate_line_weight(midpoint_x, midpoint_y, length, False)
-                    # Dodatna provera - odbaci linije sa vrlo malom težinom
-                    if weight > 0.1:
-                        potential_right_lines.append((line, midpoint_x, length, abs(slope), weight))
+                    # Right lane candidate - positive slope on right side or any significant slope on far right
+                    potential_right_lines.append((line, midpoint_x, length, abs(slope)))
                 elif slope == np.inf:  # Vertical lines - classify by position only
                     if midpoint_x < image_center_x:
-                        weight = self.calculate_line_weight(midpoint_x, midpoint_y, length, True)
-                        if weight > 0.1:
-                            potential_left_lines.append((line, midpoint_x, length, float('inf'), weight))
+                        potential_left_lines.append((line, midpoint_x, length, float('inf')))
                     else:
-                        weight = self.calculate_line_weight(midpoint_x, midpoint_y, length, False)
-                        if weight > 0.1:
-                            potential_right_lines.append((line, midpoint_x, length, float('inf'), weight))
+                        potential_right_lines.append((line, midpoint_x, length, float('inf')))
 
         # Minimum lane width for validation
         min_lane_width = int(self.width * 0.2)  # Minimum 20% of image width
         
-        # Sort by weighted score (length * slope * weight^2) - kvadriramo težinu za pojačavanje efekata
+        # For curved roads, we might have multiple line segments for each side
+        # Sort lines by a combination of position, length and slope to get the most prominent ones
+        # Longer lines with appropriate slopes are preferred
+        
+        # Sort by a weighted score (length * slope significance)
         if potential_left_lines:
-            potential_left_lines.sort(key=lambda item: item[2] * item[3] * (item[4] ** 2), reverse=True)
+            potential_left_lines.sort(key=lambda item: item[2] * item[3], reverse=True)  # Sort by length*slope
         
         if potential_right_lines:
-            potential_right_lines.sort(key=lambda item: item[2] * item[3] * (item[4] ** 2), reverse=True)
+            potential_right_lines.sort(key=lambda item: item[2] * item[3], reverse=True)  # Sort by length*slope
         
-        # Take the top candidates (most significant lines) - smanjeno za strožu selekciju
-        max_lines_per_side = 2  # Smanjen broj linija po strani
+        # Take the top candidates (most significant lines)
+        max_lines_per_side = 3  # Allow multiple segments per side for curved roads
         final_left_lines = [item[0] for item in potential_left_lines[:max_lines_per_side]] if potential_left_lines else []
         final_right_lines = [item[0] for item in potential_right_lines[:max_lines_per_side]] if potential_right_lines else []
         
@@ -267,7 +205,7 @@ class LaneDetector:
         y_coords = []
 
         # Use all lines from the history for robustness
-        all_lines = [line for lines_history in lines_history for line in lines_history]
+        all_lines = [line for lines_group in lines_history for line in lines_group]
 
         if not all_lines:  # Check if the flattened list of lines is empty
             return None
