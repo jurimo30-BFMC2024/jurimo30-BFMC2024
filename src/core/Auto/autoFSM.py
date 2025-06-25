@@ -356,10 +356,7 @@ class autoFSM(ControlModeThread):
                 )
                 self.state = autoFSMState.INTERSECTION
 
-            elif stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]:
-                if (self.navigateCommand[0] == "Left" or self.navigateCommand[0] == "Right" or self.navigateCommand[0] == "Straight"):
-                    self.state = autoFSMState.INTERSECTION
-                else:
+            elif (stop_line_present_close and self.traffic_signs.get_active() in ["round_about", "round_about2"]) and not (self.navigateCommand[0] in ["Left", "Right", "Straight"]):
                     print("Entering roundabout")
                     isStarted = self.roundaboutController.start(self.navigateCommand.pop(0))
                     self.traffic_signs.clear()
