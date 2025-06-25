@@ -145,7 +145,7 @@ class autoFSM(ControlModeThread):
         self.steerMotorSender.send("0")
         self.speedMotorSender.send("0")
 
-        best_node = "18"  # Starting node, for testing purposes, remove later
+        best_node = None  # Starting node, for testing purposes, remove later
 
         if self.initial_navigate_command is None:
             print("Finding best node for starting position and initializing path planning")
@@ -192,6 +192,7 @@ class autoFSM(ControlModeThread):
             print("Using predefined navigation command and segments")
             print(f'Commands executed: {self.initial_navigate_command[:self.navigation_counter]}')
             print(f'Navigation commands left: {self.navigateCommand}')
+            print(f'Car restarted after intersection: {self.navigation_counter}, resuming from intersection: {self.navigation_counter + 1} to go {self.navigateCommand[0] if self.navigateCommand else "END OF LINE" }')
 
         self.traffic_signs = TrafficSignController([
             "stop", "crosswalk", "highway_entrance", "highway_exit",
@@ -222,6 +223,8 @@ class autoFSM(ControlModeThread):
         print("[autoFSM] Started")
     
     def stop(self):
+        print("[autoFSM] Stopping")
+        print(f"Put the car at intersection: {self.navigation_counter + 1} to go {self.navigateCommand[0] if self.navigateCommand else 'END OF LINE'}")
         super().stop()
 
     def _get_next_intersection_command(self):
