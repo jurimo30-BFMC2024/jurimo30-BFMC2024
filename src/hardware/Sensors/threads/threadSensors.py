@@ -1,6 +1,6 @@
 from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.messageHandlerSender import messageHandlerSender
-from src.utils.messages.allMessages import FrontSensors, SideSensors
+from src.utils.messages.allMessages import FrontSensors, SideSensors, Heading
 import serial
 import json
 
@@ -24,6 +24,10 @@ class threadSensors(ThreadWithStop):
         self.ser = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
         self.frontSensorSender = messageHandlerSender(self.queuesList, FrontSensors)
         self.sideSensorSender = messageHandlerSender(self.queuesList, SideSensors)
+        self.headingSender = messageHandlerSender(self.queuesList, Heading)
+
+        self.heading_error = 23.0  # Change this to match location error value
+
         super(threadSensors, self).__init__()
 
     def run(self):
@@ -49,6 +53,14 @@ class threadSensors(ThreadWithStop):
                         left_data = data.get('l', 10000.0)
                         right_data = data.get('r', 10000.0)
 
+                        # Extract heading data safely
+                        yaw = data.get('yaw', 0.0)
+                        yaw = 360 - yaw
+                        # Normalize to 0-360
+                        yaw = yaw % 360
+                        # Apply heading error correction
+                        yaw = (yaw - self.heading_error) % 360
+                        
                         self.frontSensorSender.send({
                             "distance": front_data[0] if front_data[0] != 0.0 else 10000.0,
                             "relative_speed": front_data[1],
@@ -58,6 +70,8 @@ class threadSensors(ThreadWithStop):
                             "left": left_data if isinstance(left_data, (int, float)) and left_data != 0.0 else 10000.0,
                             "right": right_data if isinstance(right_data, (int, float)) and right_data != 0.0 else 10000.0,
                         })
+
+                        self.headingSender.send(float(yaw))
                         
                 except json.JSONDecodeError:
                     if self.debugging:

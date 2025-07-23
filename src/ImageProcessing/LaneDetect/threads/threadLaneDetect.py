@@ -17,7 +17,7 @@ from src.ImageProcessing.LaneDetect.imagePreProcessing import ImagePreProcessing
 from src.ImageProcessing.LaneDetect.StopLineDetector import StopLineDetector as StopDetect
 from src.ImageProcessing.LaneDetect.ParkingSpotDetector import ParkingSpotDetector
 from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream as vs
-
+from src.hardware.camera.encoder import decode_frame
 
 class threadLaneDetect(ThreadWithStop):
     """This thread handles LaneDetect.
@@ -57,7 +57,7 @@ class threadLaneDetect(ThreadWithStop):
             try:
                 videoData = self.videoSubscriber.receiveWithBlock()
                 # Dekodiraj frejm iz base64
-                frame = self.decode_frame(videoData)
+                frame = decode_frame(videoData)
 
                 # Process frame
                 edges = self.imgProcessor.process_frame(frame)
@@ -83,11 +83,3 @@ class threadLaneDetect(ThreadWithStop):
                 self.strm.display(frame)
             except Exception as e:
                 print(e)
-
-    @staticmethod
-    def decode_frame(encoded_data):
-        """Decode base64 encoded frame to an OpenCV image."""
-        frame_data = base64.b64decode(encoded_data)
-        np_array = np.frombuffer(frame_data, np.uint8)
-        frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
-        return frame

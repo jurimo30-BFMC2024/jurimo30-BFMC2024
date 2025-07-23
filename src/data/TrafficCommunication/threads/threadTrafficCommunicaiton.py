@@ -45,7 +45,7 @@ class threadTrafficCommunication(ThreadWithStop):
     """
 
     # ====================================== INIT ==========================================
-    def __init__(self, shrd_mem, queueslist, deviceID, frequency, decrypt_key):
+    def __init__(self, queueslist, deviceID, frequency, decrypt_key):
         super(threadTrafficCommunication, self).__init__()
         self.listenPort = 9000
         self.queue = queueslist["General"]
@@ -54,7 +54,7 @@ class threadTrafficCommunication(ThreadWithStop):
 
         self.udp_factory = udpListener(decrypt_key, self.serverFound) #Listens for server broadcast and validates it
 
-        self.period_task = periodicTask(1, shrd_mem, self.tcp_factory) # Handles the Queue of errors accumulated so far.
+        self.period_task = periodicTask(1, queueslist, self.tcp_factory) # Handles the Queue of errors accumulated so far.
 
         self.reactor = reactor
         self.reactor.listenUDP(self.listenPort, self.udp_factory)

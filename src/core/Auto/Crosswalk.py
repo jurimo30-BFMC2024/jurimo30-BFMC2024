@@ -16,10 +16,7 @@ class CrosswalkController:
         x1, y1, x2, y2 = stephanie_position
         x = (x1 + x2) / 2
 
-        print(f"x1: {x1}, y1: {y1}, x2: {x2}, y2: {y2} x: {x}")
-        
-
-
+        # print(f"x1: {x1}, y1: {y1}, x2: {x2}, y2: {y2} x: {x}")
 
         if x < 200:
             return "left"
@@ -28,8 +25,7 @@ class CrosswalkController:
         else:
             return "middle"
 
-    def control(self, stephanie_position):
-        
+    def control(self, stephanie_position, forward_enabled=True):
         # First detection of Stephanie - set started flag if not already set
         if  not self.started:
             self.started = True
@@ -37,12 +33,10 @@ class CrosswalkController:
             print("[Crosswalk] Strarted")
             if stephanie_position is None:
                 print("[Crosswalk] No Stephanie detected")
-
-        
         
         if (stephanie_position is None and self.previous_side is None) or self.waiting_complete:
             self.curentTime = time.time()
-            if self.curentTime - self.waiting_time > 1.2:
+            if self.curentTime - self.waiting_time > 1.2 or not forward_enabled:
                 print("[Crosswalk] Waiting complete")
                 self.finished = False
                 self.waiting_time = time.time()

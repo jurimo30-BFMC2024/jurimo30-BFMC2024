@@ -85,7 +85,7 @@ if __name__ == "__main__":
     }
 
     allProcesses = list()
-    process = processSemaphores(queueList)
+    process = processSemaphores(queueList, None)
     process.start()
 
     x = range(6)

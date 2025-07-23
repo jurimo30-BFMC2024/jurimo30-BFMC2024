@@ -13,11 +13,13 @@ from src.templates.threadwithstop import ThreadWithStop
 from src.utils.messages.allMessages import (
     serialCamera,
     ObjectDetection,
-    TrafficSignsDetection
+    TrafficSignsDetection,
+    ResetSignDetectionRequest,
 )
 from src.utils.messages.messageHandlerSubscriber import messageHandlerSubscriber
 from src.utils.messages.messageHandlerSender import messageHandlerSender
 from src.ImageProcessing.VideoStream.VideoGridStreamer import VideoStream
+from src.hardware.camera.encoder import decode_frame
 
 class threadObjectDetection(ThreadWithStop):
     """This thread handles ObjectDetection.
@@ -38,9 +40,12 @@ class threadObjectDetection(ThreadWithStop):
         self.queuesList = queueList
         self.logging = logging
         self.debugging = debugging
-        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_2.9/detect/train/weights/best.pt')
+        self.model = YOLO('src/ImageProcessing/ObjectDetection/threads/yolo_version_cluj_1.0/detect/train/weights/best.pt')
         self.streamer = VideoStream(0, 0)
         
+        # Add ResetRequest subscriber
+        self.resetSubscriber = messageHandlerSubscriber(self.queuesList, ResetSignDetectionRequest, "LastOnly", True)
+
         # State management variables
         self.current_sign = None          # Currently active sign
         self.confirmation_counter = 0     # Frames with consistent new sign
@@ -56,14 +61,17 @@ class threadObjectDetection(ThreadWithStop):
         self.processing_width = 256
         self.processing_height = 256
 
-        self.lost_timeout = 0.6            # Timeout for lost objects
-   
+        self.lost_timeout = 2            # Timeout for lost objects
+        
         # Initialize relevant_objects structure
         self.relevant_objects = {
             "car": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False},
             "exit": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False},
             "stefanija": {"position": None, "present": False, "last_seen_time": None, "sent_lost_message": False}
         }
+        
+        # Exit center tracking for distance-based detection
+        self.previous_exit_center = None
         
         super(threadObjectDetection, self).__init__()
         self.subscribe() # Subscribe on serialCamera topic
@@ -79,7 +87,52 @@ class threadObjectDetection(ThreadWithStop):
     def subscribe(self):
         """Subscribes to required messages."""
         self.videoSubscriber = messageHandlerSubscriber(self.queuesList, serialCamera, "LastOnly", True)
+
+    def draw_fixed_box(self, frame):
+        # Calculate center and box coordinates in the "target" coordinate space
+        center_x_target = self.target_width / 2
+        center_y_target = self.target_height / 2
+
+        # These attributes store the box coordinates in the "target" space
+        self.fixed_x_min = center_x_target - 50   # Top-left x in target space
+        self.fixed_y_min = center_y_target - 50   # Top-left y in target space
+        self.fixed_x_max = center_x_target + 50   # Bottom-right x in target space
+        self.fixed_y_max = center_y_target + 50   # Bottom-right y in target space
         
+        # Target coordinates
+        tx1 = int(self.fixed_x_min)
+        ty1 = int(self.fixed_y_min)
+        tx2 = int(self.fixed_x_max)
+        ty2 = int(self.fixed_y_max)
+        
+        # Scale factors to convert from target dimensions to processing dimensions
+        # (dimensions of frame_to_draw_on)
+        scale_x_target_to_processing = self.processing_width / self.target_width
+        scale_y_target_to_processing = self.processing_height / self.target_height
+        
+        # Scale the coordinates to the processing frame dimensions
+        draw_x1 = int(tx1 * scale_x_target_to_processing)
+        draw_y1 = int(ty1 * scale_y_target_to_processing)
+        draw_x2 = int(tx2 * scale_x_target_to_processing)
+        draw_y2 = int(ty2 * scale_y_target_to_processing)
+        
+        # Create trapezoid points (wider at bottom, narrower at top)
+        center_x = (draw_x1 + draw_x2) // 2
+        width = draw_x2 - draw_x1
+        top_width = int(width * 0.6)  # Top is 60% of bottom width
+        
+        trapezoid_points = np.array([
+            [center_x - top_width//2 - 10, draw_y1 - 10],      # Top left
+            [center_x + top_width//2 + 10, draw_y1 - 10],      # Top right
+            [draw_x2 + 30, draw_y2 + 15],                      # Bottom right
+            [draw_x1 - 30, draw_y2 + 15]                       # Bottom left
+        ], np.int32)
+        
+        # Draw the trapezoid
+        cv2.polylines(frame, [trapezoid_points], True, (0, 255, 0), 2)
+        
+        return frame
+    
     def scale_coordinates(self, coords):
         """Scale coordinates from processing frame to target frame size."""
         if coords is None:
@@ -102,19 +155,26 @@ class threadObjectDetection(ThreadWithStop):
     def run(self):
         while self._running:
             try:
+                # Check for reset request
+                if self.resetSubscriber.receive() is not None:
+                    print("[INFO]: Reset request received, resetting sign detection state.")
+                    self.reset_sign_detection()
+
                 videoData = self.videoSubscriber.receiveWithBlock()
-                frame = self.decode_frame(videoData)
+                frame = decode_frame(videoData)
                 frame_cropped = self.crop_frame(frame)
-                frame_cropped = cv2.resize(frame_cropped, (self.processing_width, self.processing_height), interpolation=cv2.INTER_AREA)
+                frame_for_processing = cv2.resize(frame_cropped, (self.processing_width, self.processing_height), interpolation=cv2.INTER_AREA)
                 
-                # Process frame and get detections
-                processed_frame, best_sign, detected_objects = self.process_frame(frame_cropped)
+                processed_frame_detections, best_sign, detected_objects = self.process_frame(frame_for_processing)
+                
+                final_processed_frame = self.draw_fixed_box(processed_frame_detections)
                 
                 # Update state and send messages
                 self.update_state(best_sign, detected_objects)
                 
                 # Display frame on server
-                self.streamer.display(processed_frame)
+                self.streamer.display(final_processed_frame)
+
 
             except Exception as e:
                 print(e)
@@ -162,7 +222,14 @@ class threadObjectDetection(ThreadWithStop):
                 continue
             
             if label not in ("car", "exit", "stefanija"):
-                traffic_signs.append((conf, area, label, (x1, y1, x2, y2)))
+                # For traffic lights, only consider those on the right half of the image
+                if label in ("red", "green", "red_yellow", "yellow"):
+                    center_x = (x1 + x2) / 2
+                    if center_x > self.processing_width / 2:  # Right half only
+                        traffic_signs.append((conf, area, label, (x1, y1, x2, y2)))
+                # Append other signs
+                else:
+                    traffic_signs.append((conf, area, label, (x1, y1, x2, y2)))
 
             # Update relevant_objects if label matches
             if label in self.relevant_objects:
@@ -244,15 +311,47 @@ class threadObjectDetection(ThreadWithStop):
                self.relevant_objects[name]["last_seen_time"] = current_time
 
                if self.relevant_objects[name]["present"]:
-                   if self.debugging:
-                        print(f"[DETEKCIJA] Objekat '{name}' detektovan na {scaled_position}")
+                   if name == "exit":
+                       # Special logic for exit object - check distance from previous center
+                       current_center = self.calculate_bounding_box_center(current_position)
+                       
+                       should_send = False
+                       if self.previous_exit_center is not None:
+                           distance = self.calculate_distance(current_center, self.previous_exit_center)
+                           if distance <= 150:
+                               should_send = True
+                          # print(f"Distanca: {distance}")
 
-                   self.relevant_objects[name]["position"] = current_position
-                   self.relevant_objects[name]["sent_lost_message"] = False
-                   self.objectDetectionSender.send({
-                        "name": name,
-                        "position": scaled_position
-                    })
+                       if should_send:
+                           if self.debugging:
+                               print(f"[DETEKCIJA] Objekat '{name}' detektovan na {scaled_position}")
+                           
+                           self.relevant_objects[name]["position"] = current_position
+                           self.relevant_objects[name]["sent_lost_message"] = False
+                           self.objectDetectionSender.send({
+                                "name": name,
+                                "position": scaled_position
+                            })
+                       else:
+                            self.objectDetectionSender.send({
+                                "name": "exit",
+                                "position": None
+                            })
+                           
+                       # Update previous exit center
+                       self.previous_exit_center = current_center
+                       
+                   else:
+                       # Existing logic for car and stefanija
+                       if self.debugging:
+                            print(f"[DETEKCIJA] Objekat '{name}' detektovan na {scaled_position}")
+
+                       self.relevant_objects[name]["position"] = current_position
+                       self.relevant_objects[name]["sent_lost_message"] = False
+                       self.objectDetectionSender.send({
+                            "name": name,
+                            "position": scaled_position
+                        })
             else:
                 if self.relevant_objects[name]["last_seen_time"] is not None:
                     time_since_seen = current_time - self.relevant_objects[name]["last_seen_time"]
@@ -262,20 +361,37 @@ class threadObjectDetection(ThreadWithStop):
                         self.relevant_objects[name]["present"] = False
                         self.relevant_objects[name]["position"] = None
                         self.relevant_objects[name]["sent_lost_message"] = True
+                        
                         self.objectDetectionSender.send({
                         "name": name,
                         "position": None
                     })
 
-    @staticmethod
-    def decode_frame(encoded_data):
-        """Decode base64 encoded frame to OpenCV image."""
-        frame_data = base64.b64decode(encoded_data)
-        np_array = np.frombuffer(frame_data, np.uint8)
-        return cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+    def reset_sign_detection(self):
+        """Reset sign detection in order to send the data again."""
+        self.current_sign = None
+        self.confirmation_counter = 0
+        self.lost_sign_count = 0
 
     @staticmethod
     def crop_frame(frame):
         """Crop top-right quadrant of frame."""
         h, _ = frame.shape[:2]
         return frame[0:h-63, :]
+    
+    def calculate_bounding_box_center(self, position):
+        """Calculate center coordinates of bounding box."""
+        if position is None:
+            return None
+        x1, y1, x2, y2 = position
+        center_x = (x1 + x2) / 2
+        center_y = (y1 + y2) / 2
+        return (center_x, center_y)
+
+    def calculate_distance(self, point1, point2):
+        """Calculate Euclidean distance between two points."""
+        if point1 is None or point2 is None:
+            return float('inf')
+        x1, y1 = point1
+        x2, y2 = point2
+        return ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
