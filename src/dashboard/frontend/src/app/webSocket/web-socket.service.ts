@@ -55,7 +55,8 @@ export class WebSocketService {
     'Recording',
     'CurrentSpeed',
     'CurrentSteer',
-    'EnableButton'
+    'EnableButton',
+    'SystemStatus'
   ]);
   
  constructor() {
@@ -100,6 +101,10 @@ export class WebSocketService {
 
   receiveResourceMonitor(): Observable<any>{
     return this.webSocket.fromEvent('ResourceMonitor');
+  }
+
+  receiveSystemStatus(): Observable<any>{
+    return this.webSocket.fromEvent('SystemStatus');
   }
 
   receiveWarningSignal(): Observable<any> {

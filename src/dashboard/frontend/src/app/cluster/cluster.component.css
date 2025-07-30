@@ -200,6 +200,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
     height: 5%;
 }
 
+.cluster-kako-ide { 
+    position: absolute;
+    top: 82%;
+    right: 0.5%;
+    width: 30%;
+    height: 16%;
+}
+
 @keyframes pulseRedShadow {
     0%, 100% {
       box-shadow: 0 0 10px 5px rgba(255, 0, 0, 0.8);

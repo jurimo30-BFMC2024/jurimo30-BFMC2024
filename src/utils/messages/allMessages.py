@@ -264,6 +264,12 @@ class SliderChannelExample(Enum):
     msgID = 17
     msgType = "str"
 
+class SystemStatus(Enum):
+    Queue = "General"
+    Owner = "Dashboard"
+    msgID = 18
+    msgType = "dict"
+
 ################################# From Nucleo ##################################
 class BatteryLvl(Enum):
     Queue = "General"

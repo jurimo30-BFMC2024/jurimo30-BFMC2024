@@ -169,6 +169,57 @@ class processDashboard(WorkerProcess):
         self.cpuTemperature = round(psutil.sensors_temperatures()['cpu_thermal'][0].current)
         threading.Timer(1, self.sendContinuousHardwareData).start()
 
+    def getSystemStatus(self):
+        """Collect and return system status information - 'kako ide' (how is it going)"""
+        import time
+        import psutil
+        
+        # Collect basic system info
+        current_time = time.strftime("%Y-%m-%d %H:%M:%S")
+        uptime = time.time() - psutil.boot_time()
+        
+        # Process status - check which processes are active
+        process_status = {}
+        active_processes = 0
+        
+        # Check message activity (how many messages received recently)
+        message_activity = {}
+        for msg_name in self.messages:
+            # Check if there are recent messages
+            msg_obj = self.messages[msg_name]["obj"]
+            # This is a simple indicator - in a real implementation we could track message rates
+            message_activity[msg_name] = "active" if hasattr(msg_obj, 'receive') else "inactive"
+            if message_activity[msg_name] == "active":
+                active_processes += 1
+        
+        # System health assessment
+        cpu_ok = max(self.cpuCoreUsage) < 90 if self.cpuCoreUsage else True
+        memory_ok = self.memoryUsage < 85
+        temp_ok = self.cpuTemperature < 70 if self.cpuTemperature else True
+        
+        overall_status = "dobro" if (cpu_ok and memory_ok and temp_ok) else "paznja"  # "good" or "attention"
+        
+        status_data = {
+            "timestamp": current_time,
+            "uptime_seconds": int(uptime),
+            "overall_status": overall_status,
+            "system_health": {
+                "cpu_ok": cpu_ok,
+                "memory_ok": memory_ok,
+                "temperature_ok": temp_ok
+            },
+            "active_processes": active_processes,
+            "total_processes": len(self.messages),
+            "message_activity": message_activity,
+            "performance": {
+                "cpu_usage": max(self.cpuCoreUsage) if self.cpuCoreUsage else 0,
+                "memory_usage": self.memoryUsage,
+                "temperature": self.cpuTemperature
+            }
+        }
+        
+        return status_data
+
     def sendContinuousMessages(self):
         counter = 1   
         socketSleep = 0.025
@@ -193,6 +244,9 @@ class processDashboard(WorkerProcess):
             else:
                 self.socketio.emit('memory_channel', {'data': self.memoryUsage})
                 self.socketio.emit('cpu_channel', {'data': {'usage': self.cpuCoreUsage, 'temp': self.cpuTemperature}})
+                # Emit system status - kako ide (how is it going)
+                system_status = self.getSystemStatus()
+                self.socketio.emit('SystemStatus', {'value': system_status})
                 counter = 0
             self.socketio.sleep(socketSleep)
 
