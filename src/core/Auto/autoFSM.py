@@ -16,6 +16,7 @@ from src.core.Auto.IntersectionControl import IntersectionControl
 from src.core.Auto.RoundaboutControl import RoundaboutController 
 from src.core.Auto.Crosswalk import CrosswalkController
 from src.core.Auto.tunel import TunnelControl
+from src.core.Auto.FogController import FogController
 from src.utils.messages.allMessages import (
     LaneDetect,
     CoreSteerMotor,
@@ -126,6 +127,7 @@ class autoFSM(ControlModeThread):
         self.crosswalkIntersectionController = CrosswalkIntersectionController(self.intersectionController, self.crosswalkController)
         self.highwayController = Highway(512, 270, self.logging, self.debugging)
         self.tunnelController = TunnelControl(512, 270, self.logging, self.debugging)
+        self.fogController = FogController(512, 270, self.logging, self.debugging)
 
         self.laneDetectSubscriber.empty()
         self.stopLineDetectionSubscriber.empty()
@@ -333,6 +335,7 @@ class autoFSM(ControlModeThread):
             # Exit fog state when no longer in fog nodes
             if current_node not in self.fog_nodes:
                 print("Izlazak iz magle")
+                self.fogController.reset()
                 self.state = autoFSMState.DRIVE
                 self.laneFollowContrler.restartPid()
         
@@ -604,20 +607,35 @@ class autoFSM(ControlModeThread):
             self.localization.calibrate_heading(heading)
 
         elif self.state == autoFSMState.FOG:
-            no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
-            stephanie_crossing = self.stefanija_in_danger_zone and self.traffic_signs.get_active() != "crosswalk"
-
-            speed = self.speedControler.getControlData(
-                    angle=angle,
-                    stopLine=False,
-                    lowDistance=False,
-                    highway=False,
-                    frontDistance=front_sensors["distance"],
-                    enable_emergency_stop=no_active_sign,
-                    car_in_front=self.car_in_danger_zone,
-                    stephanie_in_front=stephanie_crossing,
-                    current_node=current_node
-                )
+            # Use fog controller for specialized fog handling
+            fog_angle, fog_speed = self.fogController.process_fog_control(
+                self.leftX, self.rightX, self.leftVisible, self.rightVisible, current_node,
+                normal_speed=300, front_distance=front_sensors["distance"]
+            )
+            
+            if fog_angle is not None and fog_speed is not None:
+                angle = fog_angle
+                
+                # Apply additional safety checks for fog conditions
+                no_active_sign = self.traffic_signs.get_active() is None and self.traffic_light_states.get_active() is None
+                stephanie_crossing = self.stefanija_in_danger_zone and self.traffic_signs.get_active() != "crosswalk"
+                
+                # Use fog-specific speed with additional safety considerations
+                if self.car_in_danger_zone or stephanie_crossing:
+                    speed = min(fog_speed, 100)  # Further reduce speed if obstacles detected
+                elif not no_active_sign:
+                    speed = min(fog_speed, 150)  # Reduce speed for traffic signs/lights
+                else:
+                    speed = fog_speed
+                
+                if self.debugging:
+                    print(f"Fog control active: angle={angle}, speed={speed}, base_fog_speed={fog_speed}")
+            else:
+                # Fallback to very conservative driving if fog control fails
+                angle = 0  # Go straight
+                speed = 100  # Very slow speed
+                if self.debugging:
+                    print("Fog control fallback: going straight at reduced speed")
 
             self.localization.update_position(speed / 10)
             self.localization.calibrate_heading(heading)
